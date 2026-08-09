@@ -1,0 +1,4607 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>TickerForge</title>
+		<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+		<!-- Shared theme first, so this page's own rules still win. It was
+		     the one page not loading it, which is why its dropdowns, number
+		     inputs and checkboxes rendered as OS widgets. -->
+		<link rel="stylesheet" href="/app.css" />
+		<style>
+			:root {
+				--bg: #0e1116;
+				--panel: #161b22;
+				--border: #2d333b;
+				--fg: #e6edf3;
+				--dim: #8b949e;
+				--up: #26a69a;
+				--down: #ef5350;
+				--accent: #4184e4;
+				--ma20: #f0b429;
+				--ma50: #e4589a;
+				--ma200: #9d6ce4;
+				--ema: #41c4e4;
+			}
+			* {
+				box-sizing: border-box;
+				margin: 0;
+			}
+			body {
+				background: var(--bg);
+				color: var(--fg);
+				font:
+					14px/1.4 -apple-system,
+					"Segoe UI",
+					Roboto,
+					sans-serif;
+				height: 100vh;
+				overflow: hidden;
+				display: grid;
+				/* --side-w is what the drag handle moves; the grid reads it so
+				   resizing is one custom-property write per frame rather than a
+				   layout rewrite. */
+				grid-template-columns: var(--side-w, 230px) 6px 1fr;
+				grid-template-rows: minmax(0, 1fr);
+			}
+			#side {
+				background: var(--panel);
+				padding: 12px;
+				overflow-y: auto;
+			}
+			#sidegrip {
+				background: var(--border);
+				cursor: col-resize;
+				transition: background 0.12s;
+			}
+			#sidegrip:hover,
+			body.resizing #sidegrip {
+				background: var(--accent);
+			}
+			/* While dragging, stop the pointer selecting text or the iframe/canvas
+			   swallowing mousemove — otherwise the drag dies the moment the
+			   cursor crosses the chart. */
+			body.resizing {
+				user-select: none;
+				cursor: col-resize;
+			}
+			body.resizing #drawlayer {
+				pointer-events: none;
+			}
+			#side h1 {
+				font-size: 15px;
+				margin-bottom: 10px;
+				letter-spacing: 0.5px;
+			}
+			#search {
+				width: 100%;
+				padding: 8px;
+				background: var(--bg);
+				border: 1px solid var(--border);
+				border-radius: 6px;
+				color: var(--fg);
+				outline: none;
+			}
+			#results div,
+			.wl {
+				padding: 6px 8px;
+				border-radius: 6px;
+				cursor: pointer;
+			}
+			#results div:hover,
+			.wl:hover {
+				background: #1f2733;
+			}
+			.sym {
+				font-weight: 600;
+			}
+			.nm {
+				color: var(--dim);
+				font-size: 12px;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			#wl-title {
+				margin: 14px 0 4px;
+				color: var(--dim);
+				font-size: 12px;
+				text-transform: uppercase;
+				letter-spacing: 1px;
+			}
+			.wl {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+			}
+			.wl .rm {
+				color: var(--dim);
+				visibility: hidden;
+				padding: 0 4px;
+			}
+			.wl:hover .rm {
+				visibility: visible;
+			}
+			#main {
+				display: flex;
+				flex-direction: column;
+				min-width: 0;
+				min-height: 0;
+				overflow: hidden;
+			}
+			#head {
+				display: flex;
+				align-items: baseline;
+				gap: 12px;
+				padding: 8px 16px 4px;
+				flex-wrap: wrap;
+			}
+			#title {
+				font-size: 18px;
+				font-weight: 700;
+			}
+			#name {
+				color: var(--dim);
+				font-size: 12px;
+			}
+			#status {
+				color: var(--dim);
+				font-size: 12px;
+				margin-left: auto;
+			}
+			#legend {
+				padding: 0 16px 4px;
+				font-size: 12px;
+				color: var(--dim);
+				font-variant-numeric: tabular-nums;
+				display: flex;
+				gap: 14px;
+				flex-wrap: wrap;
+			}
+			#legend b {
+				color: var(--fg);
+				font-weight: 600;
+			}
+			.bar {
+				display: flex;
+				gap: 4px;
+				padding: 4px 16px;
+				flex-wrap: wrap;
+				align-items: center;
+			}
+			.bar .lbl {
+				color: var(--dim);
+				font-size: 11px;
+				text-transform: uppercase;
+				letter-spacing: 1px;
+				margin-right: 2px;
+			}
+			.bar button {
+				background: none;
+				border: 1px solid var(--border);
+				color: var(--dim);
+				border-radius: 6px;
+				padding: 3px 9px;
+				cursor: pointer;
+				font-size: 12px;
+			}
+			.bar button.on {
+				color: var(--fg);
+				border-color: var(--accent);
+				background: #1c2a41;
+			}
+			.bar .sep {
+				width: 10px;
+			}
+			#wadd {
+				margin-left: auto;
+			}
+			/* chart + its own vertical tool rail, the way every charting app does
+			   it — tools live beside the thing they draw on, not in a header two
+			   rows away from it. */
+			#chartrow {
+				flex: 1;
+				min-height: 0;
+				display: flex;
+			}
+			#drawtools {
+				display: flex;
+				flex-direction: column;
+				gap: 3px;
+				padding: 6px 5px;
+				border-right: 1px solid var(--border);
+				background: var(--panel);
+			}
+			#drawtools .dsep {
+				height: 1px;
+				background: var(--border);
+				margin: 4px 2px;
+			}
+			.picker {
+				display: none;
+				/* fixed, positioned by placeMenu() from the button's rect — the
+				   same mechanism #indmenu, #evmenu and #laymenu use. `absolute`
+				   here would resolve against the page, because .dd carries no
+				   positioning of its own, and the menu would open a full viewport
+				   below the fold: visibly "not opening". */
+				position: fixed;
+				z-index: 60;
+				min-width: 196px;
+				max-height: 68vh;
+				overflow-y: auto;
+				background: var(--panel2);
+				border: 1px solid var(--border);
+				border-radius: 9px;
+				padding: 5px;
+				box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+			}
+			.picker.open {
+				display: block;
+			}
+			.picker button {
+				display: block;
+				width: 100%;
+				text-align: left;
+				background: none;
+				border: 0;
+				border-radius: 6px;
+				padding: 7px 10px;
+				color: var(--fg);
+				font: inherit;
+				cursor: pointer;
+			}
+			.picker button:hover {
+				background: var(--panel);
+			}
+			.picker button.on {
+				background: var(--panel);
+				color: var(--accent);
+			}
+			.picker .pgrp {
+				color: var(--dim);
+				font-size: 11px;
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+				padding: 9px 10px 3px;
+			}
+			.picker .pnote {
+				color: var(--dim);
+				font-size: 11.5px;
+				line-height: 1.5;
+				padding: 8px 10px 4px;
+				border-top: 1px solid var(--border);
+				margin-top: 5px;
+			}
+			@media (max-width: 760px) {
+				#drawtools {
+					flex-direction: row;
+					border-right: 0;
+					border-bottom: 1px solid var(--border);
+					overflow-x: auto;
+				}
+				#chartrow {
+					flex-direction: column;
+				}
+			}
+			#chartwrap {
+				flex: 1;
+				min-height: 0;
+				position: relative;
+			}
+			#chart {
+				position: absolute;
+				inset: 0;
+			}
+			/* The overlay sits ON the chart and is transparent to the mouse
+			   unless a drawing tool is active — otherwise it would swallow the
+			   pan, zoom and crosshair that make the chart usable. */
+			#drawlayer {
+				position: absolute;
+				inset: 0;
+				pointer-events: none;
+			}
+			#drawlayer.active {
+				pointer-events: auto;
+				cursor: crosshair;
+			}
+			#cmpbox {
+				display: inline-flex;
+				gap: 2px;
+				margin-left: 10px;
+			}
+			#cmpIn {
+				width: 92px;
+				background: var(--panel2);
+				color: var(--fg);
+				border: 1px solid var(--border);
+				border-radius: 6px;
+				padding: 2px 7px;
+				font: inherit;
+			}
+			.chip2 {
+				margin-left: 8px;
+				font-size: 12px;
+				color: var(--accent);
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 1px 9px;
+			}
+			#replaybar {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				padding: 6px 10px;
+				border-top: 1px solid var(--border);
+				background: var(--panel);
+			}
+			#rpSlider {
+				flex: 1;
+				accent-color: var(--accent);
+			}
+			.rpinfo {
+				color: var(--dim);
+				font-size: 12px;
+				font-variant-numeric: tabular-nums;
+				min-width: 150px;
+			}
+			.wl .spark {
+				opacity: 0.75;
+			}
+			.wl .chg {
+				font-size: 12px;
+				font-variant-numeric: tabular-nums;
+				min-width: 52px;
+				text-align: right;
+			}
+			.wl .right {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+			}
+			#drawtools {
+				display: inline-flex;
+				gap: 2px;
+				margin-left: 10px;
+				padding-left: 10px;
+				border-left: 1px solid var(--border);
+			}
+			#drawtools .dt {
+				background: var(--panel2);
+				color: var(--dim);
+				border: 1px solid var(--border);
+				border-radius: 6px;
+				padding: 2px 8px;
+				font: inherit;
+				line-height: 1.5;
+				cursor: pointer;
+			}
+			#drawtools .dt:hover {
+				color: var(--fg);
+			}
+			#drawtools .dt.on {
+				color: var(--accent);
+				border-color: var(--accent);
+			}
+			#drawtools .dt.danger:hover {
+				color: var(--down);
+				border-color: var(--down);
+			}
+			.up {
+				color: var(--up);
+			}
+			.down {
+				color: var(--down);
+			}
+			/* ---- indicator catalog + chips + panes ---- */
+			#evmenu,
+			#laymenu {
+				position: fixed;
+				z-index: 60;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				padding: 6px;
+				width: 250px;
+				box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+				display: none;
+			}
+			#evmenu.open,
+			#laymenu.open {
+				display: block;
+			}
+			#evmenu label {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				padding: 5px 7px;
+				border-radius: 6px;
+				cursor: pointer;
+				font-size: 13px;
+			}
+			#evmenu label:hover {
+				background: var(--panel2);
+			}
+			#evmenu .dot {
+				width: 9px;
+				height: 9px;
+				border-radius: 50%;
+				flex: none;
+			}
+			#evmenu .hint {
+				color: var(--dim);
+				font-size: 11.5px;
+				padding: 6px 7px 2px;
+				line-height: 1.45;
+			}
+			#laymenu input {
+				width: 100%;
+				box-sizing: border-box;
+				margin-bottom: 6px;
+			}
+			#laylist .row {
+				display: flex;
+				align-items: center;
+				gap: 6px;
+				padding: 5px 7px;
+				border-radius: 6px;
+				cursor: pointer;
+				font-size: 13px;
+			}
+			#laylist .row:hover {
+				background: var(--panel2);
+			}
+			#laylist .row .x {
+				margin-left: auto;
+				color: var(--dim);
+			}
+			#laylist .row .x:hover {
+				color: var(--down);
+			}
+			#laylist .empty {
+				color: var(--dim);
+				font-size: 12px;
+				padding: 6px 7px;
+			}
+			#indmenu {
+				position: fixed;
+				z-index: 60;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				padding: 6px;
+				width: 280px;
+				box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+				display: none;
+			}
+			#indmenu.open {
+				display: block;
+			}
+			#indsearch {
+				width: 100%;
+				padding: 7px 9px;
+				background: var(--bg);
+				color: var(--fg);
+				border: 1px solid var(--border);
+				border-radius: 6px;
+				outline: none;
+				margin-bottom: 6px;
+			}
+			#indlist {
+				max-height: 52vh;
+				overflow-y: auto;
+			}
+			#indlist .grphead {
+				color: var(--dim);
+				font-size: 10px;
+				text-transform: uppercase;
+				letter-spacing: 1px;
+				padding: 6px 8px 3px;
+			}
+			#indlist .il {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				padding: 6px 8px;
+				border-radius: 6px;
+				cursor: pointer;
+				font-size: 13px;
+			}
+			#indlist .il:hover {
+				background: #1f2733;
+			}
+			#indlist .il .cat {
+				margin-left: auto;
+				font-size: 10px;
+				color: var(--dim);
+			}
+			#indlist .none {
+				color: var(--dim);
+				padding: 8px;
+				font-size: 12px;
+			}
+			#indchips {
+				display: flex;
+				gap: 6px;
+				flex-wrap: wrap;
+				align-items: center;
+			}
+			.ichip {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				font-size: 12px;
+				background: #1c2a41;
+				border: 1px solid var(--border);
+				border-radius: 14px;
+				padding: 2px 4px 2px 9px;
+				color: var(--fg);
+			}
+			.ichip .sw {
+				width: 9px;
+				height: 9px;
+				border-radius: 2px;
+				flex: 0 0 9px;
+			}
+			.ichip .cfg,
+			.ichip .x {
+				cursor: pointer;
+				color: var(--dim);
+				padding: 0 3px;
+				border-radius: 9px;
+				font-size: 11px;
+			}
+			.ichip .cfg:hover,
+			.ichip .x:hover {
+				color: var(--fg);
+				background: #2d333b;
+			}
+			#panes {
+				display: flex;
+				flex-direction: column;
+				min-height: 0;
+			}
+			.pane {
+				position: relative;
+				border-top: 1px solid var(--border);
+				flex: 0 0 auto;
+			}
+			.pane .plabel {
+				position: absolute;
+				top: 3px;
+				left: 8px;
+				z-index: 4;
+				font-size: 11px;
+				color: var(--dim);
+				pointer-events: none;
+			}
+			.pane .prm {
+				position: absolute;
+				top: 3px;
+				right: 8px;
+				z-index: 4;
+				cursor: pointer;
+				color: var(--dim);
+				font-size: 12px;
+			}
+			.pane .prm:hover {
+				color: var(--fg);
+			}
+			/* pane resize grip + pane settings */
+			.pane .pgrip {
+				position: absolute;
+				top: -4px;
+				left: 0;
+				right: 0;
+				height: 9px;
+				z-index: 6;
+				cursor: row-resize;
+			}
+			.pane .pgrip::after {
+				content: "";
+				position: absolute;
+				left: 50%;
+				top: 3px;
+				width: 34px;
+				height: 3px;
+				margin-left: -17px;
+				border-radius: 2px;
+				background: var(--border);
+				opacity: 0;
+				transition: opacity 0.12s;
+			}
+			.pane .pgrip:hover::after,
+			body.rowdrag .pane .pgrip::after {
+				opacity: 1;
+			}
+			body.rowdrag {
+				cursor: row-resize;
+				user-select: none;
+			}
+			body.rowdrag iframe,
+			body.rowdrag canvas {
+				pointer-events: none;
+			}
+			.pane .pcfg {
+				position: absolute;
+				top: 3px;
+				right: 26px;
+				z-index: 4;
+				cursor: pointer;
+				color: var(--dim);
+				font-size: 12px;
+			}
+			.pane .pcfg:hover {
+				color: var(--fg);
+			}
+			/* indicator settings modal (Kite-style) */
+			#cfgwrap {
+				position: fixed;
+				inset: 0;
+				z-index: 90;
+				background: rgba(4, 6, 10, 0.55);
+				display: none;
+				align-items: center;
+				justify-content: center;
+			}
+			#cfgwrap.open {
+				display: flex;
+			}
+			#cfgmodal {
+				width: 340px;
+				max-width: calc(100vw - 32px);
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+			}
+			#cfgmodal .chead {
+				display: flex;
+				align-items: center;
+				padding: 13px 16px 0;
+			}
+			#cfgmodal .chead h4 {
+				font-size: 15px;
+				font-weight: 600;
+			}
+			#cfgmodal .chead .cx {
+				margin-left: auto;
+				cursor: pointer;
+				color: var(--dim);
+				font-size: 15px;
+				padding: 2px 6px;
+				border-radius: 6px;
+			}
+			#cfgmodal .chead .cx:hover {
+				color: var(--fg);
+				background: #2d333b;
+			}
+			#cfgmodal .ctabs {
+				display: flex;
+				gap: 18px;
+				padding: 10px 16px 0;
+				border-bottom: 1px solid var(--border);
+			}
+			#cfgmodal .ct {
+				cursor: pointer;
+				color: var(--dim);
+				font-size: 13px;
+				padding-bottom: 8px;
+				border-bottom: 2px solid transparent;
+			}
+			#cfgmodal .ct.on {
+				color: var(--fg);
+				border-bottom-color: var(--accent);
+			}
+			#cfgmodal .cbody {
+				padding: 14px 16px;
+				max-height: 52vh;
+				overflow-y: auto;
+			}
+			#cfgmodal .crow {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 12px;
+				margin-bottom: 12px;
+				font-size: 13px;
+				color: var(--fg);
+			}
+			#cfgmodal .crow:last-child {
+				margin-bottom: 2px;
+			}
+			#cfgmodal .crow input[type="number"],
+			#cfgmodal .crow select {
+				width: 110px;
+				padding: 6px 8px;
+				background: var(--bg);
+				color: var(--fg);
+				border: 1px solid var(--border);
+				border-radius: 6px;
+				outline: none;
+				font-size: 13px;
+			}
+			#cfgmodal .crow input[type="color"] {
+				width: 40px;
+				height: 26px;
+				padding: 0 2px;
+				background: var(--bg);
+				border: 1px solid var(--border);
+				border-radius: 6px;
+				cursor: pointer;
+			}
+			#cfgmodal .cnone {
+				color: var(--dim);
+				font-size: 12.5px;
+			}
+			#cfgmodal .cfoot {
+				display: flex;
+				gap: 8px;
+				align-items: center;
+				padding: 12px 16px 14px;
+				border-top: 1px solid var(--border);
+			}
+			#cfgmodal .cfoot .sp {
+				flex: 1;
+			}
+			#cfgmodal button {
+				background: none;
+				border: 1px solid var(--border);
+				color: var(--fg);
+				border-radius: 6px;
+				padding: 6px 14px;
+				cursor: pointer;
+				font-size: 13px;
+			}
+			#cfgmodal button.primary {
+				border-color: var(--accent);
+				background: #1c2a41;
+			}
+			#cfgmodal button:hover {
+				border-color: var(--accent);
+			}
+
+			/* right-click alert menu */
+			.amenu {
+				position: fixed;
+				z-index: 200;
+				background: #161b22;
+				border: 1px solid #2d333b;
+				border-radius: 9px;
+				padding: 8px;
+				min-width: 210px;
+				box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+				font-size: 13px;
+			}
+			.amenu .hd {
+				color: #8b949e;
+				font-size: 12px;
+				padding: 2px 6px 6px;
+			}
+			.amenu .ft {
+				color: #8b949e;
+				font-size: 11.5px;
+				padding: 6px 6px 2px;
+			}
+			.amenu button {
+				display: block;
+				width: 100%;
+				text-align: left;
+				background: none;
+				border: 1px solid #2d333b;
+				color: #e6edf3;
+				border-radius: 7px;
+				padding: 7px 10px;
+				cursor: pointer;
+				font-size: 13px;
+			}
+			.amenu button:hover {
+				border-color: #4184e4;
+				background: #1c2a41;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="side">
+			<h1>TickerForge</h1>
+			<div
+				style="
+					display: flex;
+					gap: 2px;
+					flex-wrap: wrap;
+					margin-bottom: 10px;
+					font-size: 12px;
+				"
+			>
+				<a
+					href="/"
+					style="
+						color: #e6edf3;
+						background: #1c2a41;
+						padding: 4px 8px;
+						border-radius: 6px;
+						text-decoration: none;
+					"
+					>Chart</a
+				>
+				<a
+					href="/desk"
+					style="
+						color: #8b949e;
+						padding: 4px 8px;
+						border-radius: 6px;
+						text-decoration: none;
+					"
+					>Desk</a
+				>
+				<a
+					href="/portfolio"
+					style="
+						color: #8b949e;
+						padding: 4px 8px;
+						border-radius: 6px;
+						text-decoration: none;
+					"
+					>Portfolio</a
+				>
+				<a
+					href="/scanner"
+					style="
+						color: #8b949e;
+						padding: 4px 8px;
+						border-radius: 6px;
+						text-decoration: none;
+					"
+					>Scanner</a
+				>
+				<a
+					href="/fundamentals"
+					style="
+						color: #8b949e;
+						padding: 4px 8px;
+						border-radius: 6px;
+						text-decoration: none;
+					"
+					>Fundamentals</a
+				>
+				<a
+					href="/results"
+					style="
+						color: #8b949e;
+						padding: 4px 8px;
+						border-radius: 6px;
+						text-decoration: none;
+					"
+					>Results</a
+				>
+				<a
+					href="/valuation"
+					style="
+						color: #8b949e;
+						padding: 4px 8px;
+						border-radius: 6px;
+						text-decoration: none;
+					"
+					>Value</a
+				>
+				<a
+					href="/backtest"
+					style="
+						color: #8b949e;
+						padding: 4px 8px;
+						border-radius: 6px;
+						text-decoration: none;
+					"
+					>Backtest</a
+				>
+				<a
+					href="/journal"
+					style="
+						color: #8b949e;
+						padding: 4px 8px;
+						border-radius: 6px;
+						text-decoration: none;
+					"
+					>Journal</a
+				>
+				<a
+					href="/metrics"
+					style="
+						color: #8b949e;
+						padding: 4px 8px;
+						border-radius: 6px;
+						text-decoration: none;
+					"
+					>Metrics</a
+				>
+				<a
+					href="/news"
+					style="
+						color: #8b949e;
+						padding: 4px 8px;
+						border-radius: 6px;
+						text-decoration: none;
+					"
+					>News</a
+				>
+				<a
+					href="/actions"
+					style="
+						color: #8b949e;
+						padding: 4px 8px;
+						border-radius: 6px;
+						text-decoration: none;
+					"
+					>Actions</a
+				>
+			</div>
+			<input
+				id="search"
+				placeholder="Search stock… (e.g. tata)"
+				autocomplete="off"
+			/>
+			<div id="results"></div>
+			<div id="wl-title">Watchlist</div>
+			<div id="wlist"></div>
+		</div>
+		<div id="sidegrip" title="Drag to resize · double-click to reset"></div>
+		<div id="main">
+			<div id="head">
+				<span id="title">—</span><span id="name"></span
+				><span id="status"></span>
+			</div>
+			<div id="legend"></div>
+			<div class="bar" id="ivals">
+				<span class="dd">
+					<button id="ivbtn" title="Timeframe">D&nbsp;▾</button>
+					<div id="ivmenu" class="picker">
+						<div class="pgrp">Minutes</div>
+						<button data-i="minute">1 minute</button>
+						<button data-i="3minute">3 minutes</button>
+						<button data-i="5minute">5 minutes</button>
+						<button data-i="10minute">10 minutes</button>
+						<button data-i="15minute">15 minutes</button>
+						<button data-i="30minute">30 minutes</button>
+						<div class="pgrp">Hours</div>
+						<button data-i="60minute">1 hour</button>
+						<div class="pgrp">Days</div>
+						<button data-i="day" class="on">1 day</button>
+						<button data-i="week">1 week</button>
+						<button data-i="month">1 month</button>
+						<div class="pnote">Week and month are built from daily bars.
+							Kite serves no interval shorter than a minute.</div>
+					</div>
+				</span>
+				<span class="dd">
+					<button id="ctbtn" title="Chart type">▮ Candles ▾</button>
+					<div id="ctmenu" class="picker">
+						<button data-ct="candles" class="on">▮&nbsp; Candles</button>
+						<button data-ct="hollow">▯&nbsp; Hollow candles</button>
+						<button data-ct="heikin">◧&nbsp; Heikin Ashi</button>
+						<div class="pgrp">Bars</div>
+						<button data-ct="bars">┼&nbsp; Bars</button>
+						<button data-ct="hlc">├&nbsp; HLC bars</button>
+						<div class="pgrp">Lines</div>
+						<button data-ct="line">╱&nbsp; Line</button>
+						<button data-ct="markers">╱&nbsp; Line with markers</button>
+						<button data-ct="step">⌐&nbsp; Step line</button>
+						<button data-ct="area">◺&nbsp; Area</button>
+						<button data-ct="baseline">≡&nbsp; Baseline</button>
+						<div class="pnote">Renko, Kagi and point &amp; figure aren\u2019t
+							here: they discard time entirely, so every other tool on this
+							page would be plotting against a different x-axis.</div>
+					</div>
+				</span>
+				<span class="sep"></span><span class="lbl">Range</span>
+				<button data-r="1M">1M</button><button data-r="3M">3M</button>
+				<button data-r="6M">6M</button><button data-r="YTD">YTD</button>
+				<button data-r="1Y" class="on">1Y</button
+				><button data-r="3Y">3Y</button>
+				<button data-r="ALL">All</button>
+				<button id="wadd">+ Watchlist</button>
+			</div>
+			<div class="bar" id="inds">
+				<span class="dd">
+					<button id="indbtn">ƒ Indicators ▾</button>
+					<div id="indmenu">
+						<input
+							id="indsearch"
+							placeholder="Search indicators…"
+							autocomplete="off"
+						/>
+						<div id="indlist"></div>
+					</div>
+				</span>
+				<span class="sep"></span>
+				<span class="dd">
+					<button id="evbtn">● Events ▾</button>
+					<div id="evmenu"></div>
+				</span>
+				<span class="sep"></span>
+				<span class="dd">
+					<button id="laybtn">▤ Layout ▾</button>
+					<div id="laymenu">
+						<input
+							id="layname"
+							placeholder="Save current layout as…"
+							autocomplete="off"
+						/>
+						<div id="laylist"></div>
+					</div>
+				</span>
+				<span class="sep"></span>
+				<span id="indchips"></span>
+				<span id="cmpbox">
+					<input id="cmpIn" placeholder="compare…" autocomplete="off">
+					<button class="dt" id="cmpGo" title="Overlay indexed to 100">vs</button>
+					<button class="dt" id="cmpOff" title="Remove overlay">&#10005;</button>
+				</span>
+				<span class="chip2" id="cmpChip" style="display:none"></span>
+				<span class="chip2" id="btChip" style="display:none"></span>
+			</div>
+			<div id="chartrow">
+				<div id="drawtools">
+					<button class="dt on" data-tool="cursor" title="Select and move (Esc)">&#9655;</button>
+					<button class="dt" data-tool="trendline" title="Trendline">&#9585;</button>
+					<button class="dt" data-tool="ray" title="Ray — extends for ever">&#8599;</button>
+					<button class="dt" data-tool="hline" title="Horizontal line">&#8213;</button>
+					<button class="dt" data-tool="rect" title="Rectangle">&#9633;</button>
+					<button class="dt" data-tool="fib" title="Fibonacci retracement">&#8942;</button>
+					<span class="dsep"></span>
+					<button class="dt" id="rpToggle" title="Bar replay (r)">&#9199;</button>
+					<button class="dt danger" data-tool="clear" title="Delete all drawings on this chart">&#128465;</button>
+				</div>
+				<div id="chartwrap">
+					<div id="chart"></div>
+					<canvas id="drawlayer"></canvas>
+				</div>
+			</div>
+			<div id="replaybar" style="display:none">
+				<button class="dt" id="rpBack" title="Back one bar (←)">&#9664;</button>
+				<button class="dt" id="rpPlay" title="Play / pause (space)">&#9654;</button>
+				<button class="dt" id="rpFwd" title="Forward one bar (→)">&#9654;&#9654;</button>
+				<input type="range" id="rpSlider" min="2" value="2">
+				<span class="rpinfo"><b id="rpAt">0</b>/<span id="rpMax">0</span>
+					· <span id="rpDate"></span></span>
+				<button class="dt" id="rpExit" title="Leave replay">exit</button>
+			</div>
+			<div id="panes"></div>
+		</div>
+		<div id="cfgwrap">
+			<div id="cfgmodal">
+				<div class="chead">
+					<h4 id="cfgtitle"></h4>
+					<span class="cx" title="close">✕</span>
+				</div>
+				<div class="ctabs">
+					<span class="ct on" data-t="inputs">Inputs</span>
+					<span class="ct" data-t="style">Style</span>
+				</div>
+				<div class="cbody" id="cfg_inputs"></div>
+				<div class="cbody" id="cfg_style" style="display: none"></div>
+				<div class="cfoot">
+					<button
+						id="cfgdef"
+						title="reset fields to this indicator's defaults"
+					>
+						Defaults
+					</button>
+					<span class="sp"></span>
+					<button id="cfgcancel">Cancel</button>
+					<button class="primary" id="cfgok">Ok</button>
+				</div>
+			</div>
+		</div>
+		<script>
+			"use strict"
+			const $ = (s) => document.querySelector(s)
+			const RANGES = {
+				"1M": 31,
+				"3M": 92,
+				"6M": 183,
+				"1Y": 366,
+				"3Y": 1096,
+				ALL: 3650,
+				YTD: null,
+			}
+			const INTERVAL_CAP = {
+				minute: 60,
+				"3minute": 80,
+				"5minute": 100,
+				"10minute": 150,
+				"15minute": 200,
+				"30minute": 300,
+				"60minute": 400,
+				day: 3650,
+			}
+			const state = {
+				cur: null,
+				interval: "day",
+				tf: "day",          // what you PICKED; interval is what we request
+				ctype: "candles",
+				range: "1Y",
+				toggles: {
+					ma20: false,
+					ma50: false,
+					ma200: false,
+					ema21: false,
+					rsi: false,
+					st: false,
+					hl52: false,
+				},
+			}
+			let chart, series, volSeries, paneOpts
+			let overlaySeries = [] // {inst, series[]} price overlays on the main chart
+			let oscPanes = [] // {inst, el, chart, series[]}
+			let activeInd = [] // [{id, key, p}]  active indicator instances
+			let indSeq = 0
+			let LAYOUTS = []
+			let ws = null,
+				lastBar = null,
+				candles = [],
+				daily52 = null,
+				syncing = false
+
+			function status(msg) {
+				$("#status").textContent = msg
+			}
+
+			// ------------------------------------------------------------- indicators
+			// --- primitive series math (arrays aligned to candles, null where warming up)
+			const _cl = (c) => c.map((x) => x.close),
+				_hi = (c) => c.map((x) => x.high),
+				_lo = (c) => c.map((x) => x.low),
+				_vol = (c) => c.map((x) => x.volume || 0),
+				_tp = (c) => c.map((x) => (x.high + x.low + x.close) / 3)
+			function _sma(d, p) {
+				const o = Array(d.length).fill(null)
+				let s = 0
+				for (let i = 0; i < d.length; i++) {
+					s += d[i]
+					if (i >= p) s -= d[i - p]
+					if (i >= p - 1) o[i] = s / p
+				}
+				return o
+			}
+			function _ema(d, p) {
+				const o = Array(d.length).fill(null)
+				const k = 2 / (p + 1)
+				let e = null
+				for (let i = 0; i < d.length; i++) {
+					const v = d[i]
+					if (v == null) {
+						o[i] = e
+						continue
+					}
+					e = e == null ? v : v * k + e * (1 - k)
+					if (i >= p - 1) o[i] = e
+				}
+				return o
+			}
+			function _wma(d, p) {
+				const o = Array(d.length).fill(null)
+				const den = (p * (p + 1)) / 2
+				for (let i = p - 1; i < d.length; i++) {
+					let s = 0
+					for (let j = 0; j < p; j++) s += d[i - j] * (p - j)
+					o[i] = s / den
+				}
+				return o
+			}
+			function _std(d, p) {
+				const o = Array(d.length).fill(null)
+				for (let i = p - 1; i < d.length; i++) {
+					let m = 0
+					for (let j = 0; j < p; j++) m += d[i - j]
+					m /= p
+					let v = 0
+					for (let j = 0; j < p; j++) {
+						const x = d[i - j] - m
+						v += x * x
+					}
+					o[i] = Math.sqrt(v / p)
+				}
+				return o
+			}
+			function _atr(c, p) {
+				const o = Array(c.length).fill(null)
+				const tr = Array(c.length).fill(0)
+				for (let i = 1; i < c.length; i++)
+					tr[i] = Math.max(
+						c[i].high - c[i].low,
+						Math.abs(c[i].high - c[i - 1].close),
+						Math.abs(c[i].low - c[i - 1].close),
+					)
+				let a = 0
+				for (let i = 1; i <= p; i++) a += tr[i]
+				a /= p
+				if (p < c.length) o[p] = a
+				for (let i = p + 1; i < c.length; i++) {
+					a = (a * (p - 1) + tr[i]) / p
+					o[i] = a
+				}
+				return o
+			}
+
+			// --- named indicators (return {overlays:[{name,color,data,width?}]} for price
+			//     overlays, or {panerows:[{name,color,type,data}], refs:[{v,color}], fmt}
+			//     for oscillators). data is [{time,value}] with gaps dropped.
+			function _pts(c, arr) {
+				const o = []
+				for (let i = 0; i < arr.length; i++)
+					if (arr[i] != null && isFinite(arr[i]))
+						o.push({ time: c[i].time, value: +arr[i].toFixed(4) })
+				return o
+			}
+
+			function I_ma(kind) {
+				return (c, p) => {
+					const cl = _cl(c)
+					const a =
+						kind === "ema"
+							? _ema(cl, p.length)
+							: kind === "wma"
+								? _wma(cl, p.length)
+								: _sma(cl, p.length)
+					return {
+						overlays: [
+							{
+								name: `${kind.toUpperCase()} ${p.length}`,
+								color: p.color,
+								data: _pts(c, a),
+							},
+						],
+					}
+				}
+			}
+			function I_boll(c, p) {
+				const cl = _cl(c)
+				const b = _sma(cl, p.length),
+					sd = _std(cl, p.length)
+				const up = b.map((v, i) =>
+					v != null && sd[i] != null ? v + p.mult * sd[i] : null,
+				)
+				const lo = b.map((v, i) =>
+					v != null && sd[i] != null ? v - p.mult * sd[i] : null,
+				)
+				return {
+					overlays: [
+						{
+							name: "BB upper",
+							color: "#5b7bb5",
+							data: _pts(c, up),
+						},
+						{
+							name: "BB basis",
+							color: "#8b949e",
+							data: _pts(c, b),
+						},
+						{
+							name: "BB lower",
+							color: "#5b7bb5",
+							data: _pts(c, lo),
+						},
+					],
+				}
+			}
+			function I_donch(c, p) {
+				const u = Array(c.length).fill(null),
+					l = Array(c.length).fill(null),
+					m = Array(c.length).fill(null)
+				for (let i = p.length - 1; i < c.length; i++) {
+					let hh = -1e18,
+						ll = 1e18
+					for (let j = 0; j < p.length; j++) {
+						hh = Math.max(hh, c[i - j].high)
+						ll = Math.min(ll, c[i - j].low)
+					}
+					u[i] = hh
+					l[i] = ll
+					m[i] = (hh + ll) / 2
+				}
+				return {
+					overlays: [
+						{
+							name: "Donchian upper",
+							color: "#6ab0a0",
+							data: _pts(c, u),
+						},
+						{
+							name: "Donchian mid",
+							color: "#8b949e",
+							data: _pts(c, m),
+						},
+						{
+							name: "Donchian lower",
+							color: "#b06a6a",
+							data: _pts(c, l),
+						},
+					],
+				}
+			}
+			function I_vwap(c) {
+				const o = Array(c.length).fill(null)
+				let pv = 0,
+					vv = 0
+				const t = _tp(c)
+				for (let i = 0; i < c.length; i++) {
+					pv += t[i] * (c[i].volume || 0)
+					vv += c[i].volume || 0
+					o[i] = vv ? pv / vv : null
+				}
+				return {
+					overlays: [
+						{
+							name: "VWAP",
+							color: "#e4a541",
+							data: _pts(c, o),
+							width: 2,
+						},
+					],
+				}
+			}
+			function I_psar(c, p) {
+				const n = c.length
+				const o = Array(n).fill(null)
+				if (n >= 2) {
+					let bull = c[1].close >= c[0].close,
+						af = p.step,
+						ep = bull ? c[0].high : c[0].low,
+						sar = bull ? c[0].low : c[0].high
+					for (let i = 1; i < n; i++) {
+						sar = sar + af * (ep - sar)
+						if (bull) {
+							if (c[i].low < sar) {
+								bull = false
+								sar = ep
+								ep = c[i].low
+								af = p.step
+							} else if (c[i].high > ep) {
+								ep = c[i].high
+								af = Math.min(p.max, af + p.step)
+							}
+						} else {
+							if (c[i].high > sar) {
+								bull = true
+								sar = ep
+								ep = c[i].high
+								af = p.step
+							} else if (c[i].low < ep) {
+								ep = c[i].low
+								af = Math.min(p.max, af + p.step)
+							}
+						}
+						o[i] = sar
+					}
+				}
+				return {
+					overlays: [
+						{
+							name: "PSAR",
+							color: "#c9a0e4",
+							data: _pts(c, o),
+							dots: true,
+						},
+					],
+				}
+			}
+			function I_super(c, p) {
+				const s = supertrend(c, p.length, p.mult)
+				// ONE series whose colour switches per point — the way TradingView
+				// draws it. Two series can never be made to look like this: the
+				// colour that isn't active still has to do SOMETHING across those
+				// bars, and whatever it draws there is a line that isn't the
+				// indicator. Relying on whitespace to break it works only as long
+				// as every step between here and setData preserves valueless
+				// points, which is a lot of trust for a cosmetic detail.
+				// LineData takes an optional per-point `color`, so one series can
+				// carry both trends and the failure mode disappears.
+				const up = p.up || "#26a69a",
+					dn = p.dn || "#ef5350"
+				const data = []
+				for (let i = 0; i < s.up.length; i++) {
+					const u = s.up[i],
+						d = s.down[i]
+					// On a flip bar both sides hold the same value for one bar —
+					// the back-fill that draws the vertical jump — so taking
+					// either is correct.
+					if (u && u.value !== undefined)
+						data.push({ time: u.time, value: u.value, color: up })
+					else if (d && d.value !== undefined)
+						data.push({ time: d.time, value: d.value, color: dn })
+				}
+				return {
+					overlays: [
+						{ name: "Supertrend", color: up, data, width: 2 },
+					],
+				}
+			}
+			function I_hl52(c) {
+				const win =
+					daily52 ||
+					(c.length
+						? {
+								high: Math.max(..._hi(c)),
+								low: Math.min(..._lo(c)),
+							}
+						: null)
+				if (!win) return { overlays: [] }
+				const flat = (v) => c.map((x) => ({ time: x.time, value: v }))
+				return {
+					overlays: [
+						{
+							name: "52W H",
+							color: "#3a5",
+							data: flat(win.high),
+							dashed: true,
+						},
+						{
+							name: "52W L",
+							color: "#a53",
+							data: flat(win.low),
+							dashed: true,
+						},
+					],
+				}
+			}
+
+			function I_rsi(c, p) {
+				const cl = _cl(c)
+				const o = Array(c.length).fill(null)
+				let ag = 0,
+					al = 0
+				for (let i = 1; i < cl.length; i++) {
+					const ch = cl[i] - cl[i - 1],
+						g = Math.max(ch, 0),
+						l = Math.max(-ch, 0)
+					if (i <= p.length) {
+						ag += g / p.length
+						al += l / p.length
+					} else {
+						ag = (ag * (p.length - 1) + g) / p.length
+						al = (al * (p.length - 1) + l) / p.length
+					}
+					if (i >= p.length) {
+						const rs = al === 0 ? 100 : ag / al
+						o[i] = al === 0 ? 100 : 100 - 100 / (1 + rs)
+					}
+				}
+				return {
+					panerows: [
+						{
+							name: `RSI ${p.length}`,
+							color: "#e4a541",
+							type: "line",
+							data: _pts(c, o),
+						},
+					],
+					refs: [
+						{ v: 70, color: "#553" },
+						{ v: 30, color: "#355" },
+					],
+					range: [0, 100],
+					fmt: 1,
+				}
+			}
+			function I_macd(c, p) {
+				const cl = _cl(c)
+				const ef = _ema(cl, p.fast),
+					es = _ema(cl, p.slow)
+				const line = cl.map((_, i) =>
+					ef[i] != null && es[i] != null ? ef[i] - es[i] : null,
+				)
+				const first = line.findIndex((v) => v != null)
+				const sig = Array(c.length).fill(null)
+				if (first >= 0) {
+					const sub = line
+						.slice(first)
+						.map((v) => (v == null ? 0 : v))
+					const ss = _ema(sub, p.signal)
+					for (let i = 0; i < ss.length; i++) sig[first + i] = ss[i]
+				}
+				const hist = line.map((v, i) =>
+					v != null && sig[i] != null ? v - sig[i] : null,
+				)
+				const hp = []
+				for (let i = 0; i < hist.length; i++)
+					if (hist[i] != null)
+						hp.push({
+							time: c[i].time,
+							value: +hist[i].toFixed(4),
+							color:
+								hist[i] >= 0
+									? "rgba(38,166,154,.6)"
+									: "rgba(239,83,80,.6)",
+						})
+				return {
+					panerows: [
+						{
+							name: "Hist",
+							color: "#8b949e",
+							type: "hist",
+							data: hp,
+						},
+						{
+							name: "MACD",
+							color: "#4184e4",
+							type: "line",
+							data: _pts(c, line),
+						},
+						{
+							name: "Signal",
+							color: "#e4a541",
+							type: "line",
+							data: _pts(c, sig),
+						},
+					],
+					refs: [{ v: 0, color: "#3a3f47" }],
+					fmt: 2,
+				}
+			}
+			function I_stoch(c, p) {
+				const raw = Array(c.length).fill(null)
+				for (let i = p.k - 1; i < c.length; i++) {
+					let hh = -1e18,
+						ll = 1e18
+					for (let j = 0; j < p.k; j++) {
+						hh = Math.max(hh, c[i - j].high)
+						ll = Math.min(ll, c[i - j].low)
+					}
+					raw[i] =
+						hh === ll ? 50 : (100 * (c[i].close - ll)) / (hh - ll)
+				}
+				const k = _sma(
+					raw.map((v) => (v == null ? 0 : v)),
+					p.smooth,
+				).map((v, i) => (raw[i] == null ? null : v))
+				const d = _sma(
+					k.map((v) => (v == null ? 0 : v)),
+					p.d,
+				).map((v, i) => (k[i] == null ? null : v))
+				return {
+					panerows: [
+						{
+							name: "%K",
+							color: "#4184e4",
+							type: "line",
+							data: _pts(c, k),
+						},
+						{
+							name: "%D",
+							color: "#e4a541",
+							type: "line",
+							data: _pts(c, d),
+						},
+					],
+					refs: [
+						{ v: 80, color: "#553" },
+						{ v: 20, color: "#355" },
+					],
+					range: [0, 100],
+					fmt: 1,
+				}
+			}
+			function I_atr(c, p) {
+				return {
+					panerows: [
+						{
+							name: `ATR ${p.length}`,
+							color: "#c9a0e4",
+							type: "line",
+							data: _pts(c, _atr(c, p.length)),
+						},
+					],
+					fmt: 2,
+				}
+			}
+			function I_cci(c, p) {
+				const t = _tp(c)
+				const m = _sma(t, p.length)
+				const o = Array(c.length).fill(null)
+				for (let i = p.length - 1; i < c.length; i++) {
+					let md = 0
+					for (let j = 0; j < p.length; j++)
+						md += Math.abs(t[i - j] - m[i])
+					md /= p.length
+					o[i] = md === 0 ? 0 : (t[i] - m[i]) / (0.015 * md)
+				}
+				return {
+					panerows: [
+						{
+							name: `CCI ${p.length}`,
+							color: "#4184e4",
+							type: "line",
+							data: _pts(c, o),
+						},
+					],
+					refs: [
+						{ v: 100, color: "#553" },
+						{ v: -100, color: "#355" },
+					],
+					fmt: 1,
+				}
+			}
+			function I_willr(c, p) {
+				const o = Array(c.length).fill(null)
+				for (let i = p.length - 1; i < c.length; i++) {
+					let hh = -1e18,
+						ll = 1e18
+					for (let j = 0; j < p.length; j++) {
+						hh = Math.max(hh, c[i - j].high)
+						ll = Math.min(ll, c[i - j].low)
+					}
+					o[i] =
+						hh === ll ? -50 : (-100 * (hh - c[i].close)) / (hh - ll)
+				}
+				return {
+					panerows: [
+						{
+							name: `Williams %R ${p.length}`,
+							color: "#e4a541",
+							type: "line",
+							data: _pts(c, o),
+						},
+					],
+					refs: [
+						{ v: -20, color: "#553" },
+						{ v: -80, color: "#355" },
+					],
+					range: [-100, 0],
+					fmt: 1,
+				}
+			}
+			function I_obv(c) {
+				const o = Array(c.length).fill(null)
+				let v = 0
+				o[0] = 0
+				for (let i = 1; i < c.length; i++) {
+					const d = c[i].close - c[i - 1].close
+					v +=
+						d > 0
+							? c[i].volume || 0
+							: d < 0
+								? -(c[i].volume || 0)
+								: 0
+					o[i] = v
+				}
+				return {
+					panerows: [
+						{
+							name: "OBV",
+							color: "#6ab0a0",
+							type: "line",
+							data: _pts(c, o),
+						},
+					],
+					fmt: 0,
+				}
+			}
+			function I_mfi(c, p) {
+				const t = _tp(c)
+				const pos = Array(c.length).fill(0),
+					neg = Array(c.length).fill(0)
+				for (let i = 1; i < c.length; i++) {
+					const rmf = t[i] * (c[i].volume || 0)
+					if (t[i] > t[i - 1]) pos[i] = rmf
+					else if (t[i] < t[i - 1]) neg[i] = rmf
+				}
+				const o = Array(c.length).fill(null)
+				for (let i = p.length; i < c.length; i++) {
+					let sp = 0,
+						sn = 0
+					for (let j = 0; j < p.length; j++) {
+						sp += pos[i - j]
+						sn += neg[i - j]
+					}
+					o[i] = sn === 0 ? 100 : 100 - 100 / (1 + sp / sn)
+				}
+				return {
+					panerows: [
+						{
+							name: `MFI ${p.length}`,
+							color: "#c9a0e4",
+							type: "line",
+							data: _pts(c, o),
+						},
+					],
+					refs: [
+						{ v: 80, color: "#553" },
+						{ v: 20, color: "#355" },
+					],
+					range: [0, 100],
+					fmt: 1,
+				}
+			}
+			function I_adx(c, p) {
+				const n = c.length,
+					P = p.length
+				const tr = Array(n).fill(0),
+					pdm = Array(n).fill(0),
+					ndm = Array(n).fill(0)
+				for (let i = 1; i < n; i++) {
+					const up = c[i].high - c[i - 1].high,
+						dn = c[i - 1].low - c[i].low
+					pdm[i] = up > dn && up > 0 ? up : 0
+					ndm[i] = dn > up && dn > 0 ? dn : 0
+					tr[i] = Math.max(
+						c[i].high - c[i].low,
+						Math.abs(c[i].high - c[i - 1].close),
+						Math.abs(c[i].low - c[i - 1].close),
+					)
+				}
+				const wilder = (a) => {
+					const o = Array(n).fill(null)
+					let s = 0
+					for (let i = 1; i <= P; i++) s += a[i]
+					if (P < n) o[P] = s
+					for (let i = P + 1; i < n; i++) {
+						s = s - s / P + a[i]
+						o[i] = s
+					}
+					return o
+				}
+				const str = wilder(tr),
+					sp = wilder(pdm),
+					sn = wilder(ndm)
+				const pdi = Array(n).fill(null),
+					ndi = Array(n).fill(null),
+					dx = Array(n).fill(null)
+				for (let i = P; i < n; i++)
+					if (str[i]) {
+						pdi[i] = (100 * sp[i]) / str[i]
+						ndi[i] = (100 * sn[i]) / str[i]
+						const s = pdi[i] + ndi[i]
+						dx[i] =
+							s === 0 ? 0 : (100 * Math.abs(pdi[i] - ndi[i])) / s
+					}
+				const adxa = Array(n).fill(null)
+				if (2 * P < n) {
+					let s = 0,
+						cnt = 0
+					for (let i = P + 1; i <= 2 * P; i++)
+						if (dx[i] != null) {
+							s += dx[i]
+							cnt++
+						}
+					if (cnt) {
+						adxa[2 * P] = s / cnt
+						for (let i = 2 * P + 1; i < n; i++)
+							if (dx[i] != null && adxa[i - 1] != null)
+								adxa[i] = (adxa[i - 1] * (P - 1) + dx[i]) / P
+					}
+				}
+				return {
+					panerows: [
+						{
+							name: "+DI",
+							color: "#26a69a",
+							type: "line",
+							data: _pts(c, pdi),
+						},
+						{
+							name: "-DI",
+							color: "#ef5350",
+							type: "line",
+							data: _pts(c, ndi),
+						},
+						{
+							name: `ADX ${P}`,
+							color: "#e6edf3",
+							type: "line",
+							data: _pts(c, adxa),
+						},
+					],
+					refs: [{ v: 25, color: "#3a3f47" }],
+					fmt: 1,
+				}
+			}
+
+			// registry: cat overlay|osc, params schema, compute
+			const IND = {
+				sma: {
+					name: "Simple MA",
+					cat: "overlay",
+					p: { length: 20, color: "#f0b429" },
+					fn: I_ma("sma"),
+				},
+				ema: {
+					name: "Exponential MA",
+					cat: "overlay",
+					p: { length: 21, color: "#41c4e4" },
+					fn: I_ma("ema"),
+				},
+				wma: {
+					name: "Weighted MA",
+					cat: "overlay",
+					p: { length: 20, color: "#e4589a" },
+					fn: I_ma("wma"),
+				},
+				boll: {
+					name: "Bollinger Bands",
+					cat: "overlay",
+					p: { length: 20, mult: 2 },
+					fn: I_boll,
+				},
+				donch: {
+					name: "Donchian Channels",
+					cat: "overlay",
+					p: { length: 20 },
+					fn: I_donch,
+				},
+				vwap: { name: "VWAP", cat: "overlay", p: {}, fn: I_vwap },
+				super: {
+					name: "Supertrend",
+					cat: "overlay",
+					p: { length: 10, mult: 3, up: "#26a69a", dn: "#ef5350" },
+					fn: I_super,
+				},
+				psar: {
+					name: "Parabolic SAR",
+					cat: "overlay",
+					p: { step: 0.02, max: 0.2 },
+					fn: I_psar,
+				},
+				hl52: {
+					name: "52-week High/Low",
+					cat: "overlay",
+					p: {},
+					fn: I_hl52,
+				},
+				rsi: { name: "RSI", cat: "osc", p: { length: 14 }, fn: I_rsi },
+				macd: {
+					name: "MACD",
+					cat: "osc",
+					p: { fast: 12, slow: 26, signal: 9 },
+					fn: I_macd,
+				},
+				stoch: {
+					name: "Stochastic",
+					cat: "osc",
+					p: { k: 14, d: 3, smooth: 3 },
+					fn: I_stoch,
+				},
+				atr: { name: "ATR", cat: "osc", p: { length: 14 }, fn: I_atr },
+				adx: {
+					name: "ADX / DMI",
+					cat: "osc",
+					p: { length: 14 },
+					fn: I_adx,
+				},
+				cci: { name: "CCI", cat: "osc", p: { length: 20 }, fn: I_cci },
+				willr: {
+					name: "Williams %R",
+					cat: "osc",
+					p: { length: 14 },
+					fn: I_willr,
+				},
+				mfi: {
+					name: "Money Flow Index",
+					cat: "osc",
+					p: { length: 14 },
+					fn: I_mfi,
+				},
+				obv: {
+					name: "On-Balance Volume",
+					cat: "osc",
+					p: {},
+					fn: I_obv,
+				},
+			}
+
+
+
+
+			// ============================================================
+			// Chart types and derived timeframes
+			//
+			// Both of these are TRANSFORMS of the candles already loaded — no
+			// extra requests, and they work offline. Which is also why weekly
+			// and monthly exist at all: Kite serves eight native intervals and
+			// none of them is a week, so the alternative was not offering them.
+			// ============================================================
+
+			function heikinAshi(c) {
+				// Smoothed candles: each bar is an average of itself and the
+				// one before, which strips a lot of single-bar noise out of a
+				// trend. The cost is that the OHLC no longer refers to prices
+				// anything traded at — a Heikin Ashi close is not a close, so
+				// never read levels off one.
+				const out = []
+				let po = null,
+					pc = null
+				for (const b of c) {
+					const close = (b.open + b.high + b.low + b.close) / 4
+					const open = po === null ? (b.open + b.close) / 2 : (po + pc) / 2
+					out.push({
+						time: b.time,
+						open,
+						close,
+						high: Math.max(b.high, open, close),
+						low: Math.min(b.low, open, close),
+					})
+					po = open
+					pc = close
+				}
+				return out
+			}
+
+			function weekKey(ts) {
+				// ISO week, so a year boundary mid-week doesn't split a bar in
+				// two. Local time throughout: the store already shifted to IST.
+				const d = new Date(ts * 1000)
+				const day = (d.getDay() + 6) % 7 // Monday = 0
+				const monday = new Date(d)
+				monday.setDate(d.getDate() - day)
+				monday.setHours(0, 0, 0, 0)
+				return Math.floor(monday.getTime() / 1000)
+			}
+
+			function monthKey(ts) {
+				const d = new Date(ts * 1000)
+				return Math.floor(new Date(d.getFullYear(), d.getMonth(), 1).getTime() / 1000)
+			}
+
+			function resample(c, keyFn) {
+				// First open, highest high, lowest low, LAST close, summed
+				// volume. The last close is the one that matters: a weekly bar
+				// closes where the week ended, not where any day did.
+				const out = []
+				let cur = null
+				for (const b of c) {
+					const k = keyFn(b.time)
+					if (!cur || cur.time !== k) {
+						if (cur) out.push(cur)
+						cur = {
+							time: k,
+							open: b.open,
+							high: b.high,
+							low: b.low,
+							close: b.close,
+							volume: b.volume || 0,
+						}
+					} else {
+						cur.high = Math.max(cur.high, b.high)
+						cur.low = Math.min(cur.low, b.low)
+						cur.close = b.close
+						cur.volume += b.volume || 0
+					}
+				}
+				if (cur) out.push(cur)
+				return out
+			}
+
+			function applyTimeframe(c, tf) {
+				if (tf === "week") return resample(c, weekKey)
+				if (tf === "month") return resample(c, monthKey)
+				return c
+			}
+
+
+			// ---- chart type ------------------------------------------
+			// The series OBJECT has to be replaced, not reconfigured:
+			// lightweight-charts has no way to turn a candlestick series into
+			// a line one. So swap it, re-apply the data, and hand the new
+			// handle to everything that holds a reference — the drawing layer
+			// converts prices through `series`, and a stale reference silently
+			// puts every drawing in the wrong place.
+			const CHART_TYPES = {
+				candles: { label: "Candles", ohlc: true },
+				hollow: { label: "Hollow candles", ohlc: true },
+				heikin: { label: "Heikin Ashi", ohlc: true },
+				bars: { label: "Bars", ohlc: true },
+				hlc: { label: "HLC bars", ohlc: true },
+				line: { label: "Line", ohlc: false },
+				markers: { label: "Line with markers", ohlc: false },
+				step: { label: "Step line", ohlc: false },
+				area: { label: "Area", ohlc: false },
+				baseline: { label: "Baseline", ohlc: false },
+			}
+			const UP = "#26a69a",
+				DN = "#ef5350"
+
+			function makeSeries(kind) {
+				if (kind === "candles")
+					return chart.addCandlestickSeries({
+						upColor: UP, downColor: DN, wickUpColor: UP,
+						wickDownColor: DN, borderVisible: false,
+					})
+				if (kind === "hollow" || kind === "heikin")
+					return chart.addCandlestickSeries({
+						// Hollow: an up bar is an outline, a down bar is solid.
+						// Transparent fill plus a coloured border is how
+						// lightweight-charts expresses that.
+						upColor: kind === "hollow" ? "rgba(0,0,0,0)" : UP,
+						downColor: DN,
+						borderUpColor: UP, borderDownColor: DN,
+						wickUpColor: UP, wickDownColor: DN,
+						borderVisible: true,
+					})
+				if (kind === "bars" || kind === "hlc")
+					return chart.addBarSeries({
+						upColor: UP, downColor: DN,
+						openVisible: kind === "bars",   // HLC drops the open tick
+					})
+				if (kind === "area")
+					return chart.addAreaSeries({
+						lineColor: "#4fc3f7", topColor: "rgba(79,195,247,.28)",
+						bottomColor: "rgba(79,195,247,0)", lineWidth: 2,
+					})
+				if (kind === "baseline")
+					return chart.addBaselineSeries({
+						baseValue: { type: "price", price: 0 },
+						topLineColor: UP, bottomLineColor: DN,
+						topFillColor1: "rgba(38,166,154,.28)",
+						topFillColor2: "rgba(38,166,154,0)",
+						bottomFillColor1: "rgba(239,83,80,0)",
+						bottomFillColor2: "rgba(239,83,80,.28)",
+					})
+				return chart.addLineSeries({
+					color: "#4fc3f7",
+					lineWidth: 2,
+					lineType: kind === "step" ? 1 : 0,
+					pointMarkersVisible: kind === "markers",
+				})
+			}
+
+			function seriesData(kind, bars) {
+				if (kind === "heikin") return heikinAshi(bars)
+				if (CHART_TYPES[kind].ohlc) return bars
+				return bars.map((b) => ({ time: b.time, value: b.close }))
+			}
+
+			function setChartType(kind) {
+				if (!CHART_TYPES[kind] || !chart) return
+				state.ctype = kind
+				const bars = shownCandles()
+				if (series) chart.removeSeries(series)
+				series = makeSeries(kind)
+				if (kind === "baseline" && bars.length)
+					series.applyOptions({
+						// Anchored at the first visible close, so the shading
+						// reads as "up or down since the start of what you're
+						// looking at" rather than against an arbitrary zero.
+						baseValue: { type: "price", price: bars[0].close },
+					})
+				series.setData(seriesData(kind, bars))
+				$("#ctbtn").innerHTML = `▮ ${CHART_TYPES[kind].label} ▾`
+				for (const b of document.querySelectorAll("#ctmenu button"))
+					b.classList.toggle("on", b.dataset.ct === kind)
+				redrawDrawings()
+				showPinnedBacktest()
+			}
+
+			// ---- timeframe -------------------------------------------
+			function shownCandles() {
+				// What is actually on screen right now: the loaded candles,
+				// resampled if the timeframe is derived, sliced if replay is
+				// running. Every consumer asks THIS rather than `candles`, so
+				// none of them can disagree about what's being displayed.
+				const base = applyTimeframe(candles, state.tf)
+				if (replay.on && replay.full) return replay.full.slice(0, replay.i)
+				return base
+			}
+
+			function nativeInterval(tf) {
+				// Week and month are built here from daily bars, so the
+				// REQUEST is still for days. Kite has no weekly endpoint.
+				return tf === "week" || tf === "month" ? "day" : tf
+			}
+
+			function setTimeframe(tf) {
+				state.tf = tf
+				state.interval = nativeInterval(tf)
+				const label = { week: "W", month: "M", day: "D", minute: "1m",
+					"3minute": "3m", "5minute": "5m", "10minute": "10m",
+					"15minute": "15m", "30minute": "30m", "60minute": "1h" }[tf] || tf
+				$("#ivbtn").innerHTML = `${label}&nbsp;▾`
+				for (const b of document.querySelectorAll("#ivmenu button"))
+					b.classList.toggle("on", b.dataset.i === tf)
+				if (state.cur) load(state.cur.symbol)
+			}
+
+
+			// ---- resizable sidebar ------------------------------------
+			// Width lives in a CSS custom property and persists, because a
+			// sidebar you widen every session is a sidebar that isn't wide
+			// enough.
+			const SIDE_MIN = 170,
+				SIDE_MAX = 620,
+				SIDE_DEFAULT = 230
+
+			function setSideWidth(px, save = true) {
+				const w = Math.max(SIDE_MIN, Math.min(SIDE_MAX, Math.round(px)))
+				document.body.style.setProperty("--side-w", w + "px")
+				if (save) {
+					try {
+						localStorage.setItem("tf_side_w", String(w))
+					} catch (e) {}
+				}
+				// The chart doesn't know the grid moved under it.
+				if (chart) chart.applyOptions({})
+				redrawDrawings()
+			}
+
+			function initSideGrip() {
+				try {
+					const saved = +localStorage.getItem("tf_side_w")
+					if (saved) setSideWidth(saved, false)
+				} catch (e) {}
+
+				const grip = $("#sidegrip")
+				if (!grip) return
+				let dragging = false
+
+				grip.addEventListener("mousedown", (e) => {
+					e.preventDefault()
+					dragging = true
+					document.body.classList.add("resizing")
+				})
+				// Listener on the WINDOW, not the grip: once the pointer
+				// leaves a 6px strip — which it does immediately — the grip
+				// stops seeing mousemove and the drag would stick.
+				window.addEventListener("mousemove", (e) => {
+					if (dragging) setSideWidth(e.clientX, false)
+				})
+				window.addEventListener("mouseup", () => {
+					if (!dragging) return
+					dragging = false
+					document.body.classList.remove("resizing")
+					setSideWidth(parseInt(
+						getComputedStyle(document.body).getPropertyValue("--side-w")) ||
+						SIDE_DEFAULT)
+				})
+				grip.addEventListener("dblclick", () => setSideWidth(SIDE_DEFAULT))
+			}
+
+			function closeMenus() {
+				for (const m of document.querySelectorAll(".picker"))
+					m.classList.remove("open")
+				// the older menus too, so two can never sit on top of each other
+				for (const id of ["#indmenu", "#evmenu", "#laymenu"])
+					$(id)?.classList.remove("open")
+			}
+
+			function initPickers() {
+				const wire = (btn, menu) => {
+					$(btn).onclick = (e) => {
+						e.stopPropagation()
+						const el = $(menu)
+						const wasOpen = el.classList.contains("open")
+						closeMenus()
+						if (!wasOpen) {
+							el.classList.add("open")
+							placeMenu(btn, menu)
+						}
+					}
+					// clicks inside the menu must not reach the document handler,
+					// or picking an item would close the menu before the item's own
+					// handler ran
+					$(menu).onclick = (e) => e.stopPropagation()
+				}
+				wire("#ivbtn", "#ivmenu")
+				wire("#ctbtn", "#ctmenu")
+				for (const b of document.querySelectorAll("#ivmenu button"))
+					b.onclick = () => {
+						$("#ivmenu").classList.remove("open")
+						setTimeframe(b.dataset.i)
+					}
+				for (const b of document.querySelectorAll("#ctmenu button"))
+					b.onclick = () => {
+						$("#ctmenu").classList.remove("open")
+						setChartType(b.dataset.ct)
+					}
+				document.addEventListener("click", closeMenus)
+			}
+
+			// ============================================================
+			// 4.3 — the small chart wins
+			// ============================================================
+
+			// ---- sparklines -------------------------------------------
+			// Drawn as an inline SVG path rather than a canvas per row: at
+			// thirty rows, thirty canvases is thirty GL contexts the browser
+			// has to keep alive, and a sparkline is a decoration.
+			function sparkPath(closes, w, h) {
+				if (!closes || closes.length < 2) return ""
+				const lo = Math.min(...closes),
+					hi = Math.max(...closes)
+				const span = hi - lo || 1
+				return closes
+					.map((c, i) => {
+						const x = (i / (closes.length - 1)) * w
+						const y = h - ((c - lo) / span) * h
+						return `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`
+					})
+					.join(" ")
+			}
+
+			function sparkSVG(closes, up) {
+				const d = sparkPath(closes, 54, 16)
+				if (!d) return ""
+				return `<svg class="spark" width="54" height="16" viewBox="0 0 54 16">
+					<path d="${d}" fill="none" stroke="${up ? "#26a69a" : "#ef5350"}"
+					      stroke-width="1.2"/></svg>`
+			}
+
+			// ---- keyboard ---------------------------------------------
+			function wlSymbols() {
+				return [...document.querySelectorAll("#wlist .wl")].map(
+					(el) => el.dataset.s,
+				)
+			}
+
+			function stepWatchlist(delta) {
+				const syms = wlSymbols()
+				if (!syms.length) return
+				const cur = state.cur ? state.cur.symbol : null
+				const at = syms.indexOf(cur)
+				// Wrapping means arrow-down at the bottom lands back at the top
+				// rather than doing nothing, which reads as the key being broken.
+				const next = syms[(at + delta + syms.length) % syms.length]
+				if (next) load(next)
+			}
+
+			function initKeys() {
+				document.addEventListener("keydown", (e) => {
+					const typing =
+						e.target.tagName === "INPUT" ||
+						e.target.tagName === "SELECT" ||
+						e.target.tagName === "TEXTAREA"
+					if (e.metaKey || e.ctrlKey || e.altKey) return
+
+					if (e.key === "/" && !typing) {
+						e.preventDefault()
+						$("#search").focus()
+						$("#search").select()
+						return
+					}
+					if (e.key === "Escape" && typing) {
+						e.target.blur()
+						return
+					}
+					if (typing) return
+
+					if (e.key === "ArrowDown") {
+						e.preventDefault()
+						stepWatchlist(1)
+					} else if (e.key === "ArrowUp") {
+						e.preventDefault()
+						stepWatchlist(-1)
+					} else if (e.key === "i") {
+						e.preventDefault()
+						$("#indmenu").classList.toggle("open")
+					} else if (e.key === "r") {
+						e.preventDefault()
+						toggleReplay()
+					} else if (e.key === " " && replay.on) {
+						e.preventDefault()
+						replay.playing ? replayPause() : replayPlay()
+					} else if (e.key === "ArrowRight" && replay.on) {
+						e.preventDefault()
+						replayStep(1)
+					} else if (e.key === "ArrowLeft" && replay.on) {
+						e.preventDefault()
+						replayStep(-1)
+					}
+				})
+			}
+
+			// ---- compare mode -----------------------------------------
+			// Both series are indexed to 100 at the first visible bar, because
+			// raw prices can't be compared: a ₹3,000 stock and a ₹40 stock on
+			// one axis tells you only which is expensive per share, which is
+			// not a fact about anything.
+			let compareSeries = null
+			let compareSym = null
+
+			function indexTo100(closes) {
+				if (!closes || !closes.length) return []
+				const base = closes[0]
+				return base ? closes.map((c) => (c / base) * 100) : []
+			}
+
+			async function setCompare(symbol) {
+				clearCompare()
+				if (!symbol) return
+				try {
+					const days = Math.min(rangeDays(), INTERVAL_CAP[state.interval])
+					const r = await fetch(
+						`/api/candles?symbol=${encodeURIComponent(symbol)}` +
+							`&interval=${state.interval}&days=${days}`,
+					)
+					if (!r.ok) {
+						status(`no data for ${symbol}`)
+						return
+					}
+					const d = await r.json()
+					const other = d.candles || []
+					if (other.length < 2) {
+						status(`not enough history for ${symbol}`)
+						return
+					}
+					const base = candles.length ? candles[0].close : null
+					if (!base) return
+
+					// The main series is redrawn as an index too, so the two
+					// share one scale. Its own price axis stays on the right
+					// showing real rupees.
+					const norm = indexTo100(other.map((c) => c.close))
+					compareSeries = chart.addLineSeries({
+						color: "#f0a202",
+						lineWidth: 1.5,
+						priceScaleId: "cmp",
+						lastValueVisible: false,
+						priceLineVisible: false,
+					})
+					chart.priceScale("cmp").applyOptions({
+						scaleMargins: { top: 0.08, bottom: 0.25 },
+					})
+					compareSeries.setData(
+						other.map((c, i) => ({ time: c.time, value: norm[i] })),
+					)
+					compareSym = symbol.toUpperCase()
+					$("#cmpChip").textContent = `vs ${compareSym} (indexed 100)`
+					$("#cmpChip").style.display = ""
+				} catch (e) {
+					status("compare failed: " + e.message)
+				}
+			}
+
+			function clearCompare() {
+				if (compareSeries) {
+					chart.removeSeries(compareSeries)
+					compareSeries = null
+				}
+				compareSym = null
+				const chip = $("#cmpChip")
+				if (chip) chip.style.display = "none"
+			}
+
+			// ---- bar replay -------------------------------------------
+			// Steps the chart forward one bar at a time over data it already
+			// has. The point is to see a setup unfold without knowing what
+			// came next — which is the only honest way to judge whether you'd
+			// actually have taken it.
+			const replay = { on: false, i: 0, playing: false, timer: null, full: null }
+
+			function toggleReplay() {
+				replay.on ? replayExit() : replayEnter()
+			}
+
+			function replayEnter() {
+				if (!candles.length) return
+				replay.on = true
+				// The DISPLAYED bars: on a weekly chart, stepping should advance a
+				// week, not a day nobody can see.
+				replay.full = applyTimeframe(candles, state.tf)
+				// Start with enough bars for the indicators to mean something;
+				// beginning at bar 1 just shows a chart of nothing.
+				replay.i = Math.min(Math.max(50, Math.floor(candles.length * 0.4)), candles.length)
+				$("#replaybar").style.display = "flex"
+				$("#rpMax").textContent = candles.length
+				replayApply()
+			}
+
+			function replayExit() {
+				replayPause()
+				replay.on = false
+				if (replay.full) series.setData(seriesData(state.ctype, replay.full))
+				refreshMarkers()
+				replay.full = null
+				$("#replaybar").style.display = "none"
+				redrawDrawings()
+			}
+
+			function replayApply() {
+				const slice = replay.full.slice(0, replay.i)
+				series.setData(seriesData(state.ctype, slice))
+				refreshMarkers()
+				$("#rpAt").textContent = replay.i
+				$("#rpSlider").max = replay.full.length
+				$("#rpSlider").value = replay.i
+				const last = slice[slice.length - 1]
+				if (last)
+					$("#rpDate").textContent = new Date(
+						last.time * 1000,
+					).toLocaleDateString("en-IN")
+				redrawDrawings()
+			}
+
+			function replayStep(n) {
+				if (!replay.on) return
+				replay.i = Math.max(2, Math.min(replay.full.length, replay.i + n))
+				if (replay.i >= replay.full.length) replayPause()
+				replayApply()
+			}
+
+			function replayPlay() {
+				if (!replay.on || replay.playing) return
+				replay.playing = true
+				$("#rpPlay").textContent = "⏸"
+				replay.timer = setInterval(() => replayStep(1), 320)
+			}
+
+			function replayPause() {
+				replay.playing = false
+				if (replay.timer) clearInterval(replay.timer)
+				replay.timer = null
+				const b = $("#rpPlay")
+				if (b) b.textContent = "▶"
+			}
+
+			// ---- a backtest's trades, on the real chart ---------------
+			async function showPinnedBacktest() {
+				try {
+					const p = await (await fetch("/api/backtest/pinned")).json()
+					if (!p || !p.symbol || !p.markers || !p.markers.length) return
+					if (state.cur && p.symbol !== state.cur.symbol) return
+					// Merged with whatever event markers are already on, then
+					// sorted — lightweight-charts drops unsorted markers
+					// silently, which looks like the feature not working.
+					const mk = p.markers.map((m) => ({
+						time: m.time,
+						position: m.type === "buy" ? "belowBar" : "aboveBar",
+						color: m.type === "buy" ? "#26a69a" : "#ef5350",
+						shape: m.type === "buy" ? "arrowUp" : "arrowDown",
+						text: m.type === "buy" ? "B" : "S",
+					}))
+					series.setMarkers(mk.sort((a, b) => a.time - b.time))
+					$("#btChip").textContent = `${p.strategy || "backtest"} trades`
+					$("#btChip").style.display = ""
+				} catch (e) {}
+			}
+
+			function initSmallWins() {
+				const go = () => setCompare($("#cmpIn").value.trim().toUpperCase())
+				$("#cmpGo").onclick = go
+				$("#cmpIn").addEventListener("keydown", (e) => {
+					if (e.key === "Enter") go()
+				})
+				$("#cmpOff").onclick = () => {
+					$("#cmpIn").value = ""
+					clearCompare()
+				}
+				$("#rpToggle").onclick = toggleReplay
+				$("#rpExit").onclick = replayExit
+				$("#rpFwd").onclick = () => replayStep(1)
+				$("#rpBack").onclick = () => replayStep(-1)
+				$("#rpPlay").onclick = () =>
+					replay.playing ? replayPause() : replayPlay()
+				$("#rpSlider").addEventListener("input", (e) => {
+					if (!replay.on) return
+					replayPause()
+					replay.i = +e.target.value
+					replayApply()
+				})
+			}
+
+			// ============================================================
+			// Drawing tools
+			//
+			// Anchored in DATA space — every point is {t: unix, p: price} and
+			// is converted to pixels at paint time. Storing pixels would make
+			// each drawing correct at exactly one zoom level and quietly wrong
+			// everywhere else.
+			//
+			// The geometry below is deliberately pure: no canvas, no chart, no
+			// DOM. That's what lets tests/js exercise hit-testing and Fib
+			// ladders directly, which is the fiddly part and the part that
+			// silently degrades if you only ever eyeball it.
+			// ============================================================
+			const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1]
+			const DRAW_HIT_PX = 7 // how close the pointer must be to grab something
+			const DRAW_HANDLE_PX = 5
+
+			function distToSegment(px, py, x1, y1, x2, y2) {
+				const dx = x2 - x1,
+					dy = y2 - y1
+				const len2 = dx * dx + dy * dy
+				if (len2 === 0) return Math.hypot(px - x1, py - y1)
+				// clamp keeps this a SEGMENT: without it a trendline would be
+				// grabbable a mile past either end, along the infinite line.
+				let t = ((px - x1) * dx + (py - y1) * dy) / len2
+				t = Math.max(0, Math.min(1, t))
+				return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy))
+			}
+
+			function distToRay(px, py, x1, y1, x2, y2) {
+				// Same, but only clamped at the start — a ray runs on for ever.
+				const dx = x2 - x1,
+					dy = y2 - y1
+				const len2 = dx * dx + dy * dy
+				if (len2 === 0) return Math.hypot(px - x1, py - y1)
+				let t = ((px - x1) * dx + (py - y1) * dy) / len2
+				t = Math.max(0, t)
+				return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy))
+			}
+
+			function distToRect(px, py, x1, y1, x2, y2) {
+				// Distance to the OUTLINE, not the fill. A filled hit area
+				// would make a big rectangle impossible to draw inside of.
+				const l = Math.min(x1, x2),
+					r = Math.max(x1, x2)
+				const t = Math.min(y1, y2),
+					b = Math.max(y1, y2)
+				return Math.min(
+					distToSegment(px, py, l, t, r, t),
+					distToSegment(px, py, r, t, r, b),
+					distToSegment(px, py, r, b, l, b),
+					distToSegment(px, py, l, b, l, t),
+				)
+			}
+
+			function fibLevels(p0, p1) {
+				// 0 sits at the FIRST anchor. Dragging high→low and low→high
+				// therefore give mirrored ladders, which is right: the
+				// direction you drew encodes which way you think price moved.
+				const span = p1 - p0
+				return FIB_LEVELS.map((lv) => ({ level: lv, price: p0 + span * lv }))
+			}
+
+			function hitDistance(kind, pts, x, y, width) {
+				// pts are already pixels: [{x, y}, ...]
+				if (kind === "hline") return Math.abs(y - pts[0].y)
+				const [a, b] = pts
+				if (kind === "trendline") return distToSegment(x, y, a.x, a.y, b.x, b.y)
+				if (kind === "ray") return distToRay(x, y, a.x, a.y, b.x, b.y)
+				if (kind === "rect") return distToRect(x, y, a.x, a.y, b.x, b.y)
+				if (kind === "fib") {
+					// Any of the horizontal levels counts as a hit.
+					let best = Infinity
+					for (const lv of FIB_LEVELS) {
+						const ly = a.y + (b.y - a.y) * lv
+						best = Math.min(best, Math.abs(y - ly))
+					}
+					return best
+				}
+				return Infinity
+			}
+
+			function nearestHandle(pts, x, y) {
+				// Which anchor is the pointer grabbing, if any? Returns its
+				// index or -1. Checked BEFORE whole-shape drawDragging so the
+				// corners win — otherwise a shape could never be reshaped,
+				// only moved.
+				for (let i = 0; i < pts.length; i++) {
+					if (Math.hypot(x - pts[i].x, y - pts[i].y) <= DRAW_HANDLE_PX + 3) return i
+				}
+				return -1
+			}
+
+			let DRAWINGS = [] // for the current symbol+interval
+			let drawTool = "cursor"
+			let drawSel = null // id of the selected drawing
+			let drawPending = null // in-progress shape
+			let drawDragging = null // {id, handle|null, startX, startY, orig}
+
+			function dl() {
+				return $("#drawlayer")
+			}
+
+			function toPix(pt) {
+				const x = chart.timeScale().timeToCoordinate(pt.t)
+				const y = series.priceToCoordinate(pt.p)
+				return x == null || y == null ? null : { x, y }
+			}
+
+			function toData(x, y) {
+				const t = chart.timeScale().coordinateToTime(x)
+				const p = series.coordinateToPrice(y)
+				return t == null || p == null ? null : { t, p }
+			}
+
+			function drawShape(ctx, kind, pts, style, selected, W, H) {
+				const colour = style.color || "#4fc3f7"
+				ctx.save()
+				ctx.strokeStyle = colour
+				ctx.lineWidth = style.width || 1.5
+				ctx.setLineDash(style.dash ? [5, 4] : [])
+				ctx.beginPath()
+
+				if (kind === "hline") {
+					ctx.moveTo(0, pts[0].y)
+					ctx.lineTo(W, pts[0].y)
+				} else if (kind === "trendline") {
+					ctx.moveTo(pts[0].x, pts[0].y)
+					ctx.lineTo(pts[1].x, pts[1].y)
+				} else if (kind === "ray") {
+					// Extend well past the canvas so it reads as endless.
+					const dx = pts[1].x - pts[0].x,
+						dy = pts[1].y - pts[0].y
+					const k = (Math.hypot(W, H) * 2) / (Math.hypot(dx, dy) || 1)
+					ctx.moveTo(pts[0].x, pts[0].y)
+					ctx.lineTo(pts[0].x + dx * k, pts[0].y + dy * k)
+				} else if (kind === "rect") {
+					ctx.rect(
+						Math.min(pts[0].x, pts[1].x),
+						Math.min(pts[0].y, pts[1].y),
+						Math.abs(pts[1].x - pts[0].x),
+						Math.abs(pts[1].y - pts[0].y),
+					)
+				} else if (kind === "fib") {
+					ctx.stroke()
+					const x1 = Math.min(pts[0].x, pts[1].x)
+					const x2 = Math.max(pts[0].x, pts[1].x)
+					ctx.font = "11px ui-monospace, monospace"
+					ctx.textBaseline = "bottom"
+					for (const lv of FIB_LEVELS) {
+						const y = pts[0].y + (pts[1].y - pts[0].y) * lv
+						ctx.beginPath()
+						ctx.globalAlpha = lv === 0 || lv === 1 ? 0.9 : 0.55
+						ctx.moveTo(x1, y)
+						ctx.lineTo(x2, y)
+						ctx.stroke()
+						ctx.fillStyle = colour
+						ctx.fillText(
+							(lv * 100).toFixed(1) + "%  " + drawFmtPrice(priceAt(pts, lv)),
+							x1 + 4,
+							y - 2,
+						)
+					}
+					ctx.globalAlpha = 1
+					ctx.restore()
+					if (selected) drawHandles(ctx, pts)
+					return
+				}
+				ctx.stroke()
+				ctx.restore()
+				if (selected) drawHandles(ctx, pts)
+			}
+
+			function priceAt(pts, lv) {
+				// pts carry their source prices so labels show real numbers,
+				// not pixel positions.
+				return pts[0].p + (pts[1].p - pts[0].p) * lv
+			}
+
+			function drawFmtPrice(v) {
+				return v == null ? "" : v.toFixed(2)
+			}
+
+			function drawHandles(ctx, pts) {
+				ctx.save()
+				ctx.fillStyle = "#0d1117"
+				ctx.strokeStyle = "#4fc3f7"
+				ctx.lineWidth = 1.5
+				for (const p of pts) {
+					ctx.beginPath()
+					ctx.arc(p.x, p.y, DRAW_HANDLE_PX, 0, Math.PI * 2)
+					ctx.fill()
+					ctx.stroke()
+				}
+				ctx.restore()
+			}
+
+			function redrawDrawings() {
+				const c = dl()
+				if (!c || !chart || !series) return
+				const host = $("#chartwrap")
+				const W = host.clientWidth,
+					H = host.clientHeight
+				const dpr = window.devicePixelRatio || 1
+				if (c.width !== W * dpr || c.height !== H * dpr) {
+					c.width = W * dpr
+					c.height = H * dpr
+					c.style.width = W + "px"
+					c.style.height = H + "px"
+				}
+				const ctx = c.getContext("2d")
+				ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+				ctx.clearRect(0, 0, W, H)
+
+				const all = drawPending ? DRAWINGS.concat([drawPending]) : DRAWINGS
+				for (const d of all) {
+					const pix = d.points.map((pt) => {
+						const q = toPix(pt)
+						return q ? { ...q, p: pt.p } : null
+					})
+					// A drawing anchored off-screen has no coordinate; skip it
+					// rather than painting it at 0,0 where it would look like a
+					// line you never drew.
+					if (pix.some((q) => q === null)) continue
+					drawShape(ctx, d.kind, pix, d.style || {}, d.id === drawSel, W, H)
+				}
+			}
+
+			function hitAt(x, y) {
+				let best = null,
+					bestDist = DRAW_HIT_PX
+				for (const d of DRAWINGS) {
+					const pix = d.points.map(toPix)
+					if (pix.some((q) => q === null)) continue
+					const dist = hitDistance(d.kind, pix, x, y)
+					if (dist <= bestDist) {
+						bestDist = dist
+						best = d
+					}
+				}
+				return best
+			}
+
+			async function loadDrawings() {
+				if (!state.cur) return
+				try {
+					const r = await fetch(
+						`/api/drawings?symbol=${encodeURIComponent(state.cur)}&interval=${state.interval}`,
+					)
+					DRAWINGS = r.ok ? await r.json() : []
+				} catch (e) {
+					DRAWINGS = []
+				}
+				drawSel = null
+				redrawDrawings()
+			}
+
+			const TOOLS = ["cursor", "trendline", "ray", "hline", "rect", "fib"]
+
+			function setTool(tool) {
+				if (tool === "clear") return clearDrawings()
+				// Refuse anything not a real tool rather than arming the canvas
+				// with it — an armed canvas with no valid tool is invisible and
+				// breaks pan, zoom and the crosshair.
+				if (!TOOLS.includes(tool)) return
+				drawTool = tool
+				drawSel = null
+				drawPending = null
+				for (const b of document.querySelectorAll("#drawtools .dt[data-tool]"))
+					b.classList.toggle("on", b.dataset.tool === tool)
+				// The canvas only intercepts the mouse while a tool is armed,
+				// so panning and the crosshair keep working the rest of the time.
+				dl().classList.toggle("active", tool !== "cursor")
+				redrawDrawings()
+			}
+
+			async function clearDrawings() {
+				if (!state.cur || !DRAWINGS.length) return
+				if (!confirm(`Delete all ${DRAWINGS.length} drawings on ${state.cur} ${state.interval}?`))
+					return
+				await fetch(
+					`/api/drawings?symbol=${encodeURIComponent(state.cur)}&interval=${state.interval}`,
+					{ method: "DELETE" },
+				)
+				DRAWINGS = []
+				drawSel = null
+				redrawDrawings()
+			}
+
+			function initDrawing() {
+				const c = dl()
+				if (!c) return
+
+				c.addEventListener("mousedown", (e) => {
+					const r = c.getBoundingClientRect()
+					const x = e.clientX - r.left,
+						y = e.clientY - r.top
+					const d = toData(x, y)
+					if (!d) return
+
+					if (drawTool === "cursor") {
+						const hit = hitAt(x, y)
+						drawSel = hit ? hit.id : null
+						if (hit) {
+							const pix = hit.points.map(toPix)
+							drawDragging = {
+								id: hit.id,
+								handle: nearestHandle(pix, x, y),
+								startX: x,
+								startY: y,
+								orig: JSON.parse(JSON.stringify(hit.points)),
+							}
+						}
+						redrawDrawings()
+						return
+					}
+
+					const n = drawTool === "hline" ? 1 : 2
+					drawPending = {
+						id: -1,
+						kind: drawTool,
+						style: {},
+						points: n === 1 ? [d] : [d, d],
+					}
+					redrawDrawings()
+				})
+
+				c.addEventListener("mousemove", (e) => {
+					const r = c.getBoundingClientRect()
+					const x = e.clientX - r.left,
+						y = e.clientY - r.top
+
+					if (drawPending && drawPending.points.length === 2) {
+						const d = toData(x, y)
+						if (d) {
+							drawPending.points[1] = d
+							redrawDrawings()
+						}
+						return
+					}
+					if (drawDragging) {
+						const shape = DRAWINGS.find((s) => s.id === drawDragging.id)
+						if (!shape) return
+						const d = toData(x, y)
+						if (!d) return
+						if (drawDragging.handle >= 0) {
+							shape.points[drawDragging.handle] = d
+						} else {
+							// Whole-shape move: shift every anchor by the same
+							// delta in DATA space, so the shape keeps its size
+							// in prices and bars rather than in pixels.
+							const from = toData(drawDragging.startX, drawDragging.startY)
+							if (!from) return
+							const dt = d.t - from.t,
+								dp = d.p - from.p
+							shape.points = drawDragging.orig.map((pt) => ({
+								t: pt.t + dt,
+								p: pt.p + dp,
+							}))
+						}
+						redrawDrawings()
+					}
+				})
+
+				window.addEventListener("mouseup", async () => {
+					if (drawPending) {
+						const shape = drawPending
+						drawPending = null
+						// A click with no drag is a mis-click, not a
+						// zero-length line nobody can ever select again.
+						const moved =
+							shape.points.length === 1 ||
+							shape.points[0].t !== shape.points[1].t ||
+							shape.points[0].p !== shape.points[1].p
+						if (moved) {
+							try {
+								const r = await fetch("/api/drawings", {
+									method: "POST",
+									headers: { "Content-Type": "application/json" },
+									body: JSON.stringify({
+										symbol: state.cur,
+										interval: state.interval,
+										kind: shape.kind,
+										points: shape.points,
+									}),
+								})
+								if (r.ok) DRAWINGS.push(await r.json())
+							} catch (e) {}
+						}
+						setTool("cursor")
+						redrawDrawings()
+						return
+					}
+					if (drawDragging) {
+						const shape = DRAWINGS.find((s) => s.id === drawDragging.id)
+						drawDragging = null
+						if (shape) {
+							try {
+								await fetch(`/api/drawings/${shape.id}`, {
+									method: "PATCH",
+									headers: { "Content-Type": "application/json" },
+									body: JSON.stringify({ points: shape.points }),
+								})
+							} catch (e) {}
+						}
+					}
+				})
+
+				// [data-tool] only. #rpToggle also lives in this rail and carries
+				// no tool — binding it here armed the canvas with an undefined
+				// tool, so it swallowed every click while drawing nothing and
+				// panning stopped working.
+				for (const b of document.querySelectorAll("#drawtools .dt[data-tool]"))
+					b.addEventListener("click", () => setTool(b.dataset.tool))
+
+				document.addEventListener("keydown", async (e) => {
+					if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return
+					if (e.key === "Escape") setTool("cursor")
+					if ((e.key === "Delete" || e.key === "Backspace") && drawSel != null) {
+						e.preventDefault()
+						await fetch(`/api/drawings/${drawSel}`, { method: "DELETE" })
+						DRAWINGS = DRAWINGS.filter((d) => d.id !== drawSel)
+						drawSel = null
+						redrawDrawings()
+					}
+				})
+
+				// Repaint whenever the chart moves under us. Without this the
+				// drawings stay put while the candles pan away beneath them.
+				chart.timeScale().subscribeVisibleLogicalRangeChange(redrawDrawings)
+				new ResizeObserver(redrawDrawings).observe($("#chartwrap"))
+			}
+
+			// supertrend kept as a standalone (used by I_super and unchanged logic)
+			function supertrend(data, period = 10, mult = 3) {
+				const n = data.length
+				if (n < period + 2) return { up: [], down: [], flips: [] }
+				const tr = new Array(n).fill(0)
+				for (let i = 1; i < n; i++) {
+					tr[i] = Math.max(
+						data[i].high - data[i].low,
+						Math.abs(data[i].high - data[i - 1].close),
+						Math.abs(data[i].low - data[i - 1].close),
+					)
+				}
+				const atr = new Array(n).fill(null)
+				let acc = 0
+				for (let i = 1; i <= period; i++) acc += tr[i]
+				atr[period] = acc / period
+				for (let i = period + 1; i < n; i++)
+					atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period
+				const up = [],
+					down = [],
+					flips = []
+				let prevFub = null,
+					prevFlb = null,
+					prevSt = null,
+					prevTrend = null,
+					trend = 1
+				for (let i = period; i < n; i++) {
+					const mid = (data[i].high + data[i].low) / 2
+					const bub = mid + mult * atr[i],
+						blb = mid - mult * atr[i]
+					const fub =
+						prevFub === null ||
+						bub < prevFub ||
+						data[i - 1].close > prevFub
+							? bub
+							: prevFub
+					const flb =
+						prevFlb === null ||
+						blb > prevFlb ||
+						data[i - 1].close < prevFlb
+							? blb
+							: prevFlb
+					if (prevSt === null) trend = data[i].close >= flb ? 1 : -1
+					else if (prevSt === prevFub)
+						trend = data[i].close > fub ? 1 : -1
+					else trend = data[i].close < flb ? -1 : 1
+					const st = trend === 1 ? flb : fub
+					const v = +st.toFixed(2)
+					const t = data[i].time
+
+					// Whitespace (a point with time but NO value) is what makes
+					// lightweight-charts BREAK a line. Pushing nothing — or
+					// filtering nulls out later — leaves a dense series that
+					// gets connected straight across the gap, which is why this
+					// used to render as two full-width lines instead of one
+					// line that changes colour.
+					if (trend === 1) {
+						up.push({ time: t, value: v })
+						down.push({ time: t })
+					} else {
+						down.push({ time: t, value: v })
+						up.push({ time: t })
+					}
+
+					// At a flip, back-fill the previous bar into the NEW side so
+					// the two colours meet instead of leaving a one-bar hole.
+					// This draws the vertical jump you see on Kite.
+					if (prevTrend !== null && trend !== prevTrend && i > period) {
+						const arr = trend === 1 ? up : down
+						arr[arr.length - 2] = {
+							time: data[i - 1].time,
+							value: prevSt,
+						}
+						flips.push({
+							time: t,
+							dir: trend === 1 ? "up" : "down",
+							price: data[i].close,
+							level: v,
+						})
+					}
+
+					prevTrend = trend
+					prevFub = fub
+					prevFlb = flb
+					prevSt = st
+				}
+				return { up, down, flips }
+			}
+
+
+			// ------------------------------------------------------- event markers
+			// Dots on the price series where something actually happened. These are
+			// EVENTS, not states: a marker appears on the bar a condition became
+			// true, not on every bar it stays true. Marking the state would paint
+			// half the chart and tell you nothing.
+			//
+			// Everything is computed from closed bars already on the chart, so the
+			// markers agree with what the alert engine and the backtester see.
+			function _rsiSeries(closes, period) {
+				const out = new Array(closes.length).fill(null)
+				if (closes.length <= period) return out
+				let g = 0,
+					l = 0
+				for (let i = 1; i <= period; i++) {
+					const d = closes[i] - closes[i - 1]
+					if (d >= 0) g += d
+					else l -= d
+				}
+				let ag = g / period,
+					al = l / period
+				out[period] = al === 0 ? 100 : 100 - 100 / (1 + ag / al)
+				for (let i = period + 1; i < closes.length; i++) {
+					const d = closes[i] - closes[i - 1]
+					ag = (ag * (period - 1) + (d > 0 ? d : 0)) / period
+					al = (al * (period - 1) + (d < 0 ? -d : 0)) / period
+					out[i] = al === 0 ? 100 : 100 - 100 / (1 + ag / al)
+				}
+				return out
+			}
+
+			function _crossEvents(c, a, b, upText, downText, colUp, colDown) {
+				const out = []
+				for (let i = 1; i < c.length; i++) {
+					if (a[i] == null || b[i] == null || a[i - 1] == null || b[i - 1] == null)
+						continue
+					if (a[i - 1] <= b[i - 1] && a[i] > b[i])
+						out.push({ time: c[i].time, dir: "up", text: upText, color: colUp })
+					else if (a[i - 1] >= b[i - 1] && a[i] < b[i])
+						out.push({ time: c[i].time, dir: "down", text: downText, color: colDown })
+				}
+				return out
+			}
+
+			const EVENTS = {
+				st_flip: {
+					label: "Supertrend flip",
+					color: "#26a69a",
+					fn: (c) =>
+						supertrend(c, 10, 3).flips.map((f) => ({
+							time: f.time,
+							dir: f.dir,
+							text: f.dir === "up" ? "ST↑" : "ST↓",
+							color: f.dir === "up" ? "#26a69a" : "#ef5350",
+						})),
+				},
+				rsi_ob: {
+					label: "RSI crosses 70 / 30",
+					color: "#e3b341",
+					fn: (c) => {
+						const r = _rsiSeries(_cl(c), 14)
+						const out = []
+						for (let i = 1; i < c.length; i++) {
+							if (r[i] == null || r[i - 1] == null) continue
+							if (r[i - 1] <= 70 && r[i] > 70)
+								out.push({ time: c[i].time, dir: "down", text: "RSI 70", color: "#ef5350" })
+							else if (r[i - 1] >= 30 && r[i] < 30)
+								out.push({ time: c[i].time, dir: "up", text: "RSI 30", color: "#26a69a" })
+						}
+						return out
+					},
+				},
+				macd_cross: {
+					label: "MACD signal cross",
+					color: "#4184e4",
+					fn: (c) => {
+						const cl = _cl(c)
+						const f = _ema(cl, 12),
+							sl = _ema(cl, 26)
+						const macd = cl.map((_, i) =>
+							f[i] == null || sl[i] == null ? null : f[i] - sl[i],
+						)
+						const vals = macd.filter((x) => x != null)
+						const sigVals = _ema(vals, 9)
+						const sig = new Array(macd.length).fill(null)
+						let k = 0
+						for (let i = 0; i < macd.length; i++)
+							if (macd[i] != null) sig[i] = sigVals[k++]
+						return _crossEvents(c, macd, sig, "MACD↑", "MACD↓", "#26a69a", "#ef5350")
+					},
+				},
+				ma_cross: {
+					label: "Golden / death cross (50/200)",
+					color: "#c9a0e4",
+					fn: (c) => {
+						const cl = _cl(c)
+						return _crossEvents(
+							c,
+							_sma(cl, 50),
+							_sma(cl, 200),
+							"Golden",
+							"Death",
+							"#26a69a",
+							"#ef5350",
+						)
+					},
+				},
+				bb_break: {
+					label: "Bollinger band break",
+					color: "#8b949e",
+					fn: (c) => {
+						const cl = _cl(c),
+							m = _sma(cl, 20),
+							sd = _std(cl, 20)
+						const out = []
+						let outside = 0
+						for (let i = 0; i < cl.length; i++) {
+							if (m[i] == null || sd[i] == null) continue
+							const up = m[i] + 2 * sd[i],
+								lo = m[i] - 2 * sd[i]
+							const now = cl[i] > up ? 1 : cl[i] < lo ? -1 : 0
+							// only on the bar it BECOMES true
+							if (now !== 0 && now !== outside)
+								out.push({
+									time: c[i].time,
+									dir: now === 1 ? "up" : "down",
+									text: now === 1 ? "BB↑" : "BB↓",
+									color: now === 1 ? "#26a69a" : "#ef5350",
+								})
+							outside = now
+						}
+						return out
+					},
+				},
+				vol_surge: {
+					label: "Volume ≥ 2× average",
+					color: "#4184e4",
+					fn: (c) => {
+						const v = _vol(c),
+							a = _sma(v, 20)
+						const out = []
+						for (let i = 0; i < c.length; i++) {
+							if (a[i] == null || a[i] <= 0) continue
+							if (v[i] >= a[i] * 2)
+								out.push({
+									time: c[i].time,
+									dir: c[i].close >= c[i].open ? "up" : "down",
+									text: (v[i] / a[i]).toFixed(1) + "×",
+									color: "#4184e4",
+								})
+						}
+						return out
+					},
+				},
+			}
+
+			let eventsOn = new Set(
+				JSON.parse(localStorage.getItem("tf_events") || "null") || [],
+			)
+
+			function refreshMarkers() {
+				if (!series) return
+				// The bars ON SCREEN, not every bar loaded. Two reasons, and the
+				// second is the important one:
+				//
+				//   Rendering — lightweight-charts pins a marker whose time is
+				//   past the last data point onto the last visible bar, so during
+				//   replay every future event piled up on the replay edge as a
+				//   stack of arrows.
+				//
+				//   Honesty — replay exists to show a setup unfolding WITHOUT
+				//   knowing what came next. Marking events that haven't happened
+				//   yet defeats the entire feature.
+				const bars = shownCandles()
+				if (!eventsOn.size || !bars.length) {
+					series.setMarkers([])
+					return
+				}
+				const all = []
+				for (const key of eventsOn) {
+					const def = EVENTS[key]
+					if (!def) continue
+					try {
+						for (const e of def.fn(bars)) all.push({ ...e, key })
+					} catch (err) {
+						/* one broken event type must not blank the rest */
+					}
+				}
+				// lightweight-charts requires markers sorted by time, and silently
+				// mis-renders if they aren't.
+				all.sort((a, b) => a.time - b.time)
+				series.setMarkers(
+					all.map((e) => ({
+						time: e.time,
+						position: e.dir === "up" ? "belowBar" : "aboveBar",
+						color: e.color,
+						shape: e.dir === "up" ? "arrowUp" : "arrowDown",
+						text: e.text,
+					})),
+				)
+			}
+
+			function renderEventMenu() {
+				const m = $("#evmenu")
+				m.innerHTML =
+					Object.entries(EVENTS)
+						.map(
+							([k, d]) =>
+								`<label><input type="checkbox" data-e="${k}"${
+									eventsOn.has(k) ? " checked" : ""
+								}><span class="dot" style="background:${d.color}"></span>${
+									d.label
+								}</label>`,
+						)
+						.join("") +
+					`<div class="hint">Marks the bar a condition BECAME true, not
+					 every bar it stays true.</div>`
+				m.querySelectorAll("input[data-e]").forEach((i) => {
+					i.onchange = () => {
+						if (i.checked) eventsOn.add(i.dataset.e)
+						else eventsOn.delete(i.dataset.e)
+						localStorage.setItem(
+							"tf_events",
+							JSON.stringify([...eventsOn]),
+						)
+						refreshMarkers()
+						$("#evbtn").textContent = eventsOn.size
+							? `● Events (${eventsOn.size}) ▾`
+							: "● Events ▾"
+					}
+				})
+			}
+
+
+			// ------------------------------------------------------- chart layouts
+			// A layout is the whole working setup: which indicators are on, their
+			// parameters AND any per-instance style overrides, which event markers
+			// are enabled, and the interval. Stored server-side so it survives a
+			// browser change — the same reason drawings are meant to.
+			function currentLayout() {
+				return {
+					interval: state.interval,
+					range: state.range,
+					events: [...eventsOn],
+					indicators: activeInd.map((i) => ({
+						key: i.key,
+						p: { ...i.p },
+						s: i.s ? JSON.parse(JSON.stringify(i.s)) : undefined,
+					})),
+				}
+			}
+
+			async function applyLayout(spec) {
+				if (!spec) return
+				// Clear first, then rebuild. Reusing the existing instances would
+				// leave orphaned panes behind for any indicator the layout drops.
+				for (const inst of [...activeInd]) removeIndicator(inst.id)
+				activeInd = []
+				for (const d of spec.indicators || []) {
+					if (!IND[d.key]) continue // an indicator that no longer exists
+					const inst = {
+						id: ++indSeq,
+						key: d.key,
+						p: { ...IND[d.key].p, ...(d.p || {}) },
+					}
+					if (d.s) inst.s = d.s
+					activeInd.push(inst)
+					renderIndicator(inst)
+				}
+				renderChips()
+
+				eventsOn = new Set(spec.events || [])
+				localStorage.setItem("tf_events", JSON.stringify([...eventsOn]))
+				renderEventMenu()
+				$("#evbtn").textContent = eventsOn.size
+					? `● Events (${eventsOn.size}) ▾`
+					: "● Events ▾"
+				refreshMarkers()
+
+				// Switching interval refetches, so only do it if it actually
+				// differs — otherwise applying a layout reloads the chart for
+				// no reason and loses your scroll position.
+				let reload = false
+				if (spec.interval && spec.interval !== state.interval) {
+					state.interval = spec.interval
+					$("#ivals button[data-i].on")?.classList.remove("on")
+					if (spec.tf) state.tf = spec.tf
+					if (spec.ctype) setChartType(spec.ctype)
+					$(`#ivmenu button[data-i="${spec.tf || spec.interval}"]`)?.classList.add("on")
+					reload = true
+				}
+				if (spec.range && spec.range !== state.range) {
+					state.range = spec.range
+					$("#ivals button[data-r].on")?.classList.remove("on")
+					$(`#ivals button[data-r="${spec.range}"]`)?.classList.add("on")
+					reload = true
+				}
+				if (reload && state.cur) load(state.cur.symbol)
+			}
+
+			async function loadLayouts() {
+				let d = { layouts: [] }
+				try {
+					d = await (await fetch("/api/layouts")).json()
+				} catch (e) {
+					/* layouts are a convenience; never block the chart */
+				}
+				LAYOUTS = d.layouts || []
+				const list = $("#laylist")
+				list.innerHTML = LAYOUTS.length
+					? LAYOUTS.map(
+							(l) =>
+								`<div class="row" data-l="${l.name}">
+									${l.name}${l.is_default ? " ★" : ""}
+									<span class="x" data-del="${l.name}" title="delete">×</span>
+								</div>`,
+						).join("")
+					: '<div class="empty">No saved layouts yet. Set up your ' +
+						"indicators, then type a name above and press Enter.</div>"
+				list.querySelectorAll(".row").forEach((el) => {
+					el.onclick = async (ev) => {
+						const del = ev.target.dataset && ev.target.dataset.del
+						if (del) {
+							await fetch(`/api/layouts/${encodeURIComponent(del)}`, {
+								method: "DELETE",
+							})
+							loadLayouts()
+							return
+						}
+						const l = LAYOUTS.find((x) => x.name === el.dataset.l)
+						if (!l) return
+						$("#laymenu").classList.remove("open")
+						await applyLayout(l.spec)
+						status(`layout '${l.name}' applied`)
+					}
+				})
+				return LAYOUTS
+			}
+
+			async function saveLayout(name, asDefault) {
+				const q = new URLSearchParams({
+					spec: JSON.stringify(currentLayout()),
+				})
+				if (asDefault) q.set("is_default", "true")
+				const r = await fetch(
+					`/api/layouts/${encodeURIComponent(name)}?` + q,
+					{ method: "POST" },
+				)
+				if (!r.ok) {
+					status("could not save layout")
+					return
+				}
+				await loadLayouts()
+				status(
+					`layout '${name}' saved` +
+						(asDefault ? " and set as default" : ""),
+				)
+			}
+
+			// ------------------------------------------------------------- charts
+			function makeCharts() {
+				const opts = {
+					layout: {
+						background: { color: "#0e1116" },
+						textColor: "#8b949e",
+					},
+					grid: {
+						vertLines: { color: "#161b22" },
+						horzLines: { color: "#161b22" },
+					},
+					timeScale: {
+						timeVisible: true,
+						secondsVisible: false,
+						borderColor: "#2d333b",
+					},
+					rightPriceScale: { borderColor: "#2d333b" },
+					crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+					autoSize: true,
+				}
+				chart = LightweightCharts.createChart($("#chart"), opts)
+				series = chart.addCandlestickSeries({
+					upColor: "#26a69a",
+					downColor: "#ef5350",
+					wickUpColor: "#26a69a",
+					wickDownColor: "#ef5350",
+					borderVisible: false,
+				})
+				volSeries = chart.addHistogramSeries({
+					priceScaleId: "vol",
+					priceFormat: { type: "volume" },
+					color: "#2d333b",
+				})
+				chart
+					.priceScale("vol")
+					.applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } })
+				paneOpts = opts
+				initDrawing()
+				initKeys()
+				initSmallWins()
+				initPickers()
+				initSideGrip()
+
+				// main range drives every oscillator pane
+				chart.timeScale().subscribeVisibleLogicalRangeChange((r) => {
+					if (syncing || !r) return
+					syncing = true
+					for (const p of oscPanes)
+						p.chart.timeScale().setVisibleLogicalRange(r)
+					syncing = false
+				})
+
+				chart.subscribeCrosshairMove((p) => {
+					const c = p.seriesData && p.seriesData.get(series)
+					updateLegend(
+						c && c.close !== undefined ? c : null,
+						p.seriesData && p.seriesData.get(volSeries),
+					)
+					updateIndicatorValues(p && p.time != null ? p.time : null)
+				})
+			}
+
+			// ------------------------------------------------------------- panes engine
+			function paneHeights() {
+				try {
+					return JSON.parse(localStorage.getItem("tf_paneh") || "{}")
+				} catch (e) {
+					return {}
+				}
+			}
+			function savePaneH(key, h) {
+				const m = paneHeights()
+				m[key] = Math.round(h)
+				try {
+					localStorage.setItem("tf_paneh", JSON.stringify(m))
+				} catch (e) {}
+			}
+			function makeOscPane(inst) {
+				const el = document.createElement("div")
+				el.className = "pane"
+				el.style.height = (paneHeights()[inst.key] || 120) + "px"
+				el.innerHTML =
+					`<div class="pgrip" title="drag to resize · double-click to reset"></div>` +
+					`<div class="plabel"></div>` +
+					`<div class="pcfg" title="settings">⚙</div>` +
+					`<div class="prm" title="remove">✕</div>`
+				$("#panes").appendChild(el)
+				const host = document.createElement("div")
+				host.style.cssText = "position:absolute;inset:0;"
+				el.insertBefore(host, el.firstChild)
+				const pc = LightweightCharts.createChart(host, {
+					...paneOpts,
+					timeScale: { ...paneOpts.timeScale, visible: true },
+				})
+				// pane range drives the main chart (which re-broadcasts to the others)
+				pc.timeScale().subscribeVisibleLogicalRangeChange((r) => {
+					if (syncing || !r) return
+					syncing = true
+					chart.timeScale().setVisibleLogicalRange(r)
+					for (const p of oscPanes)
+						if (p.chart !== pc)
+							p.chart.timeScale().setVisibleLogicalRange(r)
+					syncing = false
+				})
+				el.querySelector(".prm").onclick = () =>
+					removeIndicator(inst.id)
+				el.querySelector(".pcfg").onclick = () => openCfg(inst.id)
+				// vertical resize: drag the grip on the pane's top edge. The main
+				// chart is flex:1 with autoSize, so it absorbs whatever this pane
+				// gives or takes — no manual chart.resize() needed.
+				const grip = el.querySelector(".pgrip")
+				grip.addEventListener("pointerdown", (ev) => {
+					ev.preventDefault()
+					grip.setPointerCapture(ev.pointerId)
+					const startY = ev.clientY
+					const startH = el.offsetHeight
+					// never squeeze the price chart under 140px
+					const maxH =
+						startH + Math.max(0, $("#chart").offsetHeight - 140)
+					document.body.classList.add("rowdrag")
+					const move = (m) => {
+						const h = Math.max(
+							64,
+							Math.min(maxH, startH - (m.clientY - startY)),
+						)
+						el.style.height = h + "px"
+					}
+					const up = () => {
+						grip.removeEventListener("pointermove", move)
+						grip.removeEventListener("pointerup", up)
+						document.body.classList.remove("rowdrag")
+						savePaneH(inst.key, el.offsetHeight)
+					}
+					grip.addEventListener("pointermove", move)
+					grip.addEventListener("pointerup", up)
+				})
+				grip.addEventListener("dblclick", () => {
+					el.style.height = "120px"
+					savePaneH(inst.key, 120)
+				})
+				return { inst, el, chart: pc, series: [] }
+			}
+			// Pane series drop their warm-up bars (RSI-14 starts 14 bars in),
+			// but lightweight-charts numbers logical indices from each chart's OWN
+			// first point — so a pane that starts late renders shifted against the
+			// main chart. Padding every pane row to the full candle timeline with
+			// whitespace points gives all charts the same index space.
+			function padToCandles(data) {
+				const m = new Map((data || []).map((d) => [d.time, d]))
+				return candles.map((c) => m.get(c.time) || { time: c.time })
+			}
+			// The main chart's price axis ("2,657.95") is wider than an
+			// oscillator's ("40.4"), which shrinks its plot area and skews the
+			// x-mapping by that many pixels. Equalise: measure every right price
+			// scale and pin them all to the widest via minimumWidth.
+			function syncScaleWidths() {
+				const charts = [chart, ...oscPanes.map((p) => p.chart)]
+				for (const c of charts)
+					try {
+						c.priceScale("right").applyOptions({ minimumWidth: 0 })
+					} catch (e) {}
+				requestAnimationFrame(() => {
+					let w = 0
+					for (const c of charts)
+						try {
+							w = Math.max(w, c.priceScale("right").width())
+						} catch (e) {}
+					if (!w) return
+					for (const c of charts)
+						try {
+							c.priceScale("right").applyOptions({
+								minimumWidth: w,
+							})
+						} catch (e) {}
+					syncPanesNow()
+				})
+			}
+			window.addEventListener("resize", () => syncScaleWidths())
+			function syncPanesNow() {
+				const r = chart.timeScale().getVisibleLogicalRange()
+				if (!r) return
+				syncing = true
+				for (const p of oscPanes)
+					p.chart.timeScale().setVisibleLogicalRange(r)
+				syncing = false
+			}
+
+			// ------------------------------------------------------------- render one
+			function renderIndicator(inst) {
+				const def = IND[inst.key]
+				const res = def.fn(candles, inst.p)
+				inst._cat = def.cat
+				inst._fmt = res.fmt ?? 2
+				// snapshot the compute-time colors (for the Style tab's Defaults),
+				// then apply this instance's style overrides on top
+				const allRows =
+					def.cat === "overlay"
+						? res.overlays || []
+						: res.panerows || []
+				inst._base = allRows.map((r) => ({
+					name: r.name,
+					color: r.color,
+				}))
+				if (inst.s)
+					for (const r of allRows) {
+						if (r.type === "hist") continue
+						if (inst.s.colors && inst.s.colors[r.name])
+							r.color = inst.s.colors[r.name]
+						if (inst.s.width) r.width = inst.s.width
+					}
+				// keep each rendered row's time->value map so the legend can read the value
+				// under the crosshair (or the last bar when the cursor is off-chart)
+				const rowsOf =
+					def.cat === "overlay"
+						? res.overlays || []
+						: res.panerows || []
+				inst._rows = rowsOf.map((r) => ({
+					name: r.name,
+					color: r.color,
+					map: new Map((r.data || []).map((d) => [d.time, d.value])),
+					last:
+						r.data && r.data.length
+							? r.data[r.data.length - 1].value
+							: null,
+				}))
+				if (def.cat === "overlay") {
+					const handles = []
+					for (const ov of res.overlays || []) {
+						const s = chart.addLineSeries({
+							color: ov.color,
+							lineWidth: ov.width || 1,
+							priceLineVisible: false,
+							lastValueVisible: false,
+							crosshairMarkerVisible: false,
+							lineStyle: ov.dashed ? 2 : 0,
+							lineType: ov.dots ? undefined : 0,
+							pointMarkersVisible: !!ov.dots,
+							pointMarkersRadius: ov.dots ? 1.4 : undefined,
+						})
+						s.setData(ov.data)
+						handles.push(s)
+					}
+					overlaySeries.push({ inst, series: handles })
+				} else {
+					const pane = makeOscPane(inst)
+					for (const row of res.panerows || []) {
+						const s =
+							row.type === "hist"
+								? pane.chart.addHistogramSeries({
+										priceLineVisible: false,
+										lastValueVisible: false,
+									})
+								: pane.chart.addLineSeries({
+										color: row.color,
+										lineWidth: row.width || 1,
+										priceLineVisible: false,
+										lastValueVisible: false,
+										crosshairMarkerVisible: false,
+										priceFormat: {
+											type: "custom",
+											formatter: (v) =>
+												v.toFixed(res.fmt ?? 2),
+										},
+									})
+						s.setData(padToCandles(row.data))
+						pane.series.push(s)
+					}
+					for (const rf of res.refs || [])
+						pane.series[0]?.createPriceLine({
+							price: rf.v,
+							color: rf.color,
+							lineStyle: 2,
+							lineWidth: 1,
+						})
+					pane.labelBase = def.name + "  " + pstr(inst)
+					oscPanes.push(pane)
+					syncPanesNow()
+					syncScaleWidths()
+				}
+			}
+
+			// value(s) of an indicator at a given time (or last bar if not found)
+			function indValues(inst, time) {
+				return inst._rows.map((r) => {
+					let v =
+						time != null && r.map.has(time) ? r.map.get(time) : null
+					if (v == null) v = r.last
+					return {
+						name: r.name,
+						color: r.color,
+						text:
+							v == null
+								? "—"
+								: (+v).toLocaleString("en-IN", {
+										maximumFractionDigits: inst._fmt,
+									}),
+					}
+				})
+			}
+			// refresh every indicator's on-chart value readout for the crosshair time
+			function updateIndicatorValues(time) {
+				const t =
+					time != null
+						? time
+						: candles.length
+							? candles[candles.length - 1].time
+							: null
+				for (const inst of activeInd) {
+					const vals = indValues(inst, t)
+					if (inst._cat === "overlay") {
+						const el = document.querySelector(
+							`.ichip[data-id="${inst.id}"] .ival`,
+						)
+						if (el)
+							el.textContent = vals.map((v) => v.text).join(" / ")
+					} else {
+						const pane = oscPanes.find((p) => p.inst.id === inst.id)
+						if (pane) {
+							const lbl = pane.el.querySelector(".plabel")
+							lbl.innerHTML =
+								`${pane.labelBase}  ` +
+								vals
+									.map(
+										(v) =>
+											`<span style="color:${v.color}">${v.text}</span>`,
+									)
+									.join(" ")
+						}
+					}
+				}
+			}
+
+			// ------------------------------------------------------------- add / remove
+			function addIndicator(key) {
+				const def = IND[key]
+				const inst = { id: ++indSeq, key, p: { ...def.p } }
+				// block an exact duplicate (same indicator + identical params); a second
+				// copy with different settings is fine — change one via ⚙ then add another.
+				const dup = activeInd.find(
+					(x) =>
+						x.key === key &&
+						JSON.stringify(x.p) === JSON.stringify(inst.p),
+				)
+				if (dup) {
+					status(
+						`${def.name} ${pstr(inst)} already added — change its settings to add another`,
+					)
+					return
+				}
+				activeInd.push(inst)
+				renderIndicator(inst)
+				renderChips()
+			}
+			function removeIndicator(id) {
+				const i = activeInd.findIndex((x) => x.id === id)
+				if (i < 0) return
+				// drop overlay series
+				const ov = overlaySeries.filter((o) => o.inst.id === id)
+				ov.forEach((o) =>
+					o.series.forEach((s) => {
+						try {
+							chart.removeSeries(s)
+						} catch (e) {}
+					}),
+				)
+				overlaySeries = overlaySeries.filter((o) => o.inst.id !== id)
+				// drop osc pane
+				const pane = oscPanes.find((p) => p.inst.id === id)
+				if (pane) {
+					try {
+						pane.chart.remove()
+					} catch (e) {}
+					pane.el.remove()
+					oscPanes = oscPanes.filter((p) => p.inst.id !== id)
+				}
+				activeInd.splice(i, 1)
+				renderChips()
+				syncScaleWidths()
+			}
+			function reapplyIndicators() {
+				// recompute all (after new data / chart-type switch)
+				overlaySeries.forEach((o) =>
+					o.series.forEach((s) => {
+						try {
+							chart.removeSeries(s)
+						} catch (e) {}
+					}),
+				)
+				overlaySeries = []
+				oscPanes.forEach((p) => {
+					try {
+						p.chart.remove()
+					} catch (e) {}
+					p.el.remove()
+				})
+				oscPanes = []
+				for (const inst of activeInd) renderIndicator(inst)
+			}
+			// legacy hooks used elsewhere in the file
+			function clearIndicators() {
+				overlaySeries.forEach((o) =>
+					o.series.forEach((s) => {
+						try {
+							chart.removeSeries(s)
+						} catch (e) {}
+					}),
+				)
+				overlaySeries = []
+			}
+			function applyIndicators() {
+				reapplyIndicators()
+			}
+
+			// ------------------------------------------------------------- chips + catalog
+			function pstr(inst) {
+				const keys = Object.keys(inst.p).filter((k) => k !== "color")
+				return keys.map((k) => inst.p[k]).join(",")
+			}
+			function renderChips() {
+				$("#indchips").innerHTML = activeInd
+					.map((inst) => {
+						const def = IND[inst.key]
+						const sw = inst.p.color
+							? `<span class="sw" style="background:${inst.p.color}"></span>`
+							: ""
+						const ps = pstr(inst)
+						return (
+							`<span class="ichip" data-id="${inst.id}">${sw}${def.name}${ps ? ` <span style="color:#8b949e">${ps}</span>` : ""}` +
+							` <span class="ival" style="color:#e6edf3;font-variant-numeric:tabular-nums"></span>` +
+							`${Object.keys(inst.p).length ? `<span class="cfg" title="settings">⚙</span>` : ""}` +
+							`<span class="x" title="remove">✕</span></span>`
+						)
+					})
+					.join("")
+				$("#indchips")
+					.querySelectorAll(".ichip")
+					.forEach((el) => {
+						const id = +el.dataset.id
+						el.querySelector(".x").onclick = () =>
+							removeIndicator(id)
+						const cfg = el.querySelector(".cfg")
+						if (cfg) cfg.onclick = () => openCfg(id)
+					})
+				updateIndicatorValues(null) // fill in last-bar values immediately
+			}
+			const CAT_LABEL = { overlay: "Overlays", osc: "Oscillators" }
+			function buildCatalog(filter = "") {
+				const q = filter.trim().toLowerCase()
+				const groups = { overlay: [], osc: [] }
+				for (const [key, def] of Object.entries(IND))
+					if (
+						!q ||
+						def.name.toLowerCase().includes(q) ||
+						key.includes(q)
+					)
+						groups[def.cat].push({ key, def })
+				let html = ""
+				for (const cat of ["overlay", "osc"]) {
+					if (!groups[cat].length) continue
+					html +=
+						`<div class="grphead">${CAT_LABEL[cat]}</div>` +
+						groups[cat]
+							.map(
+								({ key, def }) =>
+									`<div class="il" data-k="${key}"><span>${def.name}</span><span class="cat">${key}</span></div>`,
+							)
+							.join("")
+				}
+				const box = $("#indlist")
+				box.innerHTML =
+					html ||
+					`<div class="none">No indicator matches “${filter}”.</div>`
+				box.querySelectorAll(".il").forEach(
+					(el) =>
+						(el.onclick = () => {
+							addIndicator(el.dataset.k)
+							closeIndMenu()
+						}),
+				)
+			}
+			function closeIndMenu() {
+				$("#indmenu").classList.remove("open")
+			}
+
+			// ------------------------------------------------------------- settings modal
+			// Kite/TradingView-style dialog: Inputs + Style tabs, Defaults,
+			// Ok/Cancel. Opened from a chip's ⚙ or an oscillator pane's ⚙.
+			const HEXCOLOR = /^#[0-9a-f]{3,8}$/i
+			const PLABEL = {
+				length: "Length",
+				fast: "Fast length",
+				slow: "Slow length",
+				signal: "Signal smoothing",
+				mult: "Multiplier",
+				k: "%K length",
+				d: "%D smoothing",
+				smooth: "%K smoothing",
+				step: "Acceleration step",
+				max: "Max acceleration",
+				up: "Uptrend colour",
+				dn: "Downtrend colour",
+			}
+			let cfgInst = null
+			function rebuildInstance(inst) {
+				const id = inst.id
+				const ovh = overlaySeries.filter((o) => o.inst.id === id)
+				ovh.forEach((o) =>
+					o.series.forEach((se) => {
+						try {
+							chart.removeSeries(se)
+						} catch (e) {}
+					}),
+				)
+				overlaySeries = overlaySeries.filter((o) => o.inst.id !== id)
+				const pane = oscPanes.find((pn) => pn.inst.id === id)
+				if (pane) {
+					try {
+						pane.chart.remove()
+					} catch (e) {}
+					pane.el.remove()
+					oscPanes = oscPanes.filter((pn) => pn.inst.id !== id)
+				}
+				renderIndicator(inst)
+				renderChips()
+			}
+			function cfgFillInputs(pvals) {
+				// Colour-valued params belong in the Style tab, not as number
+				// spinners. Detected by value so a new one needs no bookkeeping.
+				const keys = Object.keys(pvals).filter(
+					(k) => !HEXCOLOR.test(String(pvals[k])),
+				)
+				$("#cfg_inputs").innerHTML = keys.length
+					? keys
+							.map(
+								(k) =>
+									`<div class="crow"><span>${PLABEL[k] || k}</span>` +
+									`<input type="number" data-k="${k}" step="${String(pvals[k]).includes(".") ? "0.01" : "1"}" value="${pvals[k]}"></div>`,
+							)
+							.join("")
+					: `<div class="cnone">This indicator has no inputs.</div>`
+			}
+			function cfgFillStyle(inst, useBase) {
+				const rows = []
+				// Indicators that carry colour as a real parameter — the MAs'
+				// `color`, Supertrend's `up`/`dn` — configure it here instead of
+				// through the per-row override map, because the row it would
+				// override no longer maps 1:1 to a colour.
+				const pcolors = Object.keys(inst.p).filter((k) =>
+					HEXCOLOR.test(String(inst.p[k])),
+				)
+				if (pcolors.length) {
+					for (const k of pcolors) {
+						const v = useBase ? IND[inst.key].p[k] : inst.p[k]
+						rows.push(
+							`<div class="crow"><span>${PLABEL[k] || "Color"}</span><input type="color" data-c="__p:${k}" value="${v}"></div>`,
+						)
+					}
+				} else {
+					for (const b of inst._base || []) {
+						if (b.color == null) continue
+						const cur =
+							!useBase && inst.s?.colors?.[b.name]
+								? inst.s.colors[b.name]
+								: b.color
+						rows.push(
+							`<div class="crow"><span>${b.name}</span><input type="color" data-c="${b.name}" value="${cur}"></div>`,
+						)
+					}
+				}
+				const w = useBase ? 1 : inst.s?.width || 1
+				rows.push(
+					`<div class="crow"><span>Line width</span><select data-w="1">` +
+						[1, 2, 3]
+							.map(
+								(x) =>
+									`<option value="${x}"${x === w ? " selected" : ""}>${x} px</option>`,
+							)
+							.join("") +
+						`</select></div>`,
+				)
+				$("#cfg_style").innerHTML = rows.join("")
+			}
+			function openCfg(id) {
+				const inst = activeInd.find((x) => x.id === id)
+				if (!inst) return
+				cfgInst = inst
+				$("#cfgtitle").textContent = IND[inst.key].name
+				cfgTab("inputs")
+				cfgFillInputs(inst.p)
+				cfgFillStyle(inst, false)
+				$("#cfgwrap").classList.add("open")
+				const first = $("#cfg_inputs input")
+				if (first) {
+					first.focus()
+					first.select()
+				}
+			}
+			function cfgTab(t) {
+				document
+					.querySelectorAll("#cfgmodal .ct")
+					.forEach((el) =>
+						el.classList.toggle("on", el.dataset.t === t),
+					)
+				$("#cfg_inputs").style.display = t === "inputs" ? "" : "none"
+				$("#cfg_style").style.display = t === "style" ? "" : "none"
+			}
+			function closeCfg() {
+				$("#cfgwrap").classList.remove("open")
+				cfgInst = null
+			}
+			function applyCfg() {
+				const inst = cfgInst
+				if (!inst) return
+				// inputs
+				document
+					.querySelectorAll("#cfg_inputs input[data-k]")
+					.forEach((inp) => {
+						const v = +inp.value
+						if (Number.isFinite(v)) inst.p[inp.dataset.k] = v
+					})
+				// style
+				inst.s = inst.s || { colors: {} }
+				inst.s.colors = inst.s.colors || {}
+				document
+					.querySelectorAll("#cfg_style input[data-c]")
+					.forEach((inp) => {
+						if (inp.dataset.c.startsWith("__p")) {
+							// "__p" (legacy, the MAs) or "__p:<param>"
+							inst.p[inp.dataset.c.split(":")[1] || "color"] =
+								inp.value
+							return
+						}
+						const base = (inst._base || []).find(
+							(b) => b.name === inp.dataset.c,
+						)
+						if (
+							base &&
+							inp.value.toLowerCase() ===
+								String(base.color).toLowerCase()
+						)
+							delete inst.s.colors[inp.dataset.c]
+						else inst.s.colors[inp.dataset.c] = inp.value
+					})
+				const wsel = $("#cfg_style select[data-w]")
+				inst.s.width = wsel && +wsel.value > 1 ? +wsel.value : null
+				if (!Object.keys(inst.s.colors).length && !inst.s.width)
+					inst.s = null
+				const keep = inst
+				closeCfg()
+				rebuildInstance(keep)
+			}
+			document
+				.querySelectorAll("#cfgmodal .ct")
+				.forEach((el) => (el.onclick = () => cfgTab(el.dataset.t)))
+			$("#cfgmodal .cx").onclick = closeCfg
+			$("#cfgcancel").onclick = closeCfg
+			$("#cfgok").onclick = applyCfg
+			$("#cfgdef").onclick = () => {
+				if (!cfgInst) return
+				cfgFillInputs(IND[cfgInst.key].p)
+				cfgFillStyle(cfgInst, true)
+			}
+			$("#cfgwrap").onclick = (e) => {
+				if (e.target === $("#cfgwrap")) closeCfg()
+			}
+			document.addEventListener("keydown", (e) => {
+				if (!$("#cfgwrap").classList.contains("open")) return
+				if (e.key === "Escape") closeCfg()
+				else if (e.key === "Enter" && e.target.tagName !== "SELECT") {
+					e.preventDefault()
+					applyCfg()
+				}
+			})
+
+			function updateLegend(bar, vol) {
+				const b = bar || lastBar
+				if (!b) {
+					$("#legend").innerHTML = ""
+					return
+				}
+				const v = (vol && vol.value) ?? b.volume
+				const idx = candles.findIndex((c) => c.time === b.time)
+				const prev = idx > 0 ? candles[idx - 1] : null
+				const ref = prev ? prev.close : b.open
+				const chg = ref ? ((b.close - ref) / ref) * 100 : 0
+				const cls = b.close >= b.open ? "up" : "down"
+				const f = (x) => (x == null ? "—" : x.toLocaleString("en-IN"))
+				let extra = ""
+				if (daily52)
+					extra = `<span>52W H <b>${f(daily52.high)}</b></span><span>52W L <b>${f(daily52.low)}</b></span>`
+				$("#legend").innerHTML =
+					`<span>O <b>${f(b.open)}</b></span><span>H <b>${f(b.high)}</b></span>` +
+					`<span>L <b>${f(b.low)}</b></span><span>C <b class="${cls}">${f(b.close)}</b></span>` +
+					`<span>V <b>${f(v)}</b></span>` +
+					`<span class="${chg >= 0 ? "up" : "down"}">${chg >= 0 ? "+" : ""}${chg.toFixed(2)}%</span>` +
+					extra
+			}
+
+			function rangeDays() {
+				if (state.range === "YTD") {
+					const now = new Date()
+					return Math.max(
+						2,
+						Math.ceil(
+							(now - new Date(now.getFullYear(), 0, 1)) / 864e5,
+						),
+					)
+				}
+				return RANGES[state.range]
+			}
+
+			// ------------------------------------------------------------- data
+			async function load(symbol) {
+				status("loading…")
+				try {
+					const days = Math.min(
+						rangeDays(),
+						INTERVAL_CAP[state.interval],
+					)
+					if (days < rangeDays())
+						status(
+							`(${state.range} clamped to ${days}d for ${state.interval} candles)`,
+						)
+					const r = await fetch(
+						`/api/candles?symbol=${encodeURIComponent(symbol)}` +
+							`&interval=${state.interval}&days=${days}`,
+					)
+					if (!r.ok) {
+						status((await r.json()).detail)
+						return
+					}
+					const d = await r.json()
+					state.cur = d
+					$("#title").textContent = d.symbol
+					$("#name").textContent = d.name
+					candles = d.candles
+					series.setData(seriesData(state.ctype, applyTimeframe(candles, state.tf)))
+					// Both of these are anchored to the symbol we just left.
+					if (replay.on) replayExit()
+					clearCompare()
+					loadDrawings()
+					showPinnedBacktest()
+					syncScaleWidths()
+					volSeries.setData(
+						candles.map((c) => ({
+							time: c.time,
+							value: c.volume,
+							color:
+								c.close >= c.open
+									? "rgba(38,166,154,.35)"
+									: "rgba(239,83,80,.35)",
+						})),
+					)
+					lastBar = candles[candles.length - 1] || null
+					chart.timeScale().fitContent()
+					status(`${candles.length} candles`)
+					await load52w(d.symbol)
+					applyIndicators()
+					updateLegend(null, null)
+					startTicks(d.token)
+					initChartAlerts()
+					refreshAlertLines()
+					refreshMarkers()
+				} catch (e) {
+					status("error: " + e.message)
+				}
+			}
+
+
+			// ------------------------------------------------- alerts on the chart
+			// Right-click the chart to arm a price alert; armed alerts render as
+			// horizontal lines you can drag to re-arm at a new level.
+			//
+			// lightweight-charts 4.x price lines are not draggable, so this is a
+			// thin overlay: watch mousedown near a line's y-coordinate, move the
+			// line while the pointer is down, and commit on release. Everything
+			// else (the line itself, the axis label) stays native so it tracks
+			// zoom and pan for free.
+			const alertLines = new Map() // id -> { line, price, kind }
+			let dragging = null
+			const HIT_PX = 7 // how close the pointer must be to grab a line
+
+			function alertColor(kind, price) {
+				// Above spot = a level you're waiting to break up through.
+				const spot = lastBar ? lastBar.close : price
+				return price >= spot ? "#26a69a" : "#ef5350"
+			}
+
+			function drawAlertLines(rows) {
+				for (const { line } of alertLines.values()) {
+					try {
+						series.removePriceLine(line)
+					} catch (e) {}
+				}
+				alertLines.clear()
+				for (const a of rows) {
+					let p = {}
+					try {
+						p = JSON.parse(a.params || "{}")
+					} catch (e) {}
+					// Only price thresholds have a level to draw. An RSI or
+					// Supertrend alert has no single price, so it lives in the
+					// alerts panel and not on the chart.
+					if (p.x == null) continue
+					const price = Number(p.x)
+					const line = series.createPriceLine({
+						price,
+						color: alertColor(a.kind, price),
+						lineWidth: 1,
+						lineStyle: LightweightCharts.LineStyle.Dashed,
+						axisLabelVisible: true,
+						title: a.kind === "price_lt" ? "▽ alert" : "▲ alert",
+					})
+					alertLines.set(a.id, { line, price, kind: a.kind })
+				}
+			}
+
+			async function refreshAlertLines() {
+				if (!state.cur) return
+				try {
+					const r = await fetch(
+						`/api/alerts?symbol=${encodeURIComponent(state.cur.symbol)}`,
+					)
+					if (!r.ok) return
+					drawAlertLines((await r.json()).alerts || [])
+				} catch (e) {
+					/* alerts are an overlay; never block the chart */
+				}
+			}
+
+			function priceAtY(y) {
+				const v = series.coordinateToPrice(y)
+				return v == null ? null : v
+			}
+
+			function lineNearY(y) {
+				for (const [id, rec] of alertLines) {
+					const c = series.priceToCoordinate(rec.price)
+					if (c != null && Math.abs(c - y) <= HIT_PX) return { id, rec }
+				}
+				return null
+			}
+
+			function fmtPrice(p) {
+				return p >= 100 ? p.toFixed(1) : p.toFixed(2)
+			}
+
+			function initChartAlerts() {
+				const host = $("#chart")
+				if (!host || host.dataset.alertsWired) return
+				host.dataset.alertsWired = "1"
+
+				// --- hover affordance: the cursor tells you a line is grabbable
+				host.addEventListener("mousemove", (e) => {
+					if (dragging) return
+					const y = e.clientY - host.getBoundingClientRect().top
+					host.style.cursor = lineNearY(y) ? "ns-resize" : ""
+				})
+
+				// --- drag to re-arm
+				host.addEventListener("mousedown", (e) => {
+					if (e.button !== 0) return
+					const y = e.clientY - host.getBoundingClientRect().top
+					const hit = lineNearY(y)
+					if (!hit) return
+					// Stop the chart panning while we drag the line.
+					e.preventDefault()
+					e.stopPropagation()
+					dragging = { ...hit, startPrice: hit.rec.price }
+					chart.applyOptions({
+						handleScroll: false,
+						handleScale: false,
+					})
+					host.style.cursor = "ns-resize"
+				})
+
+				window.addEventListener("mousemove", (e) => {
+					if (!dragging) return
+					const y = e.clientY - host.getBoundingClientRect().top
+					const p = priceAtY(y)
+					if (p == null) return
+					dragging.rec.price = p
+					dragging.rec.line.applyOptions({
+						price: p,
+						color: alertColor(dragging.rec.kind, p),
+						title: `${fmtPrice(p)}`,
+					})
+				})
+
+				window.addEventListener("mouseup", async () => {
+					if (!dragging) return
+					const d = dragging
+					dragging = null
+					chart.applyOptions({ handleScroll: true, handleScale: true })
+					host.style.cursor = ""
+					if (Math.abs(d.rec.price - d.startPrice) < 1e-9) return
+					try {
+						const last = lastBar ? lastBar.close : ""
+						const r = await fetch(
+							`/api/alerts/${d.id}?price=${d.rec.price}&last_price=${last}`,
+							{ method: "PATCH" },
+						)
+						if (!r.ok) throw new Error((await r.json()).detail || "failed")
+						const out = await r.json()
+						status(`alert moved → ${out.label}`)
+					} catch (err) {
+						status("could not move alert: " + err.message)
+					}
+					refreshAlertLines()
+				})
+
+				// --- right-click to arm
+				host.addEventListener("contextmenu", (e) => {
+					if (!state.cur) return
+					e.preventDefault()
+					const rect = host.getBoundingClientRect()
+					const y = e.clientY - rect.top
+					const hit = lineNearY(y)
+					const price = priceAtY(y)
+					if (price == null) return
+					showAlertMenu(e.clientX, e.clientY, price, hit)
+				})
+			}
+
+			function closeAlertMenu() {
+				const m = $("#alertMenu")
+				if (m) m.remove()
+			}
+
+			function showAlertMenu(x, y, price, hit) {
+				closeAlertMenu()
+				const spot = lastBar ? lastBar.close : price
+				const dir = price >= spot ? "above" : "below"
+				const m = document.createElement("div")
+				m.id = "alertMenu"
+				m.className = "amenu"
+				m.style.left = x + "px"
+				m.style.top = y + "px"
+				m.innerHTML = hit
+					? `<div class="hd">alert @ ${fmtPrice(hit.rec.price)}</div>
+					   <button data-act="del">Remove this alert</button>
+					   <div class="ft">or drag the line to move it</div>`
+					: `<div class="hd">${fmtPrice(price)} · ${dir} spot</div>
+					   <button data-act="arm">Alert when price crosses ${dir}</button>
+					   <div class="ft">${state.cur ? state.cur.symbol : ""}</div>`
+				document.body.appendChild(m)
+				// keep it on screen when you right-click near an edge
+				const r = m.getBoundingClientRect()
+				if (r.right > innerWidth) m.style.left = innerWidth - r.width - 8 + "px"
+				if (r.bottom > innerHeight) m.style.top = innerHeight - r.height - 8 + "px"
+
+				m.addEventListener("click", async (ev) => {
+					const act = ev.target.dataset && ev.target.dataset.act
+					if (!act) return
+					closeAlertMenu()
+					try {
+						if (act === "del") {
+							await fetch(`/api/alerts/${hit.id}`, { method: "DELETE" })
+							status("alert removed")
+						} else {
+							const cond = `${price >= spot ? ">" : "<"} ${price.toFixed(2)}`
+							const r = await fetch(
+								`/api/alerts?symbol=${encodeURIComponent(state.cur.symbol)}` +
+									`&cond=${encodeURIComponent(cond)}`,
+								{ method: "POST" },
+							)
+							if (!r.ok) throw new Error((await r.json()).detail || "failed")
+							status(`armed: ${(await r.json()).label}`)
+						}
+					} catch (err) {
+						status("alert failed: " + err.message)
+					}
+					refreshAlertLines()
+				})
+				setTimeout(() => {
+					document.addEventListener("click", closeAlertMenu, { once: true })
+					document.addEventListener("contextmenu", closeAlertMenu, {
+						once: true,
+					})
+				}, 0)
+			}
+
+			async function load52w(symbol) {
+				daily52 = null
+				try {
+					if (
+						state.interval === "day" &&
+						rangeDays() >= 366 &&
+						candles.length
+					) {
+						const cut =
+							candles[candles.length - 1].time - 366 * 86400
+						const win = candles.filter((c) => c.time >= cut)
+						daily52 = {
+							high: Math.max(...win.map((c) => c.high)),
+							low: Math.min(...win.map((c) => c.low)),
+						}
+						return
+					}
+					const r = await fetch(
+						`/api/candles?symbol=${encodeURIComponent(symbol)}&interval=day&days=370`,
+					)
+					if (!r.ok) return
+					const d = await r.json()
+					if (d.candles.length)
+						daily52 = {
+							high: Math.max(...d.candles.map((c) => c.high)),
+							low: Math.min(...d.candles.map((c) => c.low)),
+						}
+				} catch (e) {
+					/* 52w is decoration; never block the chart */
+				}
+			}
+
+			function startTicks(token) {
+				if (ws) {
+					ws.close()
+					ws = null
+				}
+				ws = new WebSocket(
+					`ws://${location.host}/ws/ticks?token=${token}`,
+				)
+				ws.onmessage = (ev) => {
+					const t = JSON.parse(ev.data)
+					if (t.error) {
+						status(t.error)
+						return
+					}
+					if (t.ltp == null || !lastBar) return
+					lastBar.close = t.ltp
+					lastBar.high = Math.max(lastBar.high, t.ltp)
+					lastBar.low = Math.min(lastBar.low, t.ltp)
+					series.update(lastBar)
+					updateLegend(null, null)
+				}
+			}
+
+			// ------------------------------------------------------------- wiring
+			$("#search").addEventListener("input", (e) => {
+				clearTimeout(window._deb)
+				const q = e.target.value.trim()
+				if (q.length < 2) {
+					$("#results").innerHTML = ""
+					return
+				}
+				window._deb = setTimeout(async () => {
+					const rows = await (
+						await fetch(`/api/search?q=${encodeURIComponent(q)}`)
+					).json()
+					$("#results").innerHTML = rows
+						.map(
+							(r) =>
+								`<div data-s="${r.tradingsymbol}"><span class="sym">${r.tradingsymbol}</span>
+       <span style="color:#8b949e;font-size:11px">${r.exchange}</span>
+       <div class="nm">${r.name || ""}</div></div>`,
+						)
+						.join("")
+					$("#results")
+						.querySelectorAll("div[data-s]")
+						.forEach(
+							(el) =>
+								(el.onclick = () => {
+									$("#results").innerHTML = ""
+									$("#search").value = ""
+									load(el.dataset.s)
+								}),
+						)
+				}, 200)
+			})
+
+			$("#ivals")
+				.querySelectorAll("button[data-i]")
+				.forEach(
+					(b) =>
+						(b.onclick = () => {
+							$("#ivals button[data-i].on")?.classList.remove(
+								"on",
+							)
+							b.classList.add("on")
+							state.interval = b.dataset.i
+							if (state.cur) load(state.cur.symbol)
+						}),
+				)
+			$("#ivals")
+				.querySelectorAll("button[data-r]")
+				.forEach(
+					(b) =>
+						(b.onclick = () => {
+							$("#ivals button[data-r].on")?.classList.remove(
+								"on",
+							)
+							b.classList.add("on")
+							state.range = b.dataset.r
+							if (state.cur) load(state.cur.symbol)
+						}),
+				)
+			// indicator catalog
+			$("#indbtn").onclick = (e) => {
+				e.stopPropagation()
+				const open = $("#indmenu").classList.toggle("open")
+				if (open) {
+					const r = $("#indbtn").getBoundingClientRect()
+					const menu = $("#indmenu")
+					menu.style.left =
+						Math.min(r.left, window.innerWidth - 300) + "px"
+					menu.style.top = r.bottom + 5 + "px"
+					buildCatalog("")
+					$("#indsearch").value = ""
+					$("#indsearch").focus()
+				}
+			}
+			$("#indmenu").onclick = (e) => e.stopPropagation()
+			$("#indsearch").addEventListener("input", (e) =>
+				buildCatalog(e.target.value),
+			)
+			// --- events + layout menus (same open/close behaviour as indicators)
+			function placeMenu(btnId, menuId) {
+				const r = $(btnId).getBoundingClientRect()
+				const m = $(menuId)
+				m.style.left = Math.min(r.left, window.innerWidth - 270) + "px"
+				m.style.top = r.bottom + 5 + "px"
+			}
+			$("#evbtn").onclick = (e) => {
+				e.stopPropagation()
+				closeIndMenu()
+				$("#laymenu").classList.remove("open")
+				const m = $("#evmenu")
+				const open = m.classList.toggle("open")
+				if (open) {
+					renderEventMenu()
+					placeMenu("#evbtn", "#evmenu")
+				}
+			}
+			$("#evmenu").onclick = (e) => e.stopPropagation()
+
+			$("#laybtn").onclick = async (e) => {
+				e.stopPropagation()
+				closeIndMenu()
+				$("#evmenu").classList.remove("open")
+				const m = $("#laymenu")
+				const open = m.classList.toggle("open")
+				if (open) {
+					placeMenu("#laybtn", "#laymenu")
+					await loadLayouts()
+					$("#layname").value = ""
+					$("#layname").focus()
+				}
+			}
+			$("#laymenu").onclick = (e) => e.stopPropagation()
+			$("#layname").addEventListener("keydown", async (e) => {
+				if (e.key !== "Enter") return
+				const name = e.target.value.trim()
+				if (!name) return
+				// shift+Enter also makes it the default layout
+				await saveLayout(name, e.shiftKey)
+				e.target.value = ""
+			})
+
+			document.addEventListener("click", (e) => {
+				closeIndMenu()
+				$("#evmenu").classList.remove("open")
+				$("#laymenu").classList.remove("open")
+			})
+
+			$("#wadd").onclick = async () => {
+				if (!state.cur) return
+				await fetch(`/api/watchlist/${state.cur.symbol}`, {
+					method: "POST",
+				})
+				refreshWL()
+			}
+
+			async function refreshWL() {
+				// One call for names AND shape. The sparkline data comes from the
+				// local candle store, so this stays a single request however long
+				// the watchlist gets.
+				let rows
+				try {
+					rows = await (await fetch("/api/watchlist/sparks")).json()
+				} catch (e) {
+					rows = (await (await fetch("/api/watchlist")).json()).map((r) => ({
+						symbol: r.tradingsymbol,
+						name: r.name,
+						closes: [],
+						change_pct: null,
+					}))
+				}
+				$("#wlist").innerHTML = rows
+					.map((r) => {
+						const up = (r.change_pct || 0) >= 0
+						const chg =
+							r.change_pct == null
+								? ""
+								: `<span class="chg ${up ? "up" : "down"}">${up ? "+" : ""}${r.change_pct.toFixed(2)}%</span>`
+						return `<div class="wl" data-s="${r.symbol}">
+       <span><span class="sym">${r.symbol}</span>
+       <div class="nm">${r.name || ""}</div></span>
+       <span class="right">${sparkSVG(r.closes, up)}${chg}
+       <span class="rm" title="remove">✕</span></span></div>`
+					})
+					.join("")
+				$("#wlist")
+					.querySelectorAll(".wl")
+					.forEach((el) => {
+						el.querySelector(".rm").onclick = async (ev) => {
+							ev.stopPropagation()
+							await fetch(`/api/watchlist/${el.dataset.s}`, {
+								method: "DELETE",
+							})
+							refreshWL()
+						}
+						el.onclick = () => load(el.dataset.s)
+					})
+			}
+
+			try {
+				makeCharts()
+				refreshWL()
+				$("#evbtn").textContent = eventsOn.size
+					? `● Events (${eventsOn.size}) ▾`
+					: "● Events ▾"
+				;(async () => {
+					// Apply the default layout, if one is marked. Done before the
+					// first symbol loads so the chart comes up already configured
+					// instead of visibly rearranging itself a moment later.
+					try {
+						const ls = await loadLayouts()
+						const def = ls.find((l) => l.is_default)
+						if (def) await applyLayout(def.spec)
+					} catch (e) {
+						/* a bad layout must never stop the chart booting */
+					}
+					// ?symbol=BEL — how the backtest page hands a result over. Done
+					// after the layout so the chart doesn't load twice.
+					const want = new URLSearchParams(location.search).get("symbol")
+					if (want) load(want.toUpperCase())
+				})()
+				;(async () => {
+					const s = await (await fetch("/api/session")).json()
+					if (!s.kite.startsWith("valid"))
+						$("#status").innerHTML =
+							`no Kite session — <a style="color:#4184e4" href="${s.login_url}">log in</a>`
+				})()
+			} catch (e) {
+				status("init error: " + e.message)
+			}
+		</script>
+	</body>
+</html>

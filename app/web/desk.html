@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, viewport-fit=cover"
+		/>
+		<title>TickerForge · Desk</title>
+		<link rel="stylesheet" href="/app.css" />
+
+		<!-- Home-screen app. start_url is /desk, so the icon opens straight into the
+     page you actually use from the office rather than the chart. -->
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<meta name="theme-color" content="#0d1117" />
+		<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" />
+		<!-- iOS ignores the manifest for add-to-home-screen and wants its own tags. -->
+		<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta
+			name="apple-mobile-web-app-status-bar-style"
+			content="black-translucent"
+		/>
+		<meta name="apple-mobile-web-app-title" content="Desk" />
+		<style>
+			.deskgrid {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr) 320px;
+				gap: 16px;
+				margin-top: 14px;
+			}
+			@media (max-width: 900px) {
+				.deskgrid {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			/* ---------------- offline / staleness -------------------------------
+     A quote that silently went stale is worse than one that failed to load:
+     it looks live. So say it, loudly, and stamp the data with its age. */
+			#offline {
+				display: none;
+				background: #3a1d1d;
+				border: 1px solid var(--down);
+				color: #ffb4b1;
+				border-radius: 8px;
+				padding: 9px 12px;
+				margin: 10px 0;
+				font-size: 13px;
+				line-height: 1.5;
+			}
+			body.offline #offline {
+				display: block;
+			}
+			#stamp {
+				color: var(--dim);
+				font-size: 11px;
+			}
+
+			/* ---------------- phone ---------------------------------------------
+     Desk is the page used one-handed on a phone, so below 700px it stops
+     being a dashboard and becomes a stack, ordered by what you reach for. */
+			@media (max-width: 700px) {
+				.wrap {
+					padding: 10px;
+				}
+				h2.page {
+					font-size: 16px;
+				}
+				.quotehead .ltp {
+					font-size: 34px;
+				}
+
+				/* Alerts FIRST. On the phone you're arming and checking alerts; the
+       levels are reference and the chart is a glance. Desktop keeps the
+       cockpit layout, where everything is visible at once anyway. */
+				.deskgrid {
+					display: flex;
+					flex-direction: column;
+					gap: 12px;
+				}
+				.deskgrid > div:last-child {
+					order: 1;
+				}
+				.deskgrid > div:first-child {
+					order: 2;
+				}
+
+				/* The quote stays visible while you scroll the alert list — it is the
+       number every decision on this page is measured against. */
+				#quotecard {
+					position: sticky;
+					top: 0;
+					z-index: 5;
+				}
+
+				/* 44px is the smallest target most people hit reliably on the first
+       attempt; the desktop sizes are around 28. */
+				.btn,
+				button.btn {
+					min-height: 44px;
+					padding: 10px 16px;
+					font-size: 15px;
+				}
+				.search,
+				input.search {
+					min-height: 44px;
+					font-size: 16px;
+				} /* 16px stops
+       iOS zooming the whole page when the field takes focus */
+				.wlchips .chip {
+					min-height: 38px;
+					padding: 8px 14px;
+					font-size: 14px;
+				}
+				.lvlgrid {
+					grid-template-columns: repeat(
+						auto-fill,
+						minmax(104px, 1fr)
+					);
+				}
+				.lvl {
+					padding: 10px 12px;
+				}
+				.lvl .v {
+					font-size: 17px;
+				}
+				.alertrow {
+					padding: 12px 0;
+				}
+				.alertrow .rm {
+					min-width: 44px;
+					min-height: 44px;
+					display: inline-flex;
+					align-items: center;
+					justify-content: center;
+				}
+
+				/* Twelve tabs won't fit. Scroll them instead of wrapping into a wall. */
+				#nav {
+					flex-wrap: nowrap;
+					overflow-x: auto;
+					gap: 2px;
+					padding: 8px 10px;
+					scrollbar-width: none;
+				}
+				#nav::-webkit-scrollbar {
+					display: none;
+				}
+				#nav a.tab {
+					white-space: nowrap;
+					padding: 8px 10px;
+				}
+				#nav .sp {
+					display: none;
+				}
+				.cheatsheet {
+					display: none;
+				} /* the condition crib is desktop-only */
+			}
+
+			/* Standalone mode: no browser chrome, so respect the notch and add a
+     little breathing room at the bottom for the home indicator. */
+			@media (display-mode: standalone) {
+				#nav {
+					padding-top: calc(8px + env(safe-area-inset-top));
+				}
+				.wrap {
+					padding-bottom: calc(18px + env(safe-area-inset-bottom));
+				}
+			}
+			.quotehead {
+				display: flex;
+				align-items: baseline;
+				gap: 14px;
+				flex-wrap: wrap;
+			}
+			.quotehead .ltp {
+				font-size: 30px;
+				font-weight: 700;
+				font-variant-numeric: tabular-nums;
+			}
+			.quotehead .chg {
+				font-size: 17px;
+				font-weight: 600;
+			}
+			.quotehead .nm {
+				color: var(--dim);
+				font-size: 14px;
+			}
+			.poschips {
+				display: flex;
+				gap: 6px;
+				flex-wrap: wrap;
+				margin-top: 8px;
+			}
+			.poschips .badge {
+				color: var(--fg);
+			}
+			.lvlgrid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+				gap: 8px;
+				margin: 14px 0;
+			}
+			.lvl {
+				background: var(--panel2);
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				padding: 8px 10px;
+			}
+			.lvl .k {
+				color: var(--dim);
+				font-size: 11px;
+			}
+			.lvl .v {
+				font-size: 16px;
+				font-weight: 600;
+				font-variant-numeric: tabular-nums;
+			}
+			.chartimg {
+				width: 100%;
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				margin-top: 6px;
+				background: var(--panel);
+				min-height: 120px;
+			}
+			.alertrow {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				padding: 7px 0;
+				border-top: 1px solid var(--border);
+			}
+			.alertrow:first-of-type {
+				border-top: 0;
+			}
+			.alertrow .x {
+				color: var(--down);
+				cursor: pointer;
+				font-size: 13px;
+			}
+			.deeplinks {
+				display: flex;
+				gap: 6px;
+				flex-wrap: wrap;
+				margin-top: 8px;
+			}
+			.wlchips {
+				display: flex;
+				gap: 6px;
+				flex-wrap: wrap;
+				margin-top: 8px;
+			}
+			.wlchips button {
+				background: none;
+				border: 1px solid var(--border);
+				color: var(--dim);
+				border-radius: 16px;
+				padding: 3px 11px;
+				cursor: pointer;
+				font-size: 12px;
+			}
+			.wlchips button:hover {
+				color: var(--fg);
+				border-color: var(--accent);
+			}
+			.confhead {
+				display: flex;
+				align-items: baseline;
+				gap: 8px;
+			}
+			.confscore {
+				font-size: 26px;
+				font-weight: 700;
+				font-variant-numeric: tabular-nums;
+			}
+			.conftf {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				padding: 4px 0;
+				font-size: 12px;
+			}
+			.conftf .lab {
+				width: 32px;
+				color: var(--dim);
+			}
+			.conftf .tr {
+				flex: 1;
+				height: 6px;
+				background: var(--panel2);
+				border-radius: 3px;
+				position: relative;
+			}
+			.conftf .fill {
+				position: absolute;
+				top: 0;
+				bottom: 0;
+				border-radius: 3px;
+			}
+			.conftf .val {
+				width: 42px;
+				text-align: right;
+				font-variant-numeric: tabular-nums;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="nav">
+			<span class="brand">TickerForge</span>
+			<a class="tab" href="/">Chart</a>
+			<a class="tab on" href="/desk">Desk</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/scanner">Scanner</a>
+			<a class="tab" href="/screen">Screen</a>
+			<a class="tab" href="/query">Query</a>
+			<a class="tab" href="/fundamentals">Fundamentals</a>
+			<a class="tab" href="/results">Results</a>
+			<a class="tab" href="/valuation">Valuation</a>
+			<a class="tab" href="/backtest">Backtest</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/metrics">Metrics</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/news">News</a>
+			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/settings">Settings</a>
+			<span class="sp"></span>
+			<span class="status" id="status"></span>
+		</div>
+
+		<div class="wrap">
+			<div class="row">
+				<h2 class="page">Desk</h2>
+				<span class="sub">— your one-look intraday cockpit</span>
+				<div class="spacer"></div>
+				<div class="sbox">
+					<input
+						class="search"
+						id="search"
+						placeholder="Search a stock…"
+						autocomplete="off"
+					/>
+					<div class="sres" id="sres"></div>
+				</div>
+			</div>
+			<div class="wlchips" id="wlchips"></div>
+
+			<div id="offline">
+				<b>Offline.</b> The numbers below are from
+				<span id="staleage">earlier</span>
+				and are not being updated. Nothing here is live until the
+				connection is back.
+			</div>
+
+			<div id="empty" class="empty">Pick a stock to load its desk.</div>
+
+			<div class="deskgrid" id="desk" style="display: none">
+				<div>
+					<div class="block" id="quotecard">
+						<div class="quotehead">
+							<span class="ltp" id="ltp">—</span>
+							<span class="chg" id="chg"></span>
+							<span class="nm" id="nm"></span>
+							<div class="spacer"></div>
+							<button class="btn" id="refresh" title="Refresh">
+								↻
+							</button>
+						</div>
+						<div id="stamp"></div>
+						<div class="poschips" id="pos"></div>
+						<div class="lvlgrid" id="levels"></div>
+						<div class="deeplinks" id="deeplinks"></div>
+					</div>
+					<div class="block">
+						<div class="row">
+							<b>Intraday chart</b>
+							<div class="spacer"></div>
+							<span class="sub" id="charttime"></span>
+						</div>
+						<img class="chartimg" id="chart" alt="intraday chart" />
+					</div>
+				</div>
+
+				<div>
+					<div class="block">
+						<div class="row">
+							<b>Confluence</b>
+							<div class="spacer"></div>
+							<span class="sub">5m · 15m · 1h · 1d</span>
+						</div>
+						<div id="conf"><div class="sub">—</div></div>
+					</div>
+					<div class="block">
+						<div class="row">
+							<b>Alerts</b>
+							<div class="spacer"></div>
+							<span class="sub">fired to your phone</span>
+						</div>
+						<div class="row" style="margin: 8px 0">
+							<input
+								class="search"
+								id="cond"
+								placeholder="> 410 · vwap · supertrend · rsi &gt; 70 · ema20 · zone · macd (add 5m/15m, repeat)"
+								style="min-width: 0; flex: 1"
+							/>
+							<button class="btn primary" id="arm">Arm</button>
+						</div>
+						<div id="alerts"></div>
+						<div
+							class="sub cheatsheet"
+							style="margin-top: 10px; line-height: 1.7"
+						>
+							<b>Conditions:</b> <code>&gt; 410</code> ·
+							<code>vwap</code> · <code>pdh</code> ·
+							<code>orb</code> · <code>2%</code><br />
+							<code>supertrend</code> <code>supertrend up</code> ·
+							<code>rsi &gt; 70</code> <code>rsi &lt; 30</code>
+							<code>rsi 50</code> <code>rsi 45-55</code><br />
+							<code>ema20</code> <code>above ema20</code>
+							<code>ema20x50</code> <code>zone</code> ·
+							<code>macd</code> <code>bb</code>
+							<code>adx 25</code> <code>vol 3x</code>
+							<code>avwap</code><br /><b>filter:</b>
+							<code>conf &gt; 60</code> <code>aligned</code> ·
+							<b>exit:</b> <code>trail long entry=405</code><br />
+							add a timeframe (<code>1m 5m 15m 1h</code>) and
+							<code>repeat</code> to re-arm.
+						</div>
+					</div>
+					<div class="block">
+						<div class="sub">
+							Alerts and levels stay live only while
+							<code>intraday run</code> is polling at home during
+							market hours.
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script>
+			"use strict"
+			const $ = (s) => document.querySelector(s)
+			const status = (m) => {
+				$("#status").textContent = m || ""
+			}
+			// ---------------------------------------------------------------- offline
+			// The one thing a cached-shell app must get right: a stale quote looks
+			// exactly like a live one. So track when the data last actually arrived and
+			// say so plainly the moment it stops.
+			let lastOk = null
+
+			function markFresh() {
+				lastOk = Date.now()
+				document.body.classList.remove("offline")
+				paintStamp()
+			}
+
+			function markStale() {
+				document.body.classList.add("offline")
+				paintStamp()
+			}
+
+			function ago(ms) {
+				const s = Math.round(ms / 1000)
+				if (s < 60) return `${s}s ago`
+				if (s < 3600) return `${Math.round(s / 60)}m ago`
+				return `${Math.round(s / 3600)}h ago`
+			}
+
+			function paintStamp() {
+				const el = document.querySelector("#stamp")
+				if (!el) return
+				if (!lastOk) {
+					el.textContent = ""
+					return
+				}
+				const age = Date.now() - lastOk
+				el.textContent = `updated ${ago(age)}`
+				const a = document.querySelector("#staleage")
+				if (a) a.textContent = ago(age)
+			}
+			setInterval(paintStamp, 5000)
+
+			window.addEventListener("online", () => {
+				markFresh()
+				if (CUR) loadLevels()
+			})
+			window.addEventListener("offline", markStale)
+
+			// The worker caches the SHELL only — never /api. See sw.js for why that
+			// distinction is the whole point on a page showing live prices.
+			if ("serviceWorker" in navigator) {
+				window.addEventListener("load", () => {
+					navigator.serviceWorker.register("/sw.js").catch(() => {
+						/* no worker just means no offline shell; the page still works */
+					})
+				})
+			}
+
+			const esc = (s) =>
+				(s || "").replace(
+					/[&<>"]/g,
+					(c) =>
+						({
+							"&": "&amp;",
+							"<": "&lt;",
+							">": "&gt;",
+							'"': "&quot;",
+						})[c],
+				)
+			const n1 = (v) =>
+				v === null || v === undefined
+					? "—"
+					: Number(v).toLocaleString("en-IN", {
+							maximumFractionDigits: 1,
+						})
+			const n2 = (v) =>
+				v === null || v === undefined
+					? "—"
+					: Number(v).toLocaleString("en-IN", {
+							minimumFractionDigits: 2,
+							maximumFractionDigits: 2,
+						})
+
+			let CUR = null,
+				timer = null
+
+			// ---- search dropdown ----
+			let sTimer
+			$("#search").oninput = () => {
+				clearTimeout(sTimer)
+				const q = $("#search").value.trim()
+				if (q.length < 2) {
+					$("#sres").classList.remove("open")
+					return
+				}
+				sTimer = setTimeout(async () => {
+					const rows = await (
+						await fetch(`/api/search?q=${encodeURIComponent(q)}`)
+					).json()
+					$("#sres").innerHTML = rows
+						.map(
+							(r) =>
+								`<div data-sym="${r.tradingsymbol}"><span class="sym">${r.tradingsymbol}</span>
+       <span class="nm"> ${esc(r.name || "")}</span></div>`,
+						)
+						.join("")
+					$("#sres").classList.add("open")
+					$("#sres")
+						.querySelectorAll("div")
+						.forEach(
+							(d) =>
+								(d.onclick = () => {
+									$("#sres").classList.remove("open")
+									$("#search").value = ""
+									pick(d.dataset.sym)
+								}),
+						)
+				}, 180)
+			}
+			document.addEventListener("click", (e) => {
+				if (!e.target.closest(".sbox"))
+					$("#sres").classList.remove("open")
+			})
+
+			async function loadWatch() {
+				try {
+					const wl = await (await fetch("/api/watchlist")).json()
+					$("#wlchips").innerHTML = wl
+						.map(
+							(w) =>
+								`<button data-sym="${w.tradingsymbol}">${w.tradingsymbol}</button>`,
+						)
+						.join("")
+					$("#wlchips")
+						.querySelectorAll("button")
+						.forEach((b) => (b.onclick = () => pick(b.dataset.sym)))
+				} catch (e) {}
+			}
+
+			function pick(sym) {
+				CUR = sym
+				history.replaceState(null, "", `/desk?symbol=${sym}`)
+				$("#empty").style.display = "none"
+				$("#desk").style.display = ""
+				$("#deeplinks").innerHTML =
+					["fundamentals", "results", "valuation", "news"]
+						.map(
+							(p) =>
+								`<a class="btn" href="/${p}?symbol=${sym}">${p[0].toUpperCase() + p.slice(1)}</a>`,
+						)
+						.join("") +
+					`<a class="btn" href="/?symbol=${sym}">Full chart</a>`
+				refreshChart()
+				loadLevels()
+				loadAlerts()
+				loadConf()
+				if (timer) clearInterval(timer)
+				timer = setInterval(loadLevels, 15000) // live-ish while the page is open
+			}
+
+			function refreshChart() {
+				$("#chart").src =
+					`/api/intraday/chart?symbol=${CUR}&t=${Date.now()}`
+				$("#charttime").textContent = new Date().toLocaleTimeString(
+					"en-IN",
+					{ hour: "2-digit", minute: "2-digit" },
+				)
+			}
+
+			async function loadLevels() {
+				status("loading…")
+				try {
+					const r = await fetch(`/api/intraday?symbol=${CUR}`)
+					if (r.status === 401) {
+						$("#ltp").textContent = "—"
+						$("#chg").textContent = "no Kite session"
+						status("")
+						return
+					}
+					const d = await r.json()
+					markFresh()
+					$("#nm").textContent = d.symbol
+					if (d.ltp == null) {
+						$("#ltp").textContent = "—"
+						$("#chg").textContent = "market closed / no quote"
+					} else {
+						$("#ltp").textContent = n2(d.ltp)
+						const cp = d.chg_pct
+						const el = $("#chg")
+						el.textContent =
+							cp == null
+								? ""
+								: `${cp >= 0 ? "▲ +" : "▼ "}${cp.toFixed(2)}%`
+						el.className = "chg " + (cp >= 0 ? "up" : "down")
+					}
+					$("#pos").innerHTML = (d.position || [])
+						.map((p) => `<span class="badge">${esc(p)}</span>`)
+						.join("")
+					const piv = d.pivots || {}
+					const cells = [
+						["VWAP", d.vwap],
+						["PDH", d.pdh],
+						["PDL", d.pdl],
+						["Prev C", d.pdc],
+						["P", piv.P],
+						["TC", piv.TC],
+						["BC", piv.BC],
+						["R1", piv.R1],
+						["R2", piv.R2],
+						["S1", piv.S1],
+						["S2", piv.S2],
+						["Gap %", d.gap_pct],
+						["ORB H", d.orb && d.orb.high],
+						["ORB L", d.orb && d.orb.low],
+						["Day H", d.high],
+						["Day L", d.low],
+					]
+					$("#levels").innerHTML = cells
+						.map(
+							([k, v]) =>
+								`<div class="lvl"><div class="k">${k}</div><div class="v">${n1(v)}</div></div>`,
+						)
+						.join("")
+					status(
+						`updated ${new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`,
+					)
+				} catch (e) {
+					status("load failed")
+					markStale()
+				}
+			}
+
+			async function loadConf() {
+				try {
+					const d = await (
+						await fetch(`/api/confluence?symbol=${CUR}`)
+					).json()
+					if (d.score_pct == null) {
+						$("#conf").innerHTML =
+							'<div class="sub">not enough history</div>'
+						return
+					}
+					const p = d.score_pct,
+						cls = p >= 35 ? "up" : p <= -35 ? "down" : ""
+					const rows = Object.entries(d.per_tf || {})
+						.map(([tf, s]) => {
+							const v = Math.round(s.adjusted * 100),
+								w = Math.abs(v) / 2
+							const col =
+								v > 0
+									? "var(--up)"
+									: v < 0
+										? "var(--down)"
+										: "var(--dim)"
+							const left = v >= 0 ? 50 : 50 - w
+							const lab =
+								{
+									"5minute": "5m",
+									"15minute": "15m",
+									"60minute": "1h",
+									day: "1d",
+								}[tf] || tf
+							return `<div class="conftf"><span class="lab">${lab}</span>
+        <span class="tr"><span class="fill" style="left:${left}%;width:${w}%;background:${col}"></span></span>
+        <span class="val ${v > 0 ? "up" : v < 0 ? "down" : ""}">${v > 0 ? "+" : ""}${v}</span></div>`
+						})
+						.join("")
+					$("#conf").innerHTML =
+						`<div class="confhead"><span class="confscore ${cls}">${p > 0 ? "+" : ""}${p.toFixed(0)}%</span>
+      <span class="sub">${esc(d.verdict)}${d.aligned ? " · aligned" : ""}</span></div>${rows}`
+				} catch (e) {
+					$("#conf").innerHTML = '<div class="sub">—</div>'
+				}
+			}
+
+			async function loadAlerts() {
+				const d = await (
+					await fetch(`/api/alerts?symbol=${CUR}`)
+				).json()
+				const rows = d.alerts || []
+				$("#alerts").innerHTML = rows.length
+					? rows
+							.map(
+								(a) =>
+									`<div class="alertrow"><span>#${a.id} ${esc(a.label)}</span><div class="spacer"></div>
+     <span class="x" data-id="${a.id}">remove</span></div>`,
+							)
+							.join("")
+					: `<div class="sub">No armed alerts on ${CUR}.</div>`
+				$("#alerts")
+					.querySelectorAll(".x")
+					.forEach(
+						(x) =>
+							(x.onclick = async () => {
+								await fetch(`/api/alerts/${x.dataset.id}`, {
+									method: "DELETE",
+								})
+								loadAlerts()
+							}),
+					)
+			}
+
+			$("#arm").onclick = async () => {
+				const cond = $("#cond").value.trim()
+				if (!cond) return
+				const r = await fetch(
+					`/api/alerts?symbol=${CUR}&cond=${encodeURIComponent(cond)}`,
+					{ method: "POST" },
+				)
+				if (!r.ok) {
+					const e = await r.json().catch(() => ({}))
+					status(e.detail || "bad condition")
+					return
+				}
+				$("#cond").value = ""
+				loadAlerts()
+			}
+			$("#cond").addEventListener("keydown", (e) => {
+				if (e.key === "Enter") $("#arm").click()
+			})
+			$("#refresh").onclick = () => {
+				loadLevels()
+				refreshChart()
+			}
+
+			loadWatch()
+			const q0 = new URLSearchParams(location.search).get("symbol")
+			if (q0) pick(q0.toUpperCase())
+		</script>
+	</body>
+</html>

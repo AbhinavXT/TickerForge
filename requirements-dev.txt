@@ -1,0 +1,9 @@
+# Test-only dependencies. Without httpx the FastAPI TestClient can't start and
+# seven API tests SKIP rather than fail — a green run that never exercised the
+# routes. pytest isn't in requirements.txt either, so a clean
+# `pip install -r requirements.txt` leaves you unable to run the suite at all.
+-r requirements.txt
+
+pytest>=8.0
+httpx>=0.27          # required by fastapi.testclient
+pyflakes>=3.0        # catches undefined names in code paths tests can't reach

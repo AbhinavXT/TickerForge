@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>Settings — TickerForge</title>
+		<link rel="stylesheet" href="/app.css" />
+		<style>
+			.grp {
+				margin: 26px 0 6px;
+				font-size: 15px;
+				font-weight: 600;
+			}
+			.set {
+				display: grid;
+				grid-template-columns: 260px 200px 1fr;
+				gap: 14px;
+				align-items: start;
+				padding: 12px 0;
+				border-bottom: 1px solid var(--border);
+			}
+			.set .lbl {
+				font-weight: 500;
+			}
+			.set .help {
+				color: var(--dim);
+				font-size: 12.5px;
+				line-height: 1.55;
+			}
+			.set input,
+			.set select {
+				width: 100%;
+				background: var(--panel2);
+				color: var(--fg);
+				border: 1px solid var(--border);
+				border-radius: 7px;
+				padding: 7px 9px;
+				font: inherit;
+				font-variant-numeric: tabular-nums;
+			}
+			.set input:focus,
+			.set select:focus {
+				outline: none;
+				border-color: var(--accent);
+			}
+			.set.dirty input,
+			.set.dirty select {
+				border-color: var(--accent);
+			}
+			.src {
+				font-size: 11px;
+				color: var(--dim);
+				margin-top: 5px;
+				display: flex;
+				gap: 8px;
+				align-items: center;
+			}
+			.pill {
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 0 7px;
+			}
+			.pill.override {
+				border-color: var(--accent);
+				color: var(--accent);
+			}
+			.revert {
+				color: var(--dim);
+				cursor: pointer;
+				text-decoration: underline;
+			}
+			.revert:hover {
+				color: var(--accent);
+			}
+			.err {
+				color: var(--down);
+				font-size: 12px;
+				margin-top: 5px;
+			}
+			.bar {
+				position: sticky;
+				bottom: 0;
+				background: var(--panel);
+				border-top: 1px solid var(--border);
+				padding: 12px 0;
+				margin-top: 24px;
+				display: flex;
+				gap: 12px;
+				align-items: center;
+			}
+			button {
+				background: var(--accent);
+				color: #04121a;
+				border: 0;
+				border-radius: 8px;
+				padding: 8px 18px;
+				font: inherit;
+				font-weight: 600;
+				cursor: pointer;
+			}
+			button.ghost {
+				background: var(--panel2);
+				color: var(--fg);
+				border: 1px solid var(--border);
+				font-weight: 400;
+			}
+			button:disabled {
+				opacity: 0.45;
+				cursor: default;
+			}
+			.note {
+				color: var(--dim);
+				font-size: 12.5px;
+				line-height: 1.6;
+				border-left: 2px solid var(--border);
+				padding-left: 10px;
+				margin: 14px 0 0;
+			}
+			.msg {
+				font-size: 13px;
+			}
+			.msg.ok {
+				color: var(--up);
+			}
+			.msg.bad {
+				color: var(--down);
+			}
+			@media (max-width: 800px) {
+				.set {
+					grid-template-columns: 1fr;
+					gap: 6px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div id="nav">
+			<span class="brand">TickerForge</span>
+			<a class="tab" href="/">Chart</a>
+			<a class="tab" href="/desk">Desk</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/scanner">Scanner</a>
+			<a class="tab" href="/screen">Screen</a>
+			<a class="tab" href="/query">Query</a>
+			<a class="tab" href="/fundamentals">Fundamentals</a>
+			<a class="tab" href="/results">Results</a>
+			<a class="tab" href="/valuation">Valuation</a>
+			<a class="tab" href="/backtest">Backtest</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/metrics">Metrics</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/news">News</a>
+			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab on" href="/settings">Settings</a>
+			<span class="sp"></span>
+			<span class="status" id="status"></span>
+		</div>
+
+		<div class="wrap">
+			<h1>Settings</h1>
+			<div id="body"><div class="help">Loading…</div></div>
+
+			<div class="bar">
+				<button id="save" disabled>Save</button>
+				<button class="ghost" id="reset" disabled>
+					Discard changes
+				</button>
+				<span class="msg" id="msg"></span>
+			</div>
+
+			<p class="note">
+				A value set here overrides <code>.env</code>, which overrides
+				the built-in default &mdash; and the badge under each field
+				tells you which one is currently answering. Reverting clears the
+				override rather than copying <code>.env</code>'s value into the
+				database, so the two never drift. <br /><br />
+				API keys, the ntfy topic and the command PIN are deliberately
+				not editable here. This page has no login, and a form that can
+				retarget the notification channel is a form that can silently
+				redirect your alerts.
+			</p>
+		</div>
+
+		<script>
+			const $ = (s) => document.querySelector(s)
+			const esc = (s) =>
+				String(s ?? "").replace(
+					/[&<>"]/g,
+					(c) =>
+						({
+							"&": "&amp;",
+							"<": "&lt;",
+							">": "&gt;",
+							'"': "&quot;",
+						})[c],
+				)
+
+			let ORIGINAL = {} // key -> value as loaded
+			let SPECS = []
+
+			function render(list) {
+				SPECS = list
+				ORIGINAL = Object.fromEntries(list.map((s) => [s.key, s.value]))
+				const groups = []
+				for (const s of list) {
+					if (
+						!groups.length ||
+						groups[groups.length - 1].name !== s.group
+					)
+						groups.push({ name: s.group, items: [] })
+					groups[groups.length - 1].items.push(s)
+				}
+				$("#body").innerHTML = groups
+					.map(
+						(g) => `
+    <div class="grp">${esc(g.name)}</div>
+    ${g.items.map(row).join("")}
+  `,
+					)
+					.join("")
+				bind()
+				dirtyCheck()
+			}
+
+			function row(s) {
+				const input =
+					s.kind === "choice"
+						? `<select data-k="${esc(s.key)}">${s.choices
+								.map(
+									(c) =>
+										`<option${c === s.value ? " selected" : ""}>${esc(c)}</option>`,
+								)
+								.join("")}</select>`
+						: `<input data-k="${esc(s.key)}" type="${s.kind === "number" ? "number" : "text"}"
+        value="${esc(s.value)}"${s.min != null ? ` min="${s.min}"` : ""}${
+			s.max != null ? ` max="${s.max}"` : ""
+		}${s.step != null ? ` step="${s.step}"` : ""}>`
+				const badge = {
+					override: "set here",
+					env: "from .env",
+					default: "default",
+				}[s.source]
+				return `
+    <div class="set" id="row-${esc(s.key)}">
+      <div>
+        <div class="lbl">${esc(s.label)}</div>
+        <div class="src">
+          <span class="pill ${esc(s.source)}">${badge}</span>
+          ${
+				s.source === "override"
+					? `<span class="revert" data-revert="${esc(s.key)}">revert to ${esc(s.env_value || "default")}</span>`
+					: ""
+			}
+        </div>
+      </div>
+      <div>${input}<div class="err" id="err-${esc(s.key)}"></div></div>
+      <div class="help">${esc(s.help)}</div>
+    </div>`
+			}
+
+			function bind() {
+				for (const el of document.querySelectorAll("[data-k]"))
+					el.addEventListener("input", dirtyCheck)
+				for (const el of document.querySelectorAll("[data-revert]"))
+					el.addEventListener("click", () =>
+						revert(el.dataset.revert),
+					)
+			}
+
+			function current() {
+				const out = {}
+				for (const el of document.querySelectorAll("[data-k]"))
+					out[el.dataset.k] = el.value
+				return out
+			}
+
+			function dirtyCheck() {
+				const now = current()
+				let any = false
+				for (const k of Object.keys(now)) {
+					const changed = String(now[k]) !== String(ORIGINAL[k])
+					document
+						.querySelector(`#row-${CSS.escape(k)}`)
+						.classList.toggle("dirty", changed)
+					if (changed) any = true
+				}
+				$("#save").disabled = !any
+				$("#reset").disabled = !any
+				if (any) msg("")
+			}
+
+			function msg(text, cls = "") {
+				$("#msg").textContent = text
+				$("#msg").className = "msg " + cls
+			}
+
+			function clearErrors() {
+				for (const el of document.querySelectorAll(".err"))
+					el.textContent = ""
+			}
+
+			async function load() {
+				const r = await fetch("/api/settings")
+				render(await r.json())
+			}
+
+			async function save() {
+				clearErrors()
+				const changed = {}
+				const now = current()
+				for (const k of Object.keys(now))
+					if (String(now[k]) !== String(ORIGINAL[k]))
+						changed[k] = now[k]
+
+				const r = await fetch("/api/settings", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(changed),
+				})
+				const res = await r.json()
+				if (!res.ok) {
+					// Nothing was written — the server validates the whole form first, so a
+					// rejected field can't leave you half-saved.
+					for (const [k, e] of Object.entries(res.errors || {})) {
+						const el = document.querySelector(
+							`#err-${CSS.escape(k)}`,
+						)
+						if (el) el.textContent = e
+					}
+					msg("Nothing saved — fix the errors above.", "bad")
+					return
+				}
+				await load()
+				msg(
+					`Saved ${res.saved.length} setting${res.saved.length === 1 ? "" : "s"}.`,
+					"ok",
+				)
+			}
+
+			async function revert(key) {
+				await fetch("/api/settings/" + encodeURIComponent(key), {
+					method: "DELETE",
+				})
+				await load()
+				msg("Reverted to .env.", "ok")
+			}
+
+			$("#save").addEventListener("click", save)
+			$("#reset").addEventListener("click", () => {
+				render(SPECS)
+				msg("")
+			})
+			load()
+		</script>
+	</body>
+</html>

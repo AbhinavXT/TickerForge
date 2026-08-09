@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>Scanner — TickerForge</title>
+		<link rel="stylesheet" href="/app.css" />
+		<style>
+			.conds {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				margin: 10px 0;
+			}
+			.cond {
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 5px 12px;
+				cursor: pointer;
+				font-size: 13px;
+				background: var(--panel);
+				user-select: none;
+			}
+			.cond.on {
+				border-color: var(--accent);
+				background: #1c2a41;
+				color: var(--fg);
+			}
+			.cond .p {
+				color: var(--dim);
+				font-size: 11.5px;
+				margin-left: 5px;
+			}
+			.params {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 10px;
+				margin: 8px 0 4px;
+			}
+			.params .fld label {
+				font-size: 11.5px;
+			}
+			.params .fld input {
+				width: 90px;
+			}
+			.pos {
+				color: var(--up);
+			}
+			.neg {
+				color: var(--down);
+			}
+			.sect {
+				margin: 22px 0 8px;
+				font-size: 15px;
+			}
+			.empty {
+				color: var(--dim);
+				padding: 14px;
+			}
+			.warn {
+				color: var(--warn);
+				font-size: 12.5px;
+				margin-top: 6px;
+			}
+			.cov {
+				border: 1px solid var(--border);
+				border-radius: 9px;
+				padding: 10px 14px;
+				margin: 10px 0;
+				background: var(--panel);
+				font-size: 13px;
+			}
+			.bar {
+				height: 6px;
+				background: var(--panel2);
+				border-radius: 4px;
+				overflow: hidden;
+				margin-top: 6px;
+			}
+			.bar i {
+				display: block;
+				height: 100%;
+				background: var(--accent);
+			}
+			.chip {
+				display: inline-block;
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 1px 9px;
+				font-size: 11.5px;
+				color: var(--dim);
+				margin-right: 4px;
+			}
+			.saved {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				margin: 8px 0;
+			}
+			.saved .s {
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				padding: 5px 10px;
+				font-size: 13px;
+				cursor: pointer;
+				background: var(--panel);
+			}
+			.saved .s:hover {
+				border-color: var(--accent);
+			}
+			.saved .s small {
+				color: var(--dim);
+			}
+			td.sym a {
+				color: var(--fg);
+				text-decoration: none;
+			}
+			td.sym a:hover {
+				color: var(--accent);
+			}
+		</style>
+	</head>
+	<body>
+		<div id="nav">
+			<span class="brand">TickerForge</span>
+			<a class="tab" href="/">Chart</a>
+			<a class="tab" href="/desk">Desk</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab on" href="/scanner">Scanner</a>
+			<a class="tab" href="/screen">Screen</a>
+			<a class="tab" href="/query">Query</a>
+			<a class="tab" href="/fundamentals">Fundamentals</a>
+			<a class="tab" href="/results">Results</a>
+			<a class="tab" href="/valuation">Valuation</a>
+			<a class="tab" href="/backtest">Backtest</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/metrics">Metrics</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/news">News</a>
+			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/settings">Settings</a>
+			<span class="sp"></span>
+			<span class="status" id="status"></span>
+		</div>
+
+		<div class="wrap">
+			<h2 class="page">Scanner</h2>
+			<div class="sub">
+				Conditions are ANDed — the point is a list short enough to read.
+				Runs on stored candles and closed daily bars only.
+			</div>
+
+			<div class="row" style="margin-top: 12px">
+				<div class="fld">
+					<label>Universe</label>
+					<select class="sel" id="uni"></select>
+				</div>
+				<div class="fld">
+					<label
+						title="Days of stored history each symbol is scanned over"
+						>Lookback (days)</label
+					>
+					<input
+						class="search"
+						id="days"
+						type="number"
+						value="400"
+						style="width: 100px"
+					/>
+				</div>
+				<div class="fld">
+					<label>Max hits</label>
+					<input
+						class="search"
+						id="limit"
+						type="number"
+						value="60"
+						style="width: 80px"
+					/>
+				</div>
+				<span class="spacer"></span>
+				<button class="btn" id="manage">Manage universe</button>
+				<button class="btn primary" id="run">Run scan</button>
+			</div>
+
+			<div id="cov"></div>
+
+			<div class="conds" id="conds"></div>
+			<div class="params" id="cparams"></div>
+
+			<div class="row">
+				<input
+					class="search"
+					id="scanName"
+					placeholder="name this scan"
+					style="max-width: 220px"
+				/>
+				<button class="btn" id="save">Save scan</button>
+				<span class="spacer"></span>
+			</div>
+			<div class="saved" id="saved"></div>
+
+			<div id="out"></div>
+		</div>
+
+		<dialog id="dlg">
+			<h3 style="margin-bottom: 10px">Manage universe</h3>
+			<div class="fld">
+				<label>Name</label>
+				<input class="search" id="uName" value="nifty200" />
+			</div>
+			<div class="fld" style="margin-top: 8px">
+				<label>Symbols — comma or newline separated</label>
+				<textarea
+					class="search"
+					id="uSyms"
+					rows="7"
+					style="width: 420px; max-width: 80vw"
+					placeholder="RELIANCE, TCS, HDFCBANK, …"
+				></textarea>
+			</div>
+			<div class="sub" style="margin-top: 6px">
+				Paste an index constituent list, or seed from your watchlist to
+				try it out.
+			</div>
+			<div class="row" style="margin-top: 12px">
+				<button class="btn" id="uFromWatch">From watchlist</button>
+				<span class="spacer"></span>
+				<button class="btn" onclick="dlg.close()">Cancel</button>
+				<button class="btn primary" id="uSave">Save universe</button>
+			</div>
+		</dialog>
+
+		<script>
+			"use strict"
+			const $ = (s) => document.querySelector(s)
+			const status = (m) => {
+				$("#status").textContent = m || ""
+			}
+			const f = (v, d = 2) =>
+				v == null
+					? "—"
+					: (+v).toLocaleString("en-IN", { maximumFractionDigits: d })
+			const dlg = $("#dlg")
+			let CONDS = [],
+				picked = new Map() // key -> params object
+
+			async function api(url, opts) {
+				const r = await fetch(url, opts)
+				if (!r.ok)
+					throw new Error(
+						(await r.json().catch(() => ({}))).detail ||
+							r.statusText,
+					)
+				return r.json()
+			}
+
+			// ------------------------------------------------------------- conditions
+			function renderConds() {
+				$("#conds").innerHTML = CONDS.map(
+					(c) =>
+						`<div class="cond${picked.has(c.key) ? " on" : ""}" data-k="${c.key}">
+       ${c.label}</div>`,
+				).join("")
+				$("#conds")
+					.querySelectorAll(".cond")
+					.forEach((el) => {
+						el.onclick = () => {
+							const k = el.dataset.k
+							if (picked.has(k)) picked.delete(k)
+							else
+								picked.set(k, {
+									...(CONDS.find((c) => c.key === k).params ||
+										{}),
+								})
+							renderConds()
+							renderParams()
+						}
+					})
+			}
+
+			// Only show parameter inputs for the conditions actually selected — a wall of
+			// 30 inputs for conditions you aren't using is how a control panel becomes
+			// unreadable.
+			function renderParams() {
+				const html = [...picked.entries()]
+					.map(([k, p]) => {
+						const c = CONDS.find((x) => x.key === k)
+						return Object.entries(p)
+							.map(
+								([pk, pv]) =>
+									`<div class="fld"><label>${c.label.split(" ")[0]} · ${pk}</label>
+       <input class="search" data-c="${k}" data-p="${pk}" value="${pv}"></div>`,
+							)
+							.join("")
+					})
+					.join("")
+				$("#cparams").innerHTML = html
+				$("#cparams")
+					.querySelectorAll("input")
+					.forEach((i) => {
+						i.onchange = () => {
+							const p = picked.get(i.dataset.c)
+							const n = Number(i.value)
+							p[i.dataset.p] =
+								Number.isFinite(n) && i.value.trim() !== ""
+									? n
+									: i.value
+						}
+					})
+			}
+
+			function conditionSpec() {
+				return [...picked.entries()].map(([k, p]) =>
+					Object.keys(p).length ? { key: k, ...p } : k,
+				)
+			}
+
+			// -------------------------------------------------------------- universes
+			async function loadUniverses(select) {
+				const d = await api("/api/universe")
+				const opts = d.universes
+					.map(
+						(u) =>
+							`<option value="${u.name}">${u.name} (${u.n})</option>`,
+					)
+					.join("")
+				$("#uni").innerHTML =
+					opts || '<option value="">— none yet —</option>'
+				if (select) $("#uni").value = select
+				if (d.universes.length) loadCoverage()
+				else
+					$("#cov").innerHTML =
+						'<div class="cov">No universe yet. ' +
+						"<b>Manage universe</b> to paste a symbol list, or seed one from your " +
+						"watchlist.</div>"
+			}
+
+			async function loadCoverage() {
+				const name = $("#uni").value
+				if (!name) return
+				$("#cov").innerHTML =
+					'<div class="cov">checking stored candles…</div>'
+				try {
+					const c = await api(
+						`/api/universe/${encodeURIComponent(name)}/coverage`,
+					)
+					const pct = c.symbols ? (c.covered / c.symbols) * 100 : 0
+					$("#cov").innerHTML = `<div class="cov">
+      <b>${c.covered}/${c.symbols}</b> symbols have stored candles
+      ${c.todo ? `· ${c.todo} still to fetch (~${Math.round(c.est_seconds)}s)` : "· ready"}
+      <div class="bar"><i style="width:${pct.toFixed(0)}%"></i></div>
+      ${
+			c.todo
+				? `<div class="warn">Symbols without history are skipped
+        silently in the results — run the backfill so an empty scan means
+        "nothing matched" rather than "nothing was looked at".
+        <button class="btn" id="bf" style="margin-left:8px">Backfill now</button>
+        </div>`
+				: ""
+		}
+    </div>`
+					const b = $("#bf")
+					if (b) b.onclick = runBackfill
+				} catch (e) {
+					$("#cov").innerHTML = `<div class="cov">${e.message}</div>`
+				}
+			}
+
+			async function runBackfill() {
+				const name = $("#uni").value
+				status(
+					"backfilling — paced under the Kite rate limit, this takes a while…",
+				)
+				$("#bf").disabled = true
+				try {
+					const r = await api(
+						`/api/universe/${encodeURIComponent(name)}/backfill`,
+						{ method: "POST" },
+					)
+					status(
+						`fetched ${r.fetched}, skipped ${r.skipped}, failed ${r.failed.length}`,
+					)
+				} catch (e) {
+					status("backfill failed: " + e.message)
+				}
+				loadCoverage()
+			}
+
+			// ------------------------------------------------------------ saved scans
+			async function loadSaved() {
+				const d = await api("/api/scans")
+				$("#saved").innerHTML = d.scans.length
+					? d.scans
+							.map(
+								(
+									s,
+								) => `<div class="s" data-n="${s.name}">${s.name}
+        <small>${(s.spec.conditions || []).length} cond${
+			s.last_hits != null ? ` · ${s.last_hits} hits` : ""
+		}</small>
+        <span class="act" data-del="${s.name}" title="delete">×</span></div>`,
+							)
+							.join("")
+					: ""
+				$("#saved")
+					.querySelectorAll(".s")
+					.forEach((el) => {
+						el.onclick = async (ev) => {
+							if (ev.target.dataset.del) {
+								await api(
+									`/api/scans/${encodeURIComponent(ev.target.dataset.del)}`,
+									{ method: "DELETE" },
+								)
+								loadSaved()
+								return
+							}
+							status("running saved scan…")
+							try {
+								render(
+									await api(
+										`/api/scans/${encodeURIComponent(el.dataset.n)}/run`,
+										{ method: "POST" },
+									),
+								)
+								status("")
+							} catch (e) {
+								status(e.message)
+							}
+						}
+					})
+			}
+
+			// -------------------------------------------------------------------- run
+			$("#run").onclick = run
+			async function run() {
+				const conds = conditionSpec()
+				if (!conds.length) {
+					status("pick at least one condition")
+					return
+				}
+				const p = new URLSearchParams({
+					conditions: JSON.stringify(conds),
+					universe_name: $("#uni").value,
+					days: $("#days").value,
+					limit: $("#limit").value,
+				})
+				status("scanning…")
+				$("#run").disabled = true
+				$("#out").innerHTML =
+					'<div class="empty">scanning stored candles…</div>'
+				try {
+					render(await api("/api/scanner?" + p))
+					status("")
+				} catch (e) {
+					$("#out").innerHTML =
+						`<div class="empty">${e.message}</div>`
+					status("")
+				} finally {
+					$("#run").disabled = false
+				}
+			}
+
+			function detailChips(d) {
+				return Object.entries(d)
+					.map(([k, v]) => {
+						if (k === "volume_surge")
+							return `<span class="chip">${v.times}× vol</span>`
+						if (k === "52w_high")
+							return `<span class="chip">52wH +${v.above_pct}%</span>`
+						if (k === "52w_low")
+							return `<span class="chip">52wL ${v.below_pct}%</span>`
+						if (k === "bb_squeeze")
+							return `<span class="chip">squeeze ${v.side}</span>`
+						if (k === "donchian_break")
+							return `<span class="chip">${v.window}d break</span>`
+						if (k === "strategy_long")
+							return `<span class="chip">${v.name}</span>`
+						if (k === "above_sma")
+							return `<span class="chip">+${v.above_pct}% vs SMA</span>`
+						if (k === "rsi_range")
+							return `<span class="chip">RSI ${v.rsi}</span>`
+						return `<span class="chip">${k.replace(/_/g, " ")}</span>`
+					})
+					.join("")
+			}
+
+			function render(d) {
+				const conds = d.conditions
+					.map((c) => (typeof c === "string" ? c : c.key))
+					.join(" + ")
+				if (!d.hits.length) {
+					$("#out").innerHTML = `<h3 class="sect">${conds}</h3>
+      <div class="empty">Nothing matched across ${d.scanned} symbols.
+      ${
+			d.skipped.length
+				? `<br><span class="warn">${d.skipped.length} symbols
+        were skipped for thin stored history — that's not the same as no
+        match. Run the backfill.</span>`
+				: ""
+		}</div>`
+					return
+				}
+				$("#out").innerHTML =
+					`
+    <h3 class="sect">${conds}</h3>
+    <div class="sub">${d.total_hits} hit${d.total_hits === 1 ? "" : "s"} from
+      ${d.scanned} symbols${d.truncated ? ` · showing top ${d.hits.length}` : ""}
+      ${d.universe ? ` · ${d.universe}` : ""}</div>
+    ${
+		d.skipped.length
+			? `<div class="warn">${d.skipped.length} symbols skipped
+      — too little stored history. Run the backfill or they'll never appear.</div>`
+			: ""
+	}
+    <div class="tbl-wrap"><table class="stmt"><thead><tr>
+      <th>Symbol</th><th>Close</th><th>Day</th><th>Volume</th><th>Why</th>
+    </tr></thead><tbody>` +
+					d.hits
+						.map(
+							(h) => `<tr>
+      <td class="sym"><a href="/?symbol=${h.symbol}" title="open on the chart">${h.symbol}</a></td>
+      <td>${f(h.close)}</td>
+      <td class="${h.change_pct >= 0 ? "pos" : "neg"}">${
+			h.change_pct == null
+				? "—"
+				: (h.change_pct > 0 ? "+" : "") + f(h.change_pct, 1) + "%"
+		}</td>
+      <td>${h.volume ? f(h.volume, 0) : "—"}</td>
+      <td>${detailChips(h.detail)}</td>
+    </tr>`,
+						)
+						.join("") +
+					"</tbody></table></div>"
+			}
+
+			// ------------------------------------------------------------------ forms
+			$("#save").onclick = async () => {
+				const name = $("#scanName").value.trim()
+				const conds = conditionSpec()
+				if (!name) {
+					status("name the scan first")
+					return
+				}
+				if (!conds.length) {
+					status("pick at least one condition")
+					return
+				}
+				await api(
+					`/api/scans/${encodeURIComponent(name)}?spec=` +
+						encodeURIComponent(
+							JSON.stringify({
+								universe: $("#uni").value,
+								conditions: conds,
+								days: +$("#days").value,
+								limit: +$("#limit").value,
+							}),
+						),
+					{ method: "POST" },
+				)
+				$("#scanName").value = ""
+				loadSaved()
+				status(`saved '${name}'`)
+			}
+
+			$("#manage").onclick = () => {
+				dlg.showModal()
+			}
+			$("#uFromWatch").onclick = async () => {
+				const w = await api("/api/watchlist")
+				$("#uSyms").value = (w.watchlist || w.items || [])
+					.map((x) => x.tradingsymbol)
+					.join(", ")
+				$("#uName").value = "watchlist"
+			}
+			$("#uSave").onclick = async () => {
+				const name = $("#uName").value.trim()
+				const syms = $("#uSyms").value.trim()
+				if (!name || !syms) {
+					status("name and symbols are both needed")
+					return
+				}
+				try {
+					const r = await api(
+						`/api/universe/${encodeURIComponent(name)}?symbols=` +
+							encodeURIComponent(syms),
+						{ method: "POST" },
+					)
+					dlg.close()
+					status(
+						`${name}: ${r.added} symbols` +
+							(r.unknown.length
+								? ` · not found: ${r.unknown.join(", ")}`
+								: ""),
+					)
+					loadUniverses(name)
+				} catch (e) {
+					status(e.message)
+				}
+			}
+			$("#uni").onchange = loadCoverage
+
+			;(async () => {
+				CONDS = (await api("/api/scanner/conditions")).conditions
+				renderConds()
+				await loadUniverses()
+				await loadSaved()
+			})()
+		</script>
+	</body>
+</html>

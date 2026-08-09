@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>Portfolio — TickerForge</title>
+		<link rel="stylesheet" href="/app.css" />
+		<style>
+			.pos {
+				color: var(--up);
+			}
+			.neg {
+				color: var(--down);
+			}
+			.sect {
+				margin: 22px 0 8px;
+				font-size: 15px;
+			}
+			.empty {
+				color: var(--dim);
+				padding: 14px;
+			}
+			.flags {
+				border: 1px solid var(--border);
+				border-left: 3px solid var(--warn);
+				border-radius: 9px;
+				padding: 10px 14px;
+				margin: 12px 0;
+				background: var(--panel);
+			}
+			.flags div {
+				padding: 2px 0;
+			}
+			.flags .hd {
+				color: var(--warn);
+				font-size: 12px;
+				margin-bottom: 4px;
+			}
+			.wt {
+				display: inline-block;
+				height: 5px;
+				background: var(--accent);
+				border-radius: 3px;
+				vertical-align: middle;
+				margin-left: 6px;
+				min-width: 2px;
+			}
+			.tag {
+				display: inline-block;
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 1px 8px;
+				font-size: 11.5px;
+				color: var(--dim);
+			}
+			.tag.under {
+				color: var(--up);
+				border-color: var(--up);
+			}
+			.tag.over {
+				color: var(--down);
+				border-color: var(--down);
+			}
+			.tag.long {
+				color: var(--up);
+				border-color: var(--up);
+			}
+			.tag.flat {
+				color: var(--dim);
+			}
+			.ro {
+				color: var(--dim);
+				font-size: 12px;
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 2px 10px;
+			}
+			td.num {
+				font-variant-numeric: tabular-nums;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="nav">
+			<span class="brand">TickerForge</span>
+			<a class="tab" href="/">Chart</a>
+			<a class="tab" href="/desk">Desk</a>
+			<a class="tab on" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/scanner">Scanner</a>
+			<a class="tab" href="/screen">Screen</a>
+			<a class="tab" href="/query">Query</a>
+			<a class="tab" href="/fundamentals">Fundamentals</a>
+			<a class="tab" href="/results">Results</a>
+			<a class="tab" href="/valuation">Valuation</a>
+			<a class="tab" href="/backtest">Backtest</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/metrics">Metrics</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/news">News</a>
+			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/settings">Settings</a>
+			<span class="sp"></span>
+			<span class="status" id="status"></span>
+		</div>
+
+		<div class="wrap">
+			<div class="row">
+				<h2 class="page">Portfolio</h2>
+				<span
+					class="ro"
+					title="This page cannot place, modify or cancel orders"
+					>read-only</span
+				>
+				<span class="spacer"></span>
+				<button class="btn" id="sync">Add holdings to watchlist</button>
+				<button class="btn primary" id="reload">Refresh</button>
+			</div>
+			<div class="sub">
+				Your Kite holdings, next to what TickerForge already knows about
+				each one.
+			</div>
+
+			<div class="cards" id="totals"></div>
+			<div id="flags"></div>
+
+			<h3 class="sect">Holdings</h3>
+			<div class="tbl-wrap"><table class="stmt" id="hold"></table></div>
+
+			<div id="posWrap" style="display: none">
+				<h3 class="sect">Open positions</h3>
+				<div class="tbl-wrap">
+					<table class="stmt" id="pos"></table>
+				</div>
+			</div>
+
+			<div id="mfWrap" style="display: none">
+				<h3 class="sect">Mutual funds</h3>
+				<div class="sub" id="mfHead"></div>
+				<div class="tbl-wrap">
+					<table class="stmt" id="mf"></table>
+				</div>
+			</div>
+			<div class="sub" id="mfNote" style="display: none"></div>
+
+			<div class="sub" id="asof" style="margin-top: 14px"></div>
+		</div>
+
+		<script>
+			const $ = (s) => document.querySelector(s)
+			const f = (v, d = 2) => (v == null ? "—" : Number(v).toFixed(d))
+			const money = (v) =>
+				v == null
+					? "—"
+					: "₹" +
+						Number(v).toLocaleString("en-IN", {
+							maximumFractionDigits: 0,
+						})
+			const sgn = (v, d = 2) =>
+				v == null ? "—" : (v > 0 ? "+" : "") + Number(v).toFixed(d)
+			const cls = (v) => (v == null ? "" : v >= 0 ? "pos" : "neg")
+			// Fund names and folio numbers come from the broker, not from
+			// this codebase. Everything else on this page is a number.
+			const esc = (s) =>
+				String(s == null ? "" : s).replace(
+					/[&<>"']/g,
+					(c) =>
+						({
+							"&": "&amp;",
+							"<": "&lt;",
+							">": "&gt;",
+							'"': "&quot;",
+							"'": "&#39;",
+						})[c],
+				)
+
+			async function api(url, opts) {
+				const r = await fetch(url, opts)
+				if (!r.ok)
+					throw new Error(
+						(await r.json().catch(() => ({}))).detail ||
+							r.statusText,
+					)
+				return r.json()
+			}
+
+			function card(k, v, extra = "") {
+				return `<div class="card"><div class="k">${k}</div><div class="v ${extra}">${v}</div></div>`
+			}
+
+			function valTag(v) {
+				if (!v || !v.verdict) return ""
+				const c =
+					v.verdict === "undervalued"
+						? "under"
+						: v.verdict === "overvalued" || v.verdict === "rich"
+							? "over"
+							: ""
+				const t =
+					v.mos_pct == null
+						? v.verdict
+						: `${v.verdict} ${sgn(v.mos_pct, 0)}%`
+				return `<span class="tag ${c}" title="your own valuation models">${t}</span>`
+			}
+
+			function sigTag(s) {
+				if (!s) return ""
+				return (
+					`<span class="tag ${s.stance}" title="${s.long.join(", ") || "none long"}">` +
+					`${s.stance} ${s.long.length}/${s.total}</span>`
+				)
+			}
+
+			function stopCell(ch) {
+				if (!ch) return "—"
+				// A negative distance means price is already through where a 3xATR stop
+				// would sit — the single most actionable number on the row.
+				return (
+					`<span class="${cls(ch.distance_pct)}">${f(ch.stop)}` +
+					` <span class="sub">(${sgn(ch.distance_pct, 1)}%)</span></span>`
+				)
+			}
+
+			function render(d) {
+				const t = d.totals
+				$("#totals").innerHTML =
+					card("Value", money(t.value)) +
+					card("Invested", money(t.cost)) +
+					card("P&L", money(t.pnl), cls(t.pnl)) +
+					card("P&L %", sgn(t.pnl_pct, 1) + "%", cls(t.pnl_pct)) +
+					card("Today", money(t.day_pnl), cls(t.day_pnl)) +
+					card("Holdings", t.count) +
+					(d.positions.length
+						? card(
+								"Positions P&L",
+								money(t.positions_pnl),
+								cls(t.positions_pnl),
+							)
+						: "")
+
+				$("#flags").innerHTML = d.flags.length
+					? `<div class="flags"><div class="hd">Worth a look</div>` +
+						d.flags.map((x) => `<div>· ${x}</div>`).join("") +
+						`</div>`
+					: ""
+
+				const maxW = Math.max(
+					...d.holdings.map((h) => h.weight_pct || 0),
+					1,
+				)
+				$("#hold").innerHTML = !d.holdings.length
+					? '<tbody><tr><td class="empty">No holdings.</td></tr></tbody>'
+					: `<thead><tr>
+        <th>Symbol</th><th>Qty</th><th>Avg</th><th>Last</th><th>Value</th>
+        <th>P&L</th><th>Weight</th><th>Valuation</th><th>Signals</th>
+        <th>3×ATR stop</th><th>Results</th></tr></thead><tbody>` +
+						d.holdings
+							.map(
+								(h) => `<tr>
+        <td>${h.symbol}<div class="sub">${h.name || ""}</div></td>
+        <td class="num">${h.qty}</td>
+        <td class="num">${f(h.avg_price)}</td>
+        <td class="num">${f(h.last_price)}</td>
+        <td class="num">${money(h.value)}</td>
+        <td class="num ${cls(h.pnl)}">${money(h.pnl)}
+          <div class="sub ${cls(h.pnl_pct)}">${sgn(h.pnl_pct, 1)}%</div></td>
+        <td class="num">${f(h.weight_pct, 1)}%
+          <i class="wt" style="width:${(((h.weight_pct || 0) / maxW) * 40).toFixed(0)}px"></i></td>
+        <td>${valTag(h.valuation)}</td>
+        <td>${sigTag(h.signals)}</td>
+        <td class="num">${stopCell(h.chandelier)}</td>
+        <td class="sub">${h.results_due || ""}</td>
+      </tr>`,
+							)
+							.join("") +
+						"</tbody>"
+
+				if (d.positions.length) {
+					$("#posWrap").style.display = ""
+					$("#pos").innerHTML =
+						`<thead><tr>
+        <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg</th><th>Last</th>
+        <th>P&L</th><th>Product</th></tr></thead><tbody>` +
+						d.positions
+							.map(
+								(p) => `<tr>
+        <td>${p.symbol}</td><td>${p.side}</td>
+        <td class="num">${Math.abs(p.qty)}</td>
+        <td class="num">${f(p.avg_price)}</td>
+        <td class="num">${f(p.last_price)}</td>
+        <td class="num ${cls(p.pnl)}">${money(p.pnl)}</td>
+        <td class="sub">${p.product || ""}</td>
+      </tr>`,
+							)
+							.join("") +
+						"</tbody>"
+				} else {
+					$("#posWrap").style.display = "none"
+				}
+
+				// Funds sit in their own section with their own total. Folding
+				// them into the holdings table would move every weight_pct and
+				// quietly defuse the concentration flag.
+				const mf = d.mf || []
+				$("#mfWrap").style.display = mf.length ? "" : "none"
+				$("#mfNote").style.display =
+					!mf.length && d.mf_note ? "" : "none"
+				if (d.mf_note) $("#mfNote").textContent = "Mutual funds: " + d.mf_note
+				if (mf.length) {
+					const mt = d.mf_totals || {}
+					$("#mfHead").innerHTML =
+						`${money(mt.value)} \u00b7 ` +
+						`<span class="${cls(mt.pnl)}">${money(mt.pnl)}` +
+						(mt.pnl_pct == null ? "" : ` (${f(mt.pnl_pct)}%)`) +
+						`</span>` +
+						(d.totals && d.totals.net_worth
+							? ` \u00b7 with equity ${money(d.totals.net_worth)}`
+							: "")
+					$("#mf").innerHTML =
+						`<thead><tr>
+        <th>Fund</th><th>Units</th><th>Avg</th><th>NAV</th>
+        <th>Value</th><th>P&L</th></tr></thead><tbody>` +
+						mf
+							.map(
+								(m) => `<tr>
+        <td>${esc(m.name)}${
+									m.folio
+										? `<div class="sub">folio ${esc(m.folio)}</div>`
+										: ""
+								}</td>
+        <td class="num">${m.units}</td>
+        <td class="num">${f(m.avg_price)}</td>
+        <td class="num">${f(m.nav)}<div class="sub">${esc(
+									m.nav_date || "",
+								)}</div></td>
+        <td class="num">${money(m.value)}</td>
+        <td class="num ${cls(m.pnl)}">${money(m.pnl)}${
+									m.pnl_pct == null
+										? ""
+										: `<div class="sub">${f(m.pnl_pct)}%</div>`
+								}</td>
+      </tr>`,
+							)
+							.join("") +
+						"</tbody>"
+				}
+
+				$("#asof").textContent =
+					"As of " + (d.as_of || "").replace("T", " ")
+			}
+
+			async function load(refresh) {
+				$("#totals").innerHTML =
+					'<div class="empty">Loading from Kite…</div>'
+				try {
+					render(
+						await api(
+							"/api/portfolio" + (refresh ? "?refresh=true" : ""),
+						),
+					)
+				} catch (e) {
+					$("#totals").innerHTML =
+						`<div class="empty">${e.message}` +
+						(/session|log in/i.test(e.message)
+							? " — run <code>python -m app.cli login</code>"
+							: "") +
+						"</div>"
+					$("#hold").innerHTML = ""
+				}
+			}
+
+			$("#reload").onclick = () => load(true)
+			$("#sync").onclick = async () => {
+				try {
+					const r = await api("/api/portfolio/sync-watchlist", {
+						method: "POST",
+					})
+					alert(
+						r.added.length
+							? `Added to watchlist: ${r.added.join(", ")}`
+							: "Every holding is already on the watchlist.",
+					)
+				} catch (e) {
+					alert(e.message)
+				}
+			}
+			load()
+		</script>
+	</body>
+</html>

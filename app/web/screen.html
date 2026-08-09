@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>Screen — TickerForge</title>
+		<link rel="stylesheet" href="/app.css" />
+		<style>
+			.axes {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 12px;
+				margin: 14px 0;
+			}
+			.axis {
+				background: var(--panel2);
+				border: 1px solid var(--border);
+				border-radius: 9px;
+				padding: 12px 14px;
+			}
+			.axis b {
+				display: block;
+				margin-bottom: 3px;
+			}
+			.axis .sub {
+				line-height: 1.55;
+			}
+			table {
+				width: 100%;
+				border-collapse: collapse;
+				margin-top: 12px;
+			}
+			th,
+			td {
+				padding: 9px 10px;
+				text-align: right;
+				border-bottom: 1px solid var(--border);
+				font-variant-numeric: tabular-nums;
+			}
+			th:first-child,
+			td:first-child {
+				text-align: left;
+			}
+			th {
+				color: var(--dim);
+				font-weight: 500;
+				font-size: 12px;
+			}
+			tr.hit td {
+				background: rgba(38, 166, 154, 0.06);
+			}
+			.sym {
+				font-weight: 600;
+			}
+			.why {
+				font-size: 12px;
+				color: var(--dim);
+			}
+			.tagfail {
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 0 8px;
+				font-size: 11px;
+				color: var(--down);
+			}
+			.note {
+				border-left: 2px solid var(--border);
+				padding-left: 10px;
+				color: var(--dim);
+				line-height: 1.6;
+				margin: 14px 0;
+			}
+			.ctl {
+				display: flex;
+				gap: 12px;
+				align-items: flex-end;
+				flex-wrap: wrap;
+				margin-top: 10px;
+			}
+			.fld label {
+				display: block;
+				color: var(--dim);
+				font-size: 12px;
+				margin-bottom: 3px;
+			}
+			.fld input,
+			.fld select {
+				background: var(--panel2);
+				color: var(--fg);
+				border: 1px solid var(--border);
+				border-radius: 7px;
+				padding: 7px 9px;
+				font: inherit;
+			}
+			h3 {
+				margin: 22px 0 4px;
+				font-size: 14px;
+			}
+			@media (max-width: 800px) {
+				.axes {
+					grid-template-columns: 1fr;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div id="nav">
+			<span class="brand">TickerForge</span>
+			<a class="tab" href="/">Chart</a>
+			<a class="tab" href="/desk">Desk</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/scanner">Scanner</a>
+			<a class="tab on" href="/screen">Screen</a>
+			<a class="tab" href="/query">Query</a>
+			<a class="tab" href="/fundamentals">Fundamentals</a>
+			<a class="tab" href="/results">Results</a>
+			<a class="tab" href="/valuation">Valuation</a>
+			<a class="tab" href="/backtest">Backtest</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/metrics">Metrics</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/news">News</a>
+			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/settings">Settings</a>
+			<span class="sp"></span>
+			<span class="status" id="status"></span>
+		</div>
+
+		<div class="wrap">
+			<div class="row">
+				<h2 class="page">Value with momentum</h2>
+				<span class="sub"
+					>— cheap, strong and turning, at the same time</span
+				>
+			</div>
+
+			<div class="axes">
+				<div class="axis">
+					<b>Is it cheap?</b>
+					<div class="sub">
+						Your own Damodaran composite, not a screener's P/E.
+						Cheap alone is a value trap — the market is often right
+						that a business is worth less.
+					</div>
+				</div>
+				<div class="axis">
+					<b>Is it winning?</b>
+					<div class="sub">
+						Relative strength against the Nifty over 3, 6 and 12
+						months. Momentum alone buys whatever went up, including
+						the part that went up because it was overvalued.
+					</div>
+				</div>
+				<div class="axis">
+					<b>Is it working?</b>
+					<div class="sub">
+						Your configured strategies' current stance. A signal
+						alone is a timing tool with nothing to say about what
+						it's timing.
+					</div>
+				</div>
+			</div>
+
+			<div class="ctl">
+				<div class="fld">
+					<label>Universe</label>
+					<select id="uni">
+						<option value="">watchlist</option>
+					</select>
+				</div>
+				<div class="fld">
+					<label>Min RS percentile</label>
+					<input
+						id="minrs"
+						type="number"
+						value="70"
+						min="0"
+						max="99"
+						step="5"
+						style="width: 100px"
+					/>
+				</div>
+				<div class="fld">
+					<label>Valuation</label>
+					<select id="verd">
+						<option value="undervalued,fair">
+							undervalued or fair
+						</option>
+						<option value="undervalued">undervalued only</option>
+						<option value="undervalued,fair,rich">
+							anything but overvalued
+						</option>
+					</select>
+				</div>
+				<div class="fld">
+					<label>Signal</label>
+					<select id="req">
+						<option value="true">at least one strategy long</option>
+						<option value="false">ignore signals</option>
+					</select>
+				</div>
+				<button class="btn primary" id="go">Screen</button>
+			</div>
+
+			<div id="out"><div class="empty">Run the screen.</div></div>
+		</div>
+
+		<script>
+			"use strict"
+			const $ = (s) => document.querySelector(s)
+			const status = (m) => {
+				$("#status").textContent = m || ""
+			}
+			const esc = (s) =>
+				String(s ?? "").replace(
+					/[&<>"]/g,
+					(c) =>
+						({
+							"&": "&amp;",
+							"<": "&lt;",
+							">": "&gt;",
+							'"': "&quot;",
+						})[c],
+				)
+			const n = (v, d = 1) => (v == null ? "—" : v.toFixed(d))
+			const pct = (v) =>
+				v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(0)}%`
+
+			async function loadUniverses() {
+				try {
+					const rows = await (await fetch("/api/universe")).json()
+					const list = rows.universes || rows || []
+					$("#uni").innerHTML =
+						'<option value="">watchlist</option>' +
+						list
+							.map(
+								(u) =>
+									`<option value="${esc(u.name)}">${esc(u.name)} (${u.n ?? u.count ?? ""})</option>`,
+							)
+							.join("")
+				} catch (e) {
+					/* watchlist is a fine default */
+				}
+			}
+
+			function row(r, hit) {
+				const fails = r.failed
+					.map((f) => `<span class="tagfail">${esc(f)}</span>`)
+					.join(" ")
+				return `<tr class="${hit ? "hit" : ""}">
+    <td><span class="sym">${esc(r.symbol)}</span>
+        <div class="why">${esc(r.name || "")}</div></td>
+    <td>${n(r.price, 2)}</td>
+    <td>${n(r.fair, 0)}</td>
+    <td>${pct(r.mos_pct)}</td>
+    <td>${esc(r.verdict || "—")}${r.n_models ? `<div class="why">${r.n_models} models</div>` : ""}</td>
+    <td>${n(r.rs, 0)}</td>
+    <td>${pct(r.r3m)}</td>
+    <td>${pct(r.r6m)}</td>
+    <td>${esc(r.stance)}</td>
+    <td>${fails || '<span class="why">—</span>'}</td>
+  </tr>`
+			}
+
+			function table(rows, hit) {
+				return `<table>
+    <thead><tr><th>Symbol</th><th>Price</th><th>Fair</th><th>MoS</th>
+      <th>Verdict</th><th>RS</th><th>3m vs Nifty</th><th>6m vs Nifty</th>
+      <th>Stance</th><th>Failed</th></tr></thead>
+    <tbody>${rows.map((r) => row(r, hit)).join("")}</tbody></table>`
+			}
+
+			async function go() {
+				$("#go").disabled = true
+				$("#out").innerHTML =
+					'<div class="loading">valuing, scanning and ranking…</div>'
+				status("screening…")
+				try {
+					const p = new URLSearchParams({
+						min_rs: $("#minrs").value,
+						verdicts: $("#verd").value,
+						require_long: $("#req").value,
+					})
+					if ($("#uni").value) p.set("universe_name", $("#uni").value)
+					const r = await fetch("/api/screen?" + p)
+					if (!r.ok) {
+						const e = await r.json().catch(() => ({}))
+						$("#out").innerHTML =
+							`<div class="empty">${esc(e.detail || "screen failed")}</div>`
+						return
+					}
+					const d = await r.json()
+					let html = `<div class="note">${esc(d.note)}</div>`
+					if (d.hits.length)
+						html +=
+							`<h3>Passed all three</h3>` + table(d.hits, true)
+					// Near misses are shown deliberately: a name failing one axis by a whisker
+					// is worth more attention than the twentieth pass, and an invisible
+					// rejection teaches you nothing about why.
+					if (d.near_misses.length)
+						html +=
+							`<h3>Near misses — failed exactly one</h3>` +
+							table(d.near_misses, false)
+					$("#out").innerHTML = html
+					status(`${d.hits.length} of ${d.considered}`)
+				} catch (e) {
+					$("#out").innerHTML =
+						`<div class="empty">${esc(e.message)}</div>`
+				} finally {
+					$("#go").disabled = false
+				}
+			}
+
+			$("#go").onclick = go
+			loadUniverses()
+		</script>
+	</body>
+</html>

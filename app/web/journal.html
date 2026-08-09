@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>Journal — TickerForge</title>
+		<link rel="stylesheet" href="/app.css" />
+		<style>
+			.guard {
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 10px 14px;
+				margin: 12px 0;
+				background: var(--panel);
+				display: flex;
+				gap: 18px;
+				align-items: center;
+				flex-wrap: wrap;
+			}
+			.guard.blocked {
+				border-color: var(--down);
+				background: #2a1518;
+			}
+			.guard .big {
+				font-size: 20px;
+				font-weight: 600;
+				font-variant-numeric: tabular-nums;
+			}
+			.guard .lbl {
+				color: var(--dim);
+				font-size: 12px;
+			}
+			.meter {
+				flex: 1;
+				min-width: 160px;
+				height: 7px;
+				background: var(--panel2);
+				border-radius: 4px;
+				overflow: hidden;
+			}
+			.meter i {
+				display: block;
+				height: 100%;
+				background: var(--down);
+				width: 0;
+			}
+			.pos {
+				color: var(--up);
+			}
+			.neg {
+				color: var(--down);
+			}
+			.r {
+				font-variant-numeric: tabular-nums;
+				font-weight: 600;
+			}
+			.sect {
+				margin: 22px 0 8px;
+				font-size: 15px;
+			}
+			.empty {
+				color: var(--dim);
+				padding: 14px;
+			}
+			.tag {
+				display: inline-block;
+				background: var(--panel2);
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 1px 9px;
+				font-size: 12px;
+				color: var(--dim);
+			}
+			.act {
+				color: var(--dim);
+				cursor: pointer;
+				padding: 0 4px;
+			}
+			.act:hover {
+				color: var(--accent);
+			}
+			.cmp td.gap {
+				font-weight: 600;
+			}
+			.caveat {
+				color: var(--dim);
+				font-size: 12.5px;
+				line-height: 1.55;
+				margin-top: 8px;
+				border-left: 2px solid var(--border);
+				padding-left: 10px;
+			}
+			dialog {
+				background: var(--panel);
+				color: var(--fg);
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				padding: 18px;
+				min-width: 300px;
+			}
+			dialog::backdrop {
+				background: rgba(0, 0, 0, 0.6);
+			}
+			dialog .fld {
+				display: flex;
+				flex-direction: column;
+				gap: 4px;
+				margin-bottom: 10px;
+			}
+			dialog label {
+				color: var(--dim);
+				font-size: 12px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="nav">
+			<span class="brand">TickerForge</span>
+			<a class="tab" href="/">Chart</a>
+			<a class="tab" href="/desk">Desk</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/scanner">Scanner</a>
+			<a class="tab" href="/screen">Screen</a>
+			<a class="tab" href="/query">Query</a>
+			<a class="tab" href="/fundamentals">Fundamentals</a>
+			<a class="tab" href="/results">Results</a>
+			<a class="tab" href="/valuation">Valuation</a>
+			<a class="tab" href="/backtest">Backtest</a>
+			<a class="tab on" href="/journal">Journal</a>
+			<a class="tab" href="/metrics">Metrics</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/news">News</a>
+			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/settings">Settings</a>
+			<span class="sp"></span>
+			<span class="status" id="status"></span>
+		</div>
+
+		<div class="wrap">
+			<div class="row">
+				<h2 class="page">Trade journal</h2>
+				<span class="spacer"></span>
+				<button class="btn" id="reload">Refresh</button>
+				<button class="btn primary" id="newTrade">Log a trade</button>
+			</div>
+			<div class="sub">
+				What you actually did, priced in R against the stop you set at
+				entry.
+			</div>
+
+			<div class="guard" id="guard">
+				<span class="lbl">loading…</span>
+			</div>
+			<div class="cards" id="stats"></div>
+
+			<h3 class="sect">Open positions</h3>
+			<div class="tbl-wrap">
+				<table class="stmt" id="openTbl"></table>
+			</div>
+
+			<h3 class="sect">Closed</h3>
+			<div class="tbl-wrap">
+				<table class="stmt" id="closedTbl"></table>
+			</div>
+
+			<h3 class="sect">Live vs backtest, by strategy</h3>
+			<div class="row">
+				<span class="sub"
+					>Runs each tagged strategy over the symbols you traded it
+					on.</span
+				>
+				<span class="spacer"></span>
+				<button class="btn" id="runCmp">Compare</button>
+			</div>
+			<div id="cmp"></div>
+		</div>
+
+		<dialog id="dlg">
+			<h3 style="margin-bottom: 12px" id="dlgTitle">Log a trade</h3>
+			<div id="dlgBody"></div>
+			<div class="row" style="margin-top: 14px">
+				<span class="spacer"></span>
+				<button class="btn" onclick="dlg.close()">Cancel</button>
+				<button class="btn primary" id="dlgOk">Save</button>
+			</div>
+		</dialog>
+
+		<script>
+			const $ = (s) => document.querySelector(s)
+			const f = (v, d = 2) => (v == null ? "—" : Number(v).toFixed(d))
+			const sgn = (v) =>
+				v == null ? "—" : (v > 0 ? "+" : "") + Number(v).toFixed(2)
+			const cls = (v) => (v == null ? "" : v >= 0 ? "pos" : "neg")
+			let DATA = null
+
+			async function api(url, opts) {
+				const r = await fetch(url, opts)
+				if (!r.ok)
+					throw new Error(
+						(await r.json().catch(() => ({}))).detail ||
+							r.statusText,
+					)
+				return r.json()
+			}
+
+			async function load() {
+				DATA = await api("/api/journal")
+				renderGuard(DATA.guard, DATA.settings)
+				renderStats(DATA.stats)
+				renderOpen(DATA.open)
+				renderClosed(DATA.closed)
+			}
+
+			function renderGuard(g, s) {
+				// The day's risk budget as a bar. Deliberately the first thing on the page:
+				// the number that should change behaviour is the one you see before you
+				// start looking for reasons to take another trade.
+				const used = Math.min(
+					1,
+					Math.max(0, -g.effective_r / g.daily_loss_r),
+				)
+				$("#guard").className = "guard" + (g.ok ? "" : " blocked")
+				$("#guard").innerHTML = `
+    <div><div class="lbl">today</div>
+      <div class="big ${cls(g.realised_r)}">${sgn(g.realised_r)}R</div></div>
+    <div><div class="lbl">live risk</div>
+      <div class="big">${f(g.open_risk_r)}R</div></div>
+    <div style="flex:1;min-width:180px">
+      <div class="lbl">${
+			g.ok
+				? `${f(g.remaining_r)}R left of a ${f(g.daily_loss_r, 0)}R limit`
+				: g.reasons.join(" · ")
+		}</div>
+      <div class="meter"><i style="width:${(used * 100).toFixed(0)}%"></i></div>
+    </div>
+    <div><div class="lbl">positions</div>
+      <div class="big">${g.open_positions}<small style="color:var(--dim);font-size:13px">/${g.max_positions}</small></div></div>
+    <div><div class="lbl">risking</div>
+      <div class="big">${f(s.risk_pct, 1)}%<small style="color:var(--dim);font-size:13px"> of ₹${(s.account / 100000).toFixed(1)}L</small></div></div>`
+			}
+
+			function card(k, v, extra = "") {
+				return `<div class="card"><div class="k">${k}</div><div class="v ${extra}">${v}</div></div>`
+			}
+
+			function renderStats(s) {
+				if (!s.trades) {
+					$("#stats").innerHTML =
+						`<div class="empty">No closed trades yet.${
+							s.unscored
+								? ` ${s.unscored} logged without a stop — those can't be scored.`
+								: ""
+						}</div>`
+					return
+				}
+				$("#stats").innerHTML =
+					card("Trades", s.trades) +
+					card("Win rate", f(s.win_rate_pct, 1) + "%") +
+					card(
+						"Expectancy",
+						sgn(s.expectancy_r) + "R",
+						cls(s.expectancy_r),
+					) +
+					card("Total", sgn(s.total_r) + "R", cls(s.total_r)) +
+					card("Profit factor", f(s.profit_factor)) +
+					card("Max DD", f(s.max_drawdown_r) + "R", "neg") +
+					card("Avg win", sgn(s.avg_win_r) + "R", "pos") +
+					card("Avg loss", sgn(s.avg_loss_r) + "R", "neg")
+			}
+
+			function renderOpen(rows) {
+				const t = $("#openTbl")
+				if (!rows.length) {
+					t.innerHTML =
+						'<tbody><tr><td class="empty">Nothing open.</td></tr></tbody>'
+					return
+				}
+				t.innerHTML =
+					`<thead><tr>
+      <th>Symbol</th><th>Side</th><th>Qty</th><th>Entry</th><th>Stop</th>
+      <th>Last</th><th>Live R</th><th>Tag</th><th></th></tr></thead><tbody>` +
+					rows
+						.map(
+							(r) => `<tr>
+      <td>${r.symbol}</td><td>${r.side}</td><td>${r.qty}</td>
+      <td>${f(r.entry)}</td>
+      <td>${f(r.stop)}${
+			r.initial_stop != null && r.stop !== r.initial_stop
+				? `<span class="sub" title="R is measured against the stop at entry"> (from ${f(r.initial_stop)})</span>`
+				: ""
+		}</td>
+      <td>${f(r.last_price)}</td>
+      <td class="r ${cls(r.live_r)}">${sgn(r.live_r)}R</td>
+      <td>${r.tag ? `<span class="tag">${r.tag}</span>` : ""}</td>
+      <td><span class="act" onclick="askClose(${r.id})">close</span>
+          <span class="act" onclick="askTrail(${r.id},${r.stop ?? "null"})">trail</span></td>
+    </tr>`,
+						)
+						.join("") +
+					"</tbody>"
+			}
+
+			function renderClosed(rows) {
+				const t = $("#closedTbl")
+				if (!rows.length) {
+					t.innerHTML =
+						'<tbody><tr><td class="empty">Nothing closed yet.</td></tr></tbody>'
+					return
+				}
+				t.innerHTML =
+					`<thead><tr>
+      <th>Symbol</th><th>Side</th><th>Qty</th><th>Entry</th><th>Exit</th>
+      <th>R</th><th>Charges</th><th>Why</th><th>Tag</th><th>Closed</th></tr></thead><tbody>` +
+					rows
+						.map(
+							(r) => `<tr>
+      <td>${r.symbol}</td><td>${r.side}</td><td>${r.qty}</td>
+      <td>${f(r.entry)}</td><td>${f(r.exit)}</td>
+      <td class="r ${cls(r.r_multiple)}">${
+			r.r_multiple == null
+				? '<span class="sub" title="no stop recorded — cannot be scored">unscored</span>'
+				: sgn(r.r_multiple) + "R"
+		}</td>
+      <td>${f(r.charges, 0)}</td><td>${r.reason || ""}</td>
+      <td>${r.tag ? `<span class="tag">${r.tag}</span>` : ""}</td>
+      <td class="sub">${(r.exit_time || "").replace("T", " ").slice(0, 16)}</td>
+    </tr>`,
+						)
+						.join("") +
+					"</tbody>"
+			}
+
+			// ---------------------------------------------------------------- compare
+			async function compare() {
+				$("#cmp").innerHTML =
+					'<div class="empty">Running backtests…</div>'
+				let d
+				try {
+					d = await api("/api/journal/compare")
+				} catch (e) {
+					$("#cmp").innerHTML =
+						`<div class="empty">Failed: ${e.message}</div>`
+					return
+				}
+				if (!d.rows.length) {
+					$("#cmp").innerHTML =
+						'<div class="empty">No closed trades tagged with a ' +
+						"strategy key yet. Tag trades with e.g. <code>st_adx</code> to compare.</div>"
+					return
+				}
+				$("#cmp").innerHTML =
+					`<div class="tbl-wrap"><table class="stmt cmp">
+    <thead><tr>
+      <th>Strategy</th>
+      <th>Live trades</th><th>Live win%</th><th>Live expectancy</th>
+      <th>BT trades</th><th>BT win%</th><th>BT expectancy</th>
+      <th>Symbols</th></tr></thead><tbody>` +
+					d.rows
+						.map((r) => {
+							const b = r.backtest || {}
+							const dw =
+								r.live.win_rate_pct != null &&
+								b.win_rate_pct != null
+									? r.live.win_rate_pct - b.win_rate_pct
+									: null
+							return `<tr>
+        <td>${r.name}<div class="sub">${r.tag}</div></td>
+        <td>${r.live.trades}</td>
+        <td class="gap ${cls(dw)}">${f(r.live.win_rate_pct, 1)}%</td>
+        <td class="r ${cls(r.live.expectancy_r)}">${sgn(r.live.expectancy_r)}R</td>
+        <td>${b.trades ?? "—"}</td>
+        <td>${f(b.win_rate_pct, 1)}%</td>
+        <td class="r">${b.expectancy_pct == null ? "—" : sgn(b.expectancy_pct) + "%"}</td>
+        <td class="sub">${(r.symbols || []).join(", ") || "—"}</td>
+      </tr>${r.note ? `<tr><td colspan="8" class="sub">⚠ ${r.note}</td></tr>` : ""}`
+						})
+						.join("") +
+					`</tbody></table></div>
+    <div class="caveat">${d.caveat}</div>`
+			}
+
+			// ------------------------------------------------------------------ forms
+			const dlg = $("#dlg")
+			let onOk = null
+
+			function openDialog(title, html, handler) {
+				$("#dlgTitle").textContent = title
+				$("#dlgBody").innerHTML = html
+				onOk = handler
+				dlg.showModal()
+			}
+			$("#dlgOk").onclick = async () => {
+				try {
+					await onOk()
+					dlg.close()
+					await load()
+				} catch (e) {
+					alert(e.message)
+				}
+			}
+
+			function fld(id, label, type = "number", val = "") {
+				return `<div class="fld"><label>${label}</label>
+    <input class="search" id="${id}" type="${type}" value="${val}"></div>`
+			}
+
+			$("#newTrade").onclick = () =>
+				openDialog(
+					"Log a trade",
+					fld("nSym", "Symbol", "text") +
+						fld("nEntry", "Entry") +
+						fld(
+							"nStop",
+							"Stop (defines 1R — leave blank and the trade can't be scored)",
+						) +
+						fld("nQty", "Quantity") +
+						fld("nTag", "Tag (strategy key, e.g. st_adx)", "text"),
+					async () => {
+						const q = new URLSearchParams({
+							symbol: $("#nSym").value.trim().toUpperCase(),
+							entry: $("#nEntry").value,
+							qty: $("#nQty").value,
+						})
+						if ($("#nStop").value) q.set("stop", $("#nStop").value)
+						if ($("#nTag").value)
+							q.set("tag", $("#nTag").value.trim())
+						await api("/api/journal?" + q, { method: "POST" })
+					},
+				)
+
+			window.askClose = (id) =>
+				openDialog(
+					"Close trade #" + id,
+					fld("cPrice", "Exit price") +
+						`<div class="fld"><label>Reason</label><select class="sel" id="cReason">
+     <option>target</option><option>stop</option><option>trail</option>
+     <option>signal</option><option>manual</option></select></div>` +
+						fld(
+							"cCharges",
+							"Actual charges (blank = estimate at 10bps/side)",
+						),
+					async () => {
+						const q = new URLSearchParams({
+							exit_price: $("#cPrice").value,
+							reason: $("#cReason").value,
+						})
+						if ($("#cCharges").value)
+							q.set("charges", $("#cCharges").value)
+						await api(`/api/journal/${id}/close?` + q, {
+							method: "POST",
+						})
+					},
+				)
+
+			window.askTrail = (id, cur) =>
+				openDialog(
+					"Trail stop on #" + id,
+					fld("tStop", "New stop", "number", cur ?? "") +
+						`<div class="sub" style="margin-top:6px">R stays measured against the stop
+   you set at entry — trailing changes where you exit, not what you risked.</div>`,
+					async () => {
+						await api(
+							`/api/journal/${id}?stop=${$("#tStop").value}`,
+							{ method: "PATCH" },
+						)
+					},
+				)
+
+			$("#reload").onclick = load
+			$("#runCmp").onclick = compare
+			load().catch(
+				(e) =>
+					($("#guard").innerHTML =
+						`<span class="lbl">Failed: ${e.message}</span>`),
+			)
+		</script>
+	</body>
+</html>

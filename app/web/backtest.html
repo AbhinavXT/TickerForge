@@ -1,0 +1,2088 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>TickerForge · Backtest</title>
+		<link rel="stylesheet" href="/app.css" />
+		<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+		<style>
+			.ctrls {
+				display: flex;
+				gap: 12px;
+				flex-wrap: wrap;
+				align-items: flex-end;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 12px 14px;
+				margin: 12px 0 8px;
+			}
+			.ctrls .fld {
+				display: flex;
+				flex-direction: column;
+				gap: 3px;
+			}
+			.ctrls label {
+				color: var(--dim);
+				font-size: 11px;
+			}
+			.ctrls input,
+			.ctrls select {
+				padding: 6px 8px;
+				background: var(--bg);
+				color: var(--fg);
+				border: 1px solid var(--border);
+				border-radius: 6px;
+				outline: none;
+				font-size: 13px;
+			}
+			.ctrls input {
+				width: 84px;
+			}
+			.ctrls input.sym {
+				width: 150px;
+			}
+			#params,
+			#riskflds {
+				display: flex;
+				gap: 10px;
+				flex-wrap: wrap;
+				align-items: flex-end;
+			}
+			.riskbar {
+				display: flex;
+				gap: 12px;
+				flex-wrap: wrap;
+				align-items: flex-end;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 10px 14px;
+				margin: 0 0 8px;
+			}
+			.riskbar .cap {
+				color: var(--dim);
+				font-size: 11px;
+				align-self: center;
+				max-width: 340px;
+				line-height: 1.45;
+			}
+			.riskbar input {
+				width: 74px;
+			}
+			/* explainer */
+			.about {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 14px 16px;
+				margin: 0 0 12px;
+				font-size: 13px;
+				line-height: 1.55;
+			}
+			.about h3 {
+				margin: 0 0 2px;
+				font-size: 14.5px;
+			}
+			.about .cat {
+				display: inline-block;
+				font-size: 10.5px;
+				letter-spacing: 0.4px;
+				text-transform: uppercase;
+				color: var(--accent, #4184e4);
+				border: 1px solid var(--border);
+				border-radius: 20px;
+				padding: 2px 9px;
+				margin-left: 8px;
+				vertical-align: 2px;
+			}
+			.about .sum {
+				color: var(--fg);
+				margin: 6px 0 10px;
+			}
+			.about .grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+				gap: 8px 22px;
+			}
+			.about .it b {
+				color: var(--dim);
+				font-weight: 500;
+				font-size: 11px;
+				text-transform: uppercase;
+				letter-spacing: 0.4px;
+				display: block;
+				margin-bottom: 2px;
+			}
+			.about .it.w b {
+				color: #26a69a;
+			}
+			.about .it.f b {
+				color: #ef5350;
+			}
+			.about .tip {
+				border-top: 1px dashed var(--border);
+				margin-top: 10px;
+				padding-top: 8px;
+				color: var(--dim);
+			}
+			.about .tip b {
+				color: var(--fg);
+				font-weight: 600;
+			}
+			details.eng {
+				margin: 0 0 12px;
+			}
+			details.eng summary {
+				cursor: pointer;
+				color: var(--dim);
+				font-size: 12.5px;
+				user-select: none;
+			}
+			details.eng .body {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 12px 16px;
+				margin-top: 8px;
+				font-size: 12.5px;
+				line-height: 1.6;
+				color: var(--fg);
+			}
+			details.eng .body b {
+				color: var(--accent, #4184e4);
+				font-weight: 600;
+			}
+			details.eng .body p {
+				margin: 0 0 8px;
+			}
+			details.eng .body p:last-child {
+				margin: 0;
+			}
+			/* stats */
+			.statgrid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+				gap: 10px;
+				margin: 12px 0;
+			}
+			.stat {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 9px;
+				padding: 10px 12px;
+			}
+			.stat .k {
+				color: var(--dim);
+				font-size: 11px;
+			}
+			.stat .v {
+				font-size: 17px;
+				font-weight: 600;
+				font-variant-numeric: tabular-nums;
+				margin-top: 3px;
+			}
+			.stat .bh {
+				color: var(--dim);
+				font-size: 11px;
+				margin-top: 2px;
+			}
+			.pos {
+				color: var(--up);
+			}
+			.neg {
+				color: var(--down);
+			}
+			#price,
+			#equity,
+			#dd {
+				width: 100%;
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				margin-top: 10px;
+			}
+			#price {
+				height: 280px;
+			}
+			#equity {
+				height: 190px;
+			}
+			#dd {
+				height: 120px;
+			}
+			.clabel {
+				color: var(--dim);
+				font-size: 12px;
+				margin-top: 12px;
+			}
+			table.trades {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 12.5px;
+				font-variant-numeric: tabular-nums;
+				margin-top: 8px;
+			}
+			table.trades th,
+			table.trades td {
+				padding: 6px 9px;
+				border-bottom: 1px solid var(--border);
+				text-align: right;
+			}
+			table.trades th {
+				color: var(--dim);
+				font-weight: 500;
+			}
+			table.trades td:first-child,
+			table.trades th:first-child,
+			table.trades td.rsn,
+			table.trades th.rsn {
+				text-align: left;
+			}
+			td.rsn {
+				color: var(--dim);
+			}
+			.ctrls label[title],
+			.riskbar label[title] {
+				cursor: help;
+				border-bottom: 1px dotted var(--border);
+			}
+			.sigpanel {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 12px 14px;
+				margin: 0 0 12px;
+			}
+			.sigpanel .hd {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+			}
+			.sigpanel .hd h3 {
+				margin: 0;
+				font-size: 14px;
+			}
+			.sigpanel .hd .sub {
+				flex: 1;
+			}
+			.sigflip {
+				margin: 8px 0 2px;
+				font-size: 13px;
+			}
+			.sigflip .up {
+				color: #26a69a;
+			}
+			.sigflip .dn {
+				color: #ef5350;
+			}
+			table.sigmat {
+				border-collapse: collapse;
+				font-size: 12px;
+				margin-top: 8px;
+				font-variant-numeric: tabular-nums;
+			}
+			table.sigmat th,
+			table.sigmat td {
+				padding: 4px 9px;
+				border-bottom: 1px solid var(--border);
+				text-align: center;
+			}
+			table.sigmat th {
+				color: var(--dim);
+				font-weight: 500;
+			}
+			table.sigmat td:first-child,
+			table.sigmat th:first-child {
+				text-align: left;
+			}
+			.dot {
+				display: inline-block;
+				width: 9px;
+				height: 9px;
+				border-radius: 50%;
+			}
+			.dot.on {
+				background: #26a69a;
+			}
+			.dot.off {
+				background: #30363d;
+			}
+
+			/* batch panel */
+			.bverdict {
+				border: 1px solid var(--border);
+				border-left: 3px solid var(--accent);
+				border-radius: 9px;
+				padding: 11px 14px;
+				margin: 14px 0;
+				background: var(--panel);
+			}
+			.bverdict.broad {
+				border-left-color: var(--up);
+			}
+			.bverdict.narrow {
+				border-left-color: var(--warn);
+			}
+			.bverdict.coin-flip {
+				border-left-color: var(--warn);
+			}
+			.bverdict.negative {
+				border-left-color: var(--down);
+			}
+			.bverdict .read {
+				font-weight: 600;
+				text-transform: uppercase;
+				font-size: 12px;
+				letter-spacing: 0.6px;
+			}
+			.bverdict .detail {
+				margin-top: 3px;
+			}
+			.bverdict .note {
+				color: var(--warn);
+				font-size: 12.5px;
+				margin-top: 6px;
+			}
+			.bcaveat {
+				color: var(--dim);
+				font-size: 12.5px;
+				line-height: 1.55;
+				border-left: 2px solid var(--border);
+				padding-left: 10px;
+				margin-top: 8px;
+			}
+			table.stmt tbody tr.clickable {
+				cursor: pointer;
+			}
+			.pos {
+				color: var(--up);
+			}
+			.neg {
+				color: var(--down);
+			}
+
+			details.sweep {
+				margin: 16px 0;
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 10px 14px;
+				background: var(--panel);
+			}
+			details.sweep > summary {
+				cursor: pointer;
+				font-size: 14px;
+			}
+			details.sweep .row {
+				flex-wrap: wrap;
+				gap: 10px;
+				margin-top: 10px;
+			}
+			.hmwrap {
+				overflow-x: auto;
+				margin: 12px 0;
+			}
+			table.hm {
+				border-collapse: collapse;
+				font-variant-numeric: tabular-nums;
+				font-size: 12.5px;
+			}
+			table.hm caption {
+				caption-side: top;
+				text-align: left;
+				color: var(--dim);
+				padding-bottom: 6px;
+				font-size: 12.5px;
+			}
+			table.hm th {
+				color: var(--dim);
+				font-weight: 500;
+				padding: 3px 8px;
+				font-size: 12px;
+			}
+			table.hm td.hmc {
+				padding: 6px 10px;
+				text-align: right;
+				cursor: pointer;
+				border: 1px solid rgba(255, 255, 255, 0.04);
+				min-width: 52px;
+			}
+			table.hm td.hmc:hover {
+				outline: 1px solid var(--accent);
+			}
+			table.hm td.hmc.best {
+				outline: 2px solid var(--fg);
+				font-weight: 600;
+			}
+			table.hm td.hmc.thin {
+				opacity: 0.45;
+			}
+			.mcbars {
+				display: flex;
+				align-items: flex-end;
+				gap: 1px;
+				height: 110px;
+				margin: 8px 0 2px;
+				padding: 0 2px;
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 8px;
+			}
+			.mcbars i {
+				flex: 1;
+				min-height: 1px;
+				border-radius: 2px 2px 0 0;
+				opacity: 0.85;
+			}
+			.mcbars i:hover {
+				opacity: 1;
+			}
+			.mcaxis {
+				display: flex;
+				justify-content: space-between;
+				color: var(--dim);
+				font-size: 11px;
+				font-variant-numeric: tabular-nums;
+			}
+			.verdict {
+				margin: 14px 0 4px;
+				line-height: 1.6;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="nav">
+			<span class="brand">TickerForge</span>
+			<a class="tab" href="/">Chart</a>
+			<a class="tab" href="/desk">Desk</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/scanner">Scanner</a>
+			<a class="tab" href="/screen">Screen</a>
+			<a class="tab" href="/query">Query</a>
+			<a class="tab" href="/fundamentals">Fundamentals</a>
+			<a class="tab" href="/results">Results</a>
+			<a class="tab" href="/valuation">Valuation</a>
+			<a class="tab on" href="/backtest">Backtest</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/metrics">Metrics</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/news">News</a>
+			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/settings">Settings</a>
+			<span class="sp"></span>
+			<span class="status" id="status"></span>
+		</div>
+		<div class="wrap">
+			<div class="row">
+				<h2 class="page">Strategy backtester</h2>
+				<span class="sub"
+					>Long/flat · end-of-bar execution · no look-ahead · intrabar
+					risk exits · vs buy &amp; hold</span
+				>
+			</div>
+
+			<div class="ctrls">
+				<div class="fld">
+					<label
+						title="Any NSE/BSE symbol from the instrument index. Type 2+ characters to search."
+						>Symbol</label
+					>
+					<div class="sbox">
+						<input
+							class="sym"
+							id="sym"
+							placeholder="e.g. BEL"
+							autocomplete="off"
+						/>
+						<div class="sres" id="sres"></div>
+					</div>
+				</div>
+				<div class="fld">
+					<label
+						title="The entry/exit rule under test. The panel below explains the selected one; parameters appear to the right."
+						>Strategy</label
+					><select id="strat"></select>
+				</div>
+				<div class="fld">
+					<label
+						title="Bar size. day = one candle per session. Intraday intervals test the same rules on faster bars — more trades, more cost drag, and Kite serves less history."
+						>Interval</label
+					><select id="iv"></select>
+				</div>
+				<div class="fld">
+					<label
+						title="Calendar days of history (not trading bars; ~250 daily bars per 365 days). Longer windows cover more market regimes and give statistics more trades to stand on."
+						>Days</label
+					><input id="days" type="number" value="730" />
+				</div>
+				<div class="fld">
+					<label
+						title="Friction per side in basis points (1 bp = 0.01%). Charged on entry AND exit, so 10 bps ≈ 0.2% per round trip. Covers brokerage + STT + slippage. Test at 15–20 to be safe. Full detail in the Field guide below."
+						>Cost (bps/side)</label
+					><input id="cost" type="number" value="10" />
+				</div>
+				<div id="params"></div>
+				<button class="btn primary" id="run">Run backtest</button>
+				<button
+					class="btn"
+					id="runBatch"
+					title="Run this strategy across every watchlist symbol"
+				>
+					Across watchlist
+				</button>
+			</div>
+
+			<div class="riskbar">
+				<div id="riskflds">
+					<div class="fld">
+						<label
+							title="Fixed protective stop this % below the entry price. Fills intrabar at the stop (or the open on a gap). Blank = off."
+							>Stop-loss %</label
+						><input
+							id="r_sl"
+							type="number"
+							step="0.5"
+							placeholder="off"
+						/>
+					</div>
+					<div class="fld">
+						<label
+							title="Take-profit this % above entry. Fills intrabar at the target (or the open on a gap up). Blank = off."
+							>Target %</label
+						><input
+							id="r_tp"
+							type="number"
+							step="0.5"
+							placeholder="off"
+						/>
+					</div>
+					<div class="fld">
+						<label
+							title="Chandelier trailing stop: highest high since entry minus this many ATRs. Ratchets up only, never loosens. See the ATR section of the Field guide. Blank = off."
+							>ATR trail ×</label
+						><input
+							id="r_tm"
+							type="number"
+							step="0.5"
+							placeholder="off"
+						/>
+					</div>
+					<div class="fld">
+						<label
+							title="Bars used to average the true range for the trailing stop (Wilder smoothing). 22 ≈ one trading month — the classic chandelier setting."
+							>ATR period</label
+						><input id="r_tp2" type="number" value="22" />
+					</div>
+					<div class="fld">
+						<label
+							title="Time stop: force an exit at the close after this many bars in the trade. Mean-reversion trades that haven&#39;t worked quickly usually aren&#39;t going to. Blank = off."
+							>Max bars held</label
+						><input id="r_mb" type="number" placeholder="off" />
+					</div>
+				</div>
+				<span class="cap"
+					>Optional risk exits layered on any strategy. Checked
+					intrabar on each following bar; fills at the stop/target
+					price, or at the open when price gaps through it. Blank =
+					off.</span
+				>
+			</div>
+
+			<div class="sigpanel">
+				<div class="hd">
+					<h3>Watchlist signals</h3>
+					<span class="sub"
+						>the configured strategies, run on
+						<b>closed daily bars</b> for every watchlist stock — the
+						live end of this backtester (also runs automatically
+						after the 15:30 close and pushes flips to your
+						phone)</span
+					>
+					<button class="btn" id="scan">Scan now</button>
+				</div>
+				<div id="sigout"></div>
+			</div>
+
+			<div class="about" id="about"></div>
+
+			<details class="eng">
+				<summary>
+					How the engine works — execution model, costs &amp; metric
+					definitions
+				</summary>
+				<div class="body">
+					<p>
+						<b>No look-ahead.</b> A strategy turns the candles into
+						a target position (long or flat) at each bar's
+						<i>close</i>, using only information available at that
+						close. That position then earns the <i>next</i> bar's
+						close-to-close return. Nothing decided at bar t can
+						profit from bar t itself — that ordering is the whole
+						defence against accidentally trading on the future.
+					</p>
+					<p>
+						<b>Entries &amp; exits.</b> Strategy entries and exits
+						fill at the signal bar's close. Risk exits (stop /
+						target / trail / time) are checked intrabar on the bars
+						that follow: a bar whose low touches your stop fills
+						<i>at the stop price</i>, and a bar that opens beyond it
+						(overnight gap) fills at the open — never at a price the
+						market skipped. If a stop and a target both sit inside
+						one bar the stop is assumed to hit first: intrabar
+						ordering is unknowable from OHLC, so the engine takes
+						the conservative reading. After a risk exit, the
+						strategy's signal must go flat once before a new entry
+						is allowed — otherwise a still-long signal would buy
+						right back the next bar and the stop would have meant
+						nothing.
+					</p>
+					<p>
+						<b>Costs.</b> <i>Cost bps/side</i> is charged on every
+						entry and every exit (10 bps ≈ 0.2% round trip), a flat
+						stand-in for brokerage + STT + slippage. The trade log
+						shows both gross and cost-adjusted (net) returns;
+						strategies that trade a lot live or die on this number.
+						Every trade statistic below — win rate, profit factor,
+						best and worst trade — is measured on the
+						<i>net</i> figure, so a trade that gained less than it
+						cost to put on counts as the loss it was.
+					</p>
+					<p>
+						<b>Metrics.</b> <b>CAGR</b> annualises total return.
+						<b>Max drawdown</b> is the worst peak-to-trough fall of
+						the equity curve; <b>longest DD</b> is the most bars
+						spent below a prior peak. <b>Sharpe</b> is mean bar
+						return over its volatility, annualised;
+						<b>Sortino</b> penalises only downside volatility.
+						<b>Calmar</b> = CAGR ÷ |max drawdown| — return per unit
+						of worst pain. <b>Profit factor</b> = net wins ÷ net
+						losses (&gt;1.5 is respectable). <b>Expectancy</b> is
+						the average net return per trade — what one more trade
+						is "worth". <b>Trades</b> counts completed round trips
+						only: a position still open at the end of the window has
+						no exit price, so it appears in the log marked
+						<i>open</i> but is left out of every statistic —
+						otherwise an unrealised mark would show up as a win.
+						<b>Exposure</b> is the share of bars spent in the
+						market: a strategy matching buy &amp; hold at 60%
+						exposure earned it with less risk. All are compared
+						against buy &amp; hold on the same window, which is the
+						number to beat.
+					</p>
+					<p>
+						<b>Honesty caveats.</b> One stock, one window,
+						long-only, and parameters you can see — which means you
+						can also curve-fit them. A result only starts to mean
+						something when it survives other symbols, other windows
+						and costs set higher than you hope for. Backtests are
+						for rejecting bad ideas cheaply, not for proving good
+						ones.
+					</p>
+				</div>
+			</details>
+
+			<details class="eng">
+				<summary>
+					Field guide — every control explained thoroughly
+				</summary>
+				<div class="body">
+					<p>
+						<b>Symbol.</b> Any NSE/BSE instrument in the local
+						index. Backtest the stocks you would actually trade:
+						results do not transfer between a Nifty heavyweight and
+						an illiquid smallcap, because slippage, gap behaviour
+						and volatility differ completely.
+					</p>
+
+					<p>
+						<b>Interval.</b> The bar size the strategy sees.
+						<i>day</i> means one decision per session at the close —
+						the sane default for swing rules. Intraday intervals
+						(5minute, 15minute…) run the same rules on faster bars:
+						more signals, but each trade captures a smaller move
+						while paying the same round-trip cost, so cost drag
+						grows brutally as bars shrink. Kite also serves less
+						intraday history, so long lookbacks may not fill.
+					</p>
+
+					<p>
+						<b>Days.</b> Calendar days of history to test — roughly
+						250 <i>trading</i> bars per 365 calendar days. 730 days
+						≈ 2 years is a minimum for daily strategies; 1800+ spans
+						multiple regimes (a bull run, a correction, a chop
+						phase), which is what actually stress-tests a rule. A
+						strategy judged on 20 trades is being judged on noise.
+					</p>
+
+					<p>
+						<b>Cost (bps/side).</b> The friction charged on every
+						entry and every exit, in basis points — 1 bp = 0.01%, so
+						the default 10 bps takes 0.1% at entry and 0.1% at exit
+						(≈0.2% per round trip). For Indian delivery trades the
+						honest bill is: STT 0.1% on both legs, exchange + SEBI
+						charges and stamp duty (~0.015%), GST on brokerage, plus
+						<i>slippage</i> — the gap between the close your
+						backtest assumes and the price you actually get, usually
+						the biggest and least visible item. Discount brokerage
+						may be ₹0, but the rest is not. Testing at 15–20
+						bps/side is a realistic-to-pessimistic band; if a
+						strategy only works at 5 bps it does not work.
+						High-frequency strategies (look at <i>Trades</i> and
+						<i>Avg bars held</i>) are hit hardest — this single
+						field kills more paper edges than any market move.
+					</p>
+
+					<p>
+						<b>Strategy parameters.</b> These appear next to the
+						strategy and mean: <i>fast / slow</i> — lookbacks of the
+						two moving averages being compared; the gap between them
+						sets how decisive a trend must be before you act.
+						<i>length</i> — the main lookback of the indicator (SMA
+						length, RSI period, Bollinger/Keltner basis, CCI
+						window…). Shorter = more sensitive, more trades, more
+						noise. <i>signal</i> — the EMA length applied to the
+						MACD line itself. <i>mult</i> — band width in standard
+						deviations (Bollinger) or ATRs (Supertrend/Keltner):
+						higher = wider bands, fewer but stronger signals.
+						<i>low / high</i> — oscillator entry and exit thresholds
+						(RSI, stochastic, CCI): enter below <i>low</i>, exit
+						above <i>high</i>; the spread between them sets how much
+						recovery you demand before leaving.
+						<i>entry / exit</i> — separate breakout lookbacks
+						(Donchian, volume breakout): close above the
+						<i>entry</i>-bar high gets you in, close below the
+						<i>exit</i>-bar low gets you out; a shorter exit
+						protects profits faster. <i>k / d</i> — stochastic %K
+						lookback and the SMA smoothing applied to it.
+						<i>trend</i> — the long SMA regime filter (200 = the
+						classic 200-day). <i>adx / adx_len</i> — the ADX
+						trend-strength gate and its period; entries are allowed
+						only when ADX ≥ the threshold. <i>atr_len</i> — the ATR
+						period used for Keltner band width. <i>lookback</i> —
+						the history window the Bollinger squeeze ranks today's
+						bandwidth against. <i>vol_mult / vol_len</i> — volume
+						confirmation: today's volume must be at least vol_mult ×
+						its vol_len-bar average for a breakout to count.
+					</p>
+
+					<p>
+						<b>ATR — the unit behind the risk tools.</b> The
+						<i>true range</i> of a bar is the largest of: high−low,
+						|high−previous close|, |low−previous close| — i.e. the
+						bar's real travel including any overnight gap, which
+						plain high−low misses. ATR is the Wilder-smoothed
+						average of true range over N bars: "how far does this
+						stock typically move in a bar, right now". Its power is
+						that it is <i>self-calibrating</i>: a fixed 3% stop is
+						meaninglessly wide for a placid largecap and suicidally
+						tight for a volatile smallcap, but "3 ATRs" adapts to
+						each stock and to each volatility regime automatically.
+						The engine uses the same Wilder ATR your live alerts
+						use.
+					</p>
+
+					<p>
+						<b>Stop-loss %.</b> A fixed floor: exit if price falls
+						this % below your entry. Checked intrabar — a bar whose
+						low touches it fills <i>at the stop</i>, a bar that gaps
+						below it fills at the open (gaps do not respect your
+						stop; the backtest shouldn't either). It caps
+						single-trade disaster, and its cost is getting shaken
+						out of trades that would have recovered — run the same
+						window with and without it and read the trade log's
+						Reason column to see which effect dominated.
+					</p>
+
+					<p>
+						<b>Target %.</b> A fixed take-profit above entry, same
+						intrabar/gap fill rules. Targets convert open profit
+						into realised profit and cap it in the same stroke —
+						trend-following lives on rare huge winners, so a tight
+						target can quietly delete the whole edge. Compare Best
+						trade with and without.
+					</p>
+
+					<p>
+						<b>ATR trail ×.</b> The chandelier exit: stop = (highest
+						high since entry) − mult × ATR. It only ever ratchets
+						upward as the trade makes new highs — never loosens — so
+						it gives a winner room to breathe early and locks in
+						profit as the move matures. mult 2 = tight, 3 = classic,
+						4 = patient. This is the same maths as your live
+						<i>trail</i> alerts, so a rule tested here can be
+						executed there identically.
+					</p>
+
+					<p>
+						<b>ATR period.</b> How many bars the ATR averages. 22 ≈
+						one trading month, the standard chandelier setting;
+						shorter makes the stop twitchier in volatility spikes,
+						longer makes it steadier but slower to adapt.
+					</p>
+
+					<p>
+						<b>Max bars held.</b> A time stop: exit at the close
+						once the trade is this many bars old, whatever the
+						price. The logic: a mean-reversion trade's edge is
+						concentrated in its first few bars — if the snap-back
+						hasn't happened, the thesis is dead and the capital is
+						hostage. Rarely useful for trend strategies, often
+						excellent for reversion ones.
+					</p>
+
+					<p>
+						<b>Interactions worth knowing.</b> All enabled stops
+						coexist: the effective stop is whichever sits highest
+						(most protective). When a stop and a target fall inside
+						the same bar the stop is assumed first — conservative by
+						design. And after any risk exit, the strategy signal
+						must go flat once before a new entry is allowed, so a
+						still-long signal can't instantly buy back what your
+						stop just sold.
+					</p>
+				</div>
+			</details>
+
+			<div class="sub" id="meta"></div>
+			<div
+				class="row"
+				id="btActions"
+				style="display: none; margin: 6px 0"
+			>
+				<button
+					class="btn ghost"
+					id="showOnChart"
+					title="Open the main chart with these entries and exits marked"
+				>
+					Show on chart
+				</button>
+			</div>
+			<details class="sweep">
+				<summary>
+					Walk-forward — does it survive data the optimiser never saw?
+				</summary>
+				<div
+					class="row"
+					style="flex-wrap: wrap; gap: 10px; margin-top: 10px"
+				>
+					<div class="fld">
+						<label title="Bars the optimiser sees"
+							>In-sample bars</label
+						>
+						<input
+							class="search"
+							id="wfIS"
+							type="number"
+							value="250"
+							style="width: 100px"
+						/>
+					</div>
+					<div class="fld">
+						<label title="Bars it is then tested on, unchanged"
+							>Out-of-sample</label
+						>
+						<input
+							class="search"
+							id="wfOOS"
+							type="number"
+							value="60"
+							style="width: 100px"
+						/>
+					</div>
+					<div class="fld">
+						<label
+							title="rolling drops old regimes; anchored keeps all history"
+							>Mode</label
+						>
+						<select class="sel" id="wfMode">
+							<option value="rolling">rolling</option>
+							<option value="anchored">anchored</option>
+						</select>
+					</div>
+					<div class="fld">
+						<label>Metric</label>
+						<select class="sel" id="wfM">
+							<option value="sharpe">Sharpe</option>
+							<option value="profit_factor">Profit factor</option>
+							<option value="expectancy_pct">Expectancy</option>
+							<option value="total_return_pct">
+								Total return
+							</option>
+						</select>
+					</div>
+					<div class="fld">
+						<label>History (days)</label>
+						<input
+							class="search"
+							id="wfDays"
+							type="number"
+							value="1460"
+							style="width: 110px"
+						/>
+					</div>
+					<button class="btn" id="wfRun">Walk forward</button>
+				</div>
+				<div
+					class="row"
+					style="flex-wrap: wrap; gap: 10px"
+					id="wfGrid"
+				></div>
+				<div id="wfOut"></div>
+			</details>
+
+			<details class="sweep">
+				<summary>
+					Parameter sweep — is the good result a plateau or a spike?
+				</summary>
+				<div class="row" id="hmCtl"></div>
+				<div id="hmOut"></div>
+			</details>
+			<details class="sweep" id="enginePanel">
+				<summary>
+					Engine — size positions, gate by regime, export the trades
+				</summary>
+				<div
+					class="row"
+					style="flex-wrap: wrap; gap: 10px; margin-top: 10px"
+				>
+					<div class="fld">
+						<label
+							title="Off = every trade is the whole account, which is what a plain backtest assumes"
+							>Position sizing</label
+						>
+						<select class="sel" id="szMode">
+							<option value="">off — all-in each trade</option>
+							<option value="fixed_fractional">
+								fixed fractional (needs a stop)
+							</option>
+							<option value="atr_risk">
+								ATR risk (derives its own stop)
+							</option>
+						</select>
+					</div>
+					<div class="fld">
+						<label>Risk per trade %</label>
+						<input
+							class="search"
+							id="szRisk"
+							type="number"
+							value="1"
+							min="0.05"
+							max="10"
+							step="0.05"
+							style="width: 100px"
+						/>
+					</div>
+					<div class="fld">
+						<label>Max position %</label>
+						<input
+							class="search"
+							id="szCap"
+							type="number"
+							value="100"
+							min="10"
+							max="500"
+							step="10"
+							style="width: 100px"
+						/>
+					</div>
+					<div class="fld">
+						<label
+							title="Only hold while Nifty is above its own 200-DMA"
+							>Regime filter</label
+						>
+						<select class="sel" id="szRegime">
+							<option value="">off</option>
+							<option value="1">Nifty &gt; 200-DMA only</option>
+						</select>
+					</div>
+					<button
+						class="btn ghost"
+						id="dlCsv"
+						title="Trade list in the journal's columns, for a like-for-like comparison"
+					>
+						Export CSV
+					</button>
+				</div>
+				<div class="sub" id="engineNote" style="margin-top: 10px"></div>
+			</details>
+			<details class="sweep" id="mcPanel">
+				<summary>
+					Monte Carlo — how bad could that drawdown have been?
+				</summary>
+				<div
+					class="row"
+					style="flex-wrap: wrap; gap: 10px; margin-top: 10px"
+				>
+					<div class="fld">
+						<label
+							title="shuffle reorders your trades; bootstrap resamples them with replacement"
+							>Mode</label
+						>
+						<select class="sel" id="mcMode">
+							<option value="shuffle">
+								shuffle — same trades, new order
+							</option>
+							<option value="bootstrap">
+								bootstrap — resample with replacement
+							</option>
+						</select>
+					</div>
+					<div class="fld">
+						<label>Simulations</label>
+						<input
+							class="search"
+							id="mcSims"
+							type="number"
+							value="1000"
+							min="100"
+							max="20000"
+							step="100"
+							style="width: 110px"
+						/>
+					</div>
+					<button class="btn" id="mcRun">Simulate</button>
+				</div>
+				<div id="mcOut"></div>
+			</details>
+			<div id="batchOut"></div>
+			<div id="out"></div>
+		</div>
+
+		<script>
+			"use strict"
+			const $ = (s) => document.querySelector(s)
+			const status = (m) => {
+				$("#status").textContent = m || ""
+			}
+			const f = (v, d = 2) =>
+				v == null
+					? "—"
+					: (+v).toLocaleString("en-IN", { maximumFractionDigits: d })
+			let CAT = {},
+				curSym = ""
+
+			// ---- symbol search ----
+			$("#sym").addEventListener("input", (e) => {
+				clearTimeout(window._d)
+				const q = e.target.value.trim()
+				curSym = q.toUpperCase()
+				if (q.length < 2) {
+					$("#sres").classList.remove("open")
+					return
+				}
+				window._d = setTimeout(async () => {
+					const rows = await (
+						await fetch(`/api/search?q=${encodeURIComponent(q)}`)
+					).json()
+					$("#sres").innerHTML = rows
+						.map(
+							(r) =>
+								`<div data-s="${r.tradingsymbol}"><span class="sym">${r.tradingsymbol}</span>
+       <span class="nm"> · ${r.name || ""}</span></div>`,
+						)
+						.join("")
+					$("#sres").classList.add("open")
+					$("#sres")
+						.querySelectorAll("div[data-s]")
+						.forEach(
+							(el) =>
+								(el.onclick = () => {
+									curSym = el.dataset.s
+									$("#sym").value = curSym
+									$("#sres").classList.remove("open")
+								}),
+						)
+				}, 200)
+			})
+			document.addEventListener("click", (e) => {
+				if (!e.target.closest(".sbox"))
+					$("#sres").classList.remove("open")
+			})
+
+			// ---- strategy params + explainer ----
+			const PDOC = {
+				fast: "Lookback of the fast moving average — reacts to recent price.",
+				slow: "Lookback of the slow moving average — anchors the longer trend.",
+				length: "Main indicator lookback. Shorter = more sensitive, more trades, more noise.",
+				signal: "EMA length applied to the MACD line itself.",
+				mult: "Band width in standard deviations (Bollinger) or ATRs (Supertrend/Keltner). Higher = wider, fewer but stronger signals.",
+				low: "Oscillator entry threshold — enter below this (oversold).",
+				high: "Oscillator exit threshold — exit above this (recovered).",
+				entry: "Breakout entry lookback: buy a close above the highest high of this many bars. For RSI pullback: enter below this RSI level.",
+				exit: "Breakout exit lookback: exit on a close below the lowest low of this many bars. For RSI pullback: exit above this RSI level.",
+				k: "Stochastic %K lookback — where the close sits inside the recent high-low range.",
+				d: "SMA smoothing applied to %K to make %D.",
+				trend: "Long SMA regime filter — only trade above it (200 = the classic 200-day).",
+				adx: "ADX trend-strength threshold — entries allowed only at or above this.",
+				adx_len: "ADX averaging period.",
+				atr_len: "ATR period used for the Keltner band width.",
+				lookback:
+					"History window the squeeze ranks today\u2019s bandwidth against.",
+				vol_mult:
+					"Volume gate: today\u2019s volume must be at least this multiple of its average.",
+				vol_len:
+					"Bars in the volume average that the gate compares against.",
+			}
+			function renderParams() {
+				const s = CAT[$("#strat").value]
+				if (!s) return
+				$("#params").innerHTML = Object.entries(s.params)
+					.map(
+						([k, v]) =>
+							`<div class="fld"><label title="${(PDOC[k] || "").replace(/"/g, "&quot;")}">${k}</label><input data-p="${k}" title="${(PDOC[k] || "").replace(/"/g, "&quot;")}" type="number" step="${String(v).includes(".") ? "0.1" : "1"}" value="${v}"></div>`,
+					)
+					.join("")
+				renderAbout(s)
+			}
+			function renderAbout(s) {
+				const a = s.about || {}
+				$("#about").innerHTML = `
+    <h3>${s.name}<span class="cat">${a.category || ""}</span></h3>
+    <div class="sum">${a.summary || ""}</div>
+    <div class="grid">
+      <div class="it"><b>Entry rule</b>${a.entry || ""}</div>
+      <div class="it"><b>Exit rule</b>${a.exit || ""}</div>
+      <div class="it"><b>The maths</b>${a.math || ""}</div>
+      <div class="it w"><b>Works best in</b>${a.works || ""}</div>
+      <div class="it f"><b>Fails in</b>${a.fails || ""}</div>
+    </div>
+    ${a.tip ? `<div class="tip"><b>Tip:</b> ${a.tip}</div>` : ""}`
+			}
+			$("#strat").onchange = () => {
+				renderParams()
+				hmSweepControls()
+				wfGridControls()
+			}
+
+			// ---- watchlist signals ----
+			$("#scan").onclick = async () => {
+				$("#scan").disabled = true
+				$("#sigout").innerHTML =
+					'<div class="loading">scanning watchlist on closed daily bars…</div>'
+				try {
+					const r = await fetch("/api/signals")
+					if (!r.ok) {
+						const e = await r.json().catch(() => ({}))
+						$("#sigout").innerHTML =
+							`<div class="empty">${e.detail || "scan failed"}</div>`
+						return
+					}
+					const d = await r.json()
+					let html = ""
+					if (d.flips.length) {
+						html += d.flips
+							.map(
+								(f) =>
+									`<div class="sigflip"><span class="${f.action === "LONG" ? "up" : "dn"}">${f.action === "LONG" ? "▲" : "▽"}</span>
+         <b>${f.symbol}</b> — ${f.name} flipped <b>${f.action}</b> @ ${f.price}</div>`,
+							)
+							.join("")
+					} else {
+						html += `<div class="sigflip sub">No fresh flips on the latest closed bar.</div>`
+					}
+					const syms = Object.keys(d.matrix).sort()
+					if (syms.length) {
+						html += `<table class="sigmat"><thead><tr><th>Symbol</th>
+        ${d.strategies
+			.map(
+				(s) =>
+					`<th title="${Object.entries(s.params)
+						.map(([k, v]) => k + "=" + v)
+						.join(" ")}">${s.name}</th>`,
+			)
+			.join("")}
+        </tr></thead><tbody>
+        ${syms
+			.map(
+				(sym) => `<tr><td>${sym}</td>${d.strategies
+					.map(
+						(s) =>
+							`<td><span class="dot ${d.matrix[sym][s.key] ? "on" : "off"}" title="${d.matrix[sym][s.key] ? "long" : "flat"}"></span></td>`,
+					)
+					.join("")}
+        </tr>`,
+			)
+			.join("")}</tbody></table>`
+					} else
+						html += `<div class="empty">Watchlist is empty — add stocks on the Chart page.</div>`
+					if (d.errors && d.errors.length)
+						html += `<div class="sub" style="margin-top:6px">${d.errors.join(" · ")}</div>`
+					$("#sigout").innerHTML = html
+				} catch (e) {
+					$("#sigout").innerHTML =
+						`<div class="empty">error: ${e.message}</div>`
+				} finally {
+					$("#scan").disabled = false
+				}
+			}
+
+			// ---- run ----
+
+			// ------------------------------------------------------- batch across symbols
+			// The ranking is the obvious part and the least trustworthy. Breadth leads:
+			// the median result and the profitable share can't be moved by one lucky
+			// symbol, and the top row of a sorted table always looks good.
+			function batchParams() {
+				const params = {}
+				$("#params")
+					.querySelectorAll("input[data-p]")
+					.forEach((i) => {
+						if (i.value !== "") params[i.dataset.p] = +i.value
+					})
+				const p = new URLSearchParams({
+					strategy: $("#strat").value,
+					interval: $("#iv").value,
+					days: $("#days").value,
+					cost_bps: $("#cost").value,
+					params: JSON.stringify(params),
+				})
+				const risk = {
+					sl_pct: $("#r_sl").value,
+					tp_pct: $("#r_tp").value,
+					trail_mult: $("#r_tm").value,
+					trail_period: $("#r_tp2").value,
+					max_bars: $("#r_mb").value,
+				}
+				for (const [k, v] of Object.entries(risk))
+					if (v !== "" && +v > 0) p.set(k, v)
+				if (!p.has("trail_mult")) p.delete("trail_period")
+				for (const [k, v] of Object.entries(engineParams())) p.set(k, v)
+				LAST_QS = p
+				return p
+			}
+
+			$("#runBatch").onclick = runBatch
+			async function runBatch() {
+				const p = batchParams()
+				status("running across the watchlist…")
+				$("#runBatch").disabled = true
+				$("#out").innerHTML = ""
+				$("#batchOut").innerHTML =
+					'<div class="loading">backtesting every watchlist ' +
+					"symbol — this fetches candles for each, so give it a moment…</div>"
+				try {
+					const r = await fetch("/api/backtest/batch?" + p)
+					if (!r.ok) {
+						const e = await r.json().catch(() => ({}))
+						throw new Error(e.detail || r.statusText)
+					}
+					renderBatch(await r.json())
+					status("")
+				} catch (e) {
+					$("#batchOut").innerHTML =
+						`<div class="loading">batch failed: ${e.message}</div>`
+					status("")
+				} finally {
+					$("#runBatch").disabled = false
+				}
+			}
+
+			function renderBatch(d) {
+				const a = d.aggregate,
+					v = d.verdict
+				const pctCell = (x) =>
+					x == null
+						? "—"
+						: `<span class="${x >= 0 ? "pos" : "neg"}">${(x > 0 ? "+" : "") + (+x).toFixed(2)}%</span>`
+
+				const head = `<div class="bverdict ${v.read}">
+    <div class="read">${v.read}</div>
+    <div class="detail">${v.detail}</div>
+    ${(v.notes || []).map((n) => `<div class="note">⚠ ${n}</div>`).join("")}
+  </div>`
+
+				const cards = a.scored
+					? `<div class="cards">
+    ${statCard("Median expectancy", pctCell(a.median_expectancy_pct))}
+    ${statCard("Profitable", `${a.profitable}/${a.scored}`)}
+    ${statCard("Best", `${a.best_symbol || "—"}`)}
+    ${statCard("Best expectancy", pctCell(a.best_expectancy_pct))}
+    ${statCard("Worst expectancy", pctCell(a.worst_expectancy_pct))}
+    ${statCard("Median max DD", a.median_max_dd_pct == null ? "—" : a.median_max_dd_pct + "%")}
+    ${statCard("Total trades", a.total_trades)}
+    ${statCard("Median trades", a.median_trades == null ? "—" : (+a.median_trades).toFixed(0))}
+  </div>`
+					: ""
+
+				const rows = d.rows
+					.map(
+						(r) => `<tr class="clickable" data-sym="${r.symbol}">
+      <td>${r.symbol}</td>
+      <td>${r.trades ?? "—"}</td>
+      <td>${pctCell(r.expectancy_pct)}</td>
+      <td>${r.win_rate_pct == null ? "—" : (+r.win_rate_pct).toFixed(1) + "%"}</td>
+      <td>${r.profit_factor ?? "—"}</td>
+      <td>${pctCell(r.total_return_pct)}</td>
+      <td>${pctCell(r.vs_buyhold_pct)}</td>
+      <td class="neg">${r.max_drawdown_pct == null ? "—" : r.max_drawdown_pct + "%"}</td>
+      <td>${r.sharpe ?? "—"}</td>
+    </tr>`,
+					)
+					.join("")
+
+				const errs = d.errors.length
+					? `<div class="sub" style="margin-top:8px">Couldn't run ${d.errors.length}: ` +
+						d.errors
+							.map((e) => `${e.symbol} (${e.error})`)
+							.join(" · ") +
+						"</div>"
+					: ""
+
+				$("#batchOut").innerHTML = `
+    <h3 style="margin:18px 0 2px">${d.name} across ${a.scored}/${d.requested} symbols</h3>
+    <div class="sub">${d.days} days · ${d.cost_bps} bps/side · sorted by ${d.sort.replace(/_/g, " ")}</div>
+    ${head}${cards}
+    <div class="tbl-wrap"><table class="stmt" id="batchTbl"><thead><tr>
+      <th>Symbol</th><th>Trades</th><th>Expectancy</th><th>Win%</th>
+      <th>PF</th><th>Return</th><th>vs B&H</th><th>Max DD</th><th>Sharpe</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>
+    ${errs}
+    <div class="bcaveat">${d.caveat}</div>`
+
+				// click a row to open that symbol's full single run
+				$("#batchTbl")
+					.querySelectorAll("tr.clickable")
+					.forEach((tr) => {
+						tr.onclick = () => {
+							const sym = tr.dataset.sym
+							curSym = sym
+							const box = $("#sym")
+							if (box) box.value = sym
+							$("#batchOut").scrollIntoView({
+								behavior: "smooth",
+								block: "start",
+							})
+							run()
+						}
+					})
+			}
+
+			// ------------------------------------------------------------- heatmap sweep
+			// Sweeping two parameters and looking at the SHAPE is the point. One bright
+			// cell surrounded by dull ones is a curve-fit; a broad warm region means the
+			// exact value isn't load-bearing. The verdict says which, so you don't have to
+			// squint at colours to find out.
+			let HM_METRICS = []
+
+			function hmSweepControls() {
+				const s = CAT[$("#strat").value]
+				if (!s) return
+				const keys = Object.keys(s.params)
+				const opt = (sel) =>
+					keys
+						.map(
+							(k) =>
+								`<option value="${k}"${k === sel ? " selected" : ""}>${k}</option>`,
+						)
+						.join("")
+				const mopt = HM_METRICS.map(
+					(m) =>
+						`<option value="${m.key}"${m.key === "sharpe" ? " selected" : ""}>${m.label}</option>`,
+				).join("")
+				$("#hmCtl").innerHTML = keys.length
+					? `
+    <div class="fld"><label>Sweep X</label>
+      <select class="sel" id="hmX">${opt(keys[0])}</select></div>
+    <div class="fld"><label title="A list like 5,10,15 or a range as start:stop:step">X values</label>
+      <input class="search" id="hmXV" value="${defRange(s.params[keys[0]])}"></div>
+    <div class="fld"><label>Sweep Y</label>
+      <select class="sel" id="hmY"><option value="">(none — 1-D)</option>${opt(keys[1] || "")}</select></div>
+    <div class="fld"><label>Y values</label>
+      <input class="search" id="hmYV" value="${keys[1] ? defRange(s.params[keys[1]]) : ""}"></div>
+    <div class="fld"><label title="Sharpe prices risk; total return alone rewards whichever setting sat through the biggest move">Metric</label>
+      <select class="sel" id="hmM">${mopt}</select></div>
+    <button class="btn" id="hmRun">Sweep</button>`
+					: '<div class="sub">This strategy has no parameters to sweep.</div>'
+				if (keys[1]) $("#hmY").value = keys[1]
+				const b = $("#hmRun")
+				if (b) b.onclick = runHeatmap
+			}
+
+			function defRange(v) {
+				// A sensible starting sweep centred on the strategy's own default.
+				const n = +v
+				if (!isFinite(n) || n === 0) return ""
+				const step = n >= 40 ? 10 : n >= 10 ? 5 : n >= 4 ? 2 : 1
+				const lo = Math.max(step, n - step * 2)
+				return `${lo}:${n + step * 2}:${step}`
+			}
+
+			async function runHeatmap() {
+				const y = $("#hmY").value
+				const p = new URLSearchParams({
+					symbol: curSym,
+					strategy: $("#strat").value,
+					x_param: $("#hmX").value,
+					x_values: $("#hmXV").value,
+					metric: $("#hmM").value,
+					interval: $("#iv").value,
+					days: $("#days").value,
+					cost_bps: $("#cost").value,
+				})
+				if (!curSym) {
+					status("pick a symbol")
+					return
+				}
+				if (y) {
+					p.set("y_param", y)
+					p.set("y_values", $("#hmYV").value)
+				}
+				const risk = {
+					sl_pct: $("#r_sl").value,
+					tp_pct: $("#r_tp").value,
+					trail_mult: $("#r_tm").value,
+					trail_period: $("#r_tp2").value,
+					max_bars: $("#r_mb").value,
+				}
+				for (const [k, v] of Object.entries(risk))
+					if (v !== "" && +v > 0) p.set(k, v)
+				if (!p.has("trail_mult")) p.delete("trail_period")
+
+				status("sweeping…")
+				$("#hmRun").disabled = true
+				$("#hmOut").innerHTML =
+					'<div class="loading">running every parameter ' +
+					"combination against one candle fetch…</div>"
+				try {
+					const r = await fetch("/api/backtest/heatmap?" + p)
+					if (!r.ok) {
+						const e = await r.json().catch(() => ({}))
+						throw new Error(e.detail || r.statusText)
+					}
+					renderHeatmap(await r.json())
+					status("")
+				} catch (e) {
+					$("#hmOut").innerHTML =
+						`<div class="loading">sweep failed: ${e.message}</div>`
+					status("")
+				} finally {
+					$("#hmRun").disabled = false
+				}
+			}
+
+			function renderHeatmap(d) {
+				const a = d.analysis,
+					v = d.verdict
+				const vals = d.grid
+					.flat()
+					.map((c) => c.value)
+					.filter((x) => x != null)
+				const lo = Math.min(...vals),
+					hi = Math.max(...vals),
+					span = hi - lo || 1
+
+				// Diverging where zero is meaningful, sequential otherwise. A metric that
+				// crosses zero (Sharpe, expectancy) deserves red/green; profit factor and
+				// win rate don't have a natural midpoint at zero.
+				const diverging = [
+					"sharpe",
+					"expectancy_pct",
+					"total_return_pct",
+					"cagr_pct",
+				].includes(d.metric)
+				const cellBg = (x) => {
+					if (x == null) return "transparent"
+					if (diverging) {
+						const m = Math.max(Math.abs(lo), Math.abs(hi)) || 1
+						const t = Math.min(1, Math.abs(x) / m)
+						return x >= 0
+							? `rgba(38,166,154,${0.1 + t * 0.75})`
+							: `rgba(239,83,80,${0.1 + t * 0.75})`
+					}
+					const t = (x - lo) / span
+					return `rgba(65,132,228,${0.08 + t * 0.8})`
+				}
+
+				const best = a.best_at || {}
+				const head = `<tr><th></th>${d.x_values.map((x) => `<th>${x}</th>`).join("")}</tr>`
+				const body = d.grid
+					.map((row, ri) => {
+						const label = d.y_param ? d.y_values[ri] : ""
+						return (
+							`<tr><th>${label}</th>` +
+							row
+								.map((c) => {
+									const isBest =
+										c.value != null &&
+										c.x === best.x &&
+										c.y === best.y
+									const txt =
+										c.value == null
+											? "—"
+											: (+c.value).toFixed(2)
+									return `<td class="hmc${isBest ? " best" : ""}${c.thin ? " thin" : ""}"
+        style="background:${cellBg(c.value)}"
+        title="${d.x_param}=${c.x}${d.y_param ? `, ${d.y_param}=${c.y}` : ""} · ${txt} · ${c.trades ?? 0} trades${c.thin ? " (thin)" : ""}"
+        data-x="${c.x}" data-y="${c.y == null ? "" : c.y}">${txt}</td>`
+								})
+								.join("") +
+							"</tr>"
+						)
+					})
+					.join("")
+
+				$("#hmOut").innerHTML = `
+    <div class="bverdict ${v.read.replace(/ /g, "-")}">
+      <div class="read">${v.read}</div>
+      <div class="detail">${v.detail}</div>
+      ${(v.notes || []).map((n) => `<div class="note">⚠ ${n}</div>`).join("")}
+    </div>
+    <div class="cards">
+      ${statCard("Best " + d.metric_label, a.best == null ? "—" : a.best)}
+      ${statCard("At", `${d.x_param}=${best.x}${d.y_param ? ` · ${d.y_param}=${best.y}` : ""}`)}
+      ${statCard("Neighbours vs best", a.neighbour_ratio == null ? "—" : (a.neighbour_ratio * 100).toFixed(0) + "%")}
+      ${statCard("Grid within 80%", a.plateau_pct == null ? "—" : a.plateau_pct + "%")}
+      ${statCard("Median cell", a.median == null ? "—" : a.median)}
+      ${statCard("Positive cells", a.positive_pct == null ? "—" : a.positive_pct + "%")}
+    </div>
+    <div class="hmwrap"><table class="hm">
+      <caption>${d.metric_label} · rows ${d.y_param || "—"} · columns ${d.x_param}
+        <span class="sub">(click a cell to run it)</span></caption>
+      <thead>${head}</thead><tbody>${body}</tbody></table></div>
+    <div class="bcaveat">${d.caveat}</div>`
+
+				// click a cell to load that exact parameter pair into the single run
+				$("#hmOut")
+					.querySelectorAll("td.hmc")
+					.forEach((td) => {
+						td.onclick = () => {
+							const setP = (name, val) => {
+								const inp = $("#params").querySelector(
+									`input[data-p="${name}"]`,
+								)
+								if (inp && val !== "") inp.value = val
+							}
+							setP(d.x_param, td.dataset.x)
+							if (d.y_param) setP(d.y_param, td.dataset.y)
+							run()
+						}
+					})
+			}
+
+			// ---------------------------------------------------------- walk-forward
+			// The honest test: optimise on one window, apply the result unchanged to the
+			// next, roll forward. The stitched out-of-sample curve is what the strategy
+			// would actually have earned, because every decision was made without
+			// hindsight. It is usually much worse than the optimised backtest, and that
+			// gap is the finding.
+			async function runWalkForward() {
+				if (!curSym) {
+					status("pick a symbol")
+					return
+				}
+				const grid = {}
+				$("#params")
+					.querySelectorAll("input[data-p]")
+					.forEach((i) => {
+						const sweep = $("#wfG_" + i.dataset.p)
+						if (sweep && sweep.value.trim())
+							grid[i.dataset.p] = sweep.value.trim()
+					})
+				const p = new URLSearchParams({
+					symbol: curSym,
+					strategy: $("#strat").value,
+					is_bars: $("#wfIS").value,
+					oos_bars: $("#wfOOS").value,
+					mode: $("#wfMode").value,
+					metric: $("#wfM").value,
+					interval: $("#iv").value,
+					days: $("#wfDays").value,
+					cost_bps: $("#cost").value,
+				})
+				if (Object.keys(grid).length)
+					p.set("grid", JSON.stringify(grid))
+
+				status("walking forward…")
+				$("#wfRun").disabled = true
+				$("#wfOut").innerHTML =
+					'<div class="loading">optimising each window and ' +
+					"testing on the next one…</div>"
+				try {
+					const r = await fetch("/api/backtest/walkforward?" + p)
+					if (!r.ok) {
+						const e = await r.json().catch(() => ({}))
+						throw new Error(e.detail || r.statusText)
+					}
+					renderWF(await r.json())
+					status("")
+				} catch (e) {
+					$("#wfOut").innerHTML =
+						`<div class="loading">${e.message}</div>`
+					status("")
+				} finally {
+					$("#wfRun").disabled = false
+				}
+			}
+
+			function wfGridControls() {
+				const s = CAT[$("#strat").value]
+				if (!s) return
+				const keys = Object.keys(s.params)
+				$("#wfGrid").innerHTML = keys.length
+					? keys
+							.map(
+								(k) => `<div class="fld"><label>${k}</label>
+        <input class="search" id="wfG_${k}" placeholder="${defRange(s.params[k])}"
+          style="width:110px"></div>`,
+							)
+							.join("") +
+						'<div class="sub" style="align-self:end">blank = hold at default</div>'
+					: '<div class="sub">No parameters to optimise — this runs as plain ' +
+						"out-of-sample testing.</div>"
+			}
+
+			function renderWF(d) {
+				const a = d.aggregate,
+					v = d.verdict,
+					st = a.stability || {}
+				const pct = (x) =>
+					x == null ? "—" : (x * 100).toFixed(0) + "%"
+				const sgn = (x, dg = 2) =>
+					x == null ? "—" : (x > 0 ? "+" : "") + (+x).toFixed(dg)
+
+				const rows = d.folds
+					.map((f, i) => {
+						if (f.error)
+							return `<tr><td>${i + 1}</td><td colspan="5" class="sub">${f.error}</td></tr>`
+						const kept =
+							f.is_score && f.is_score > 0 && f.oos_score != null
+								? f.oos_score / f.is_score
+								: null
+						return `<tr>
+      <td>${i + 1}</td>
+      <td class="sub">${
+			Object.entries(f.params || {})
+				.map(([k, x]) => `${k}=${x}`)
+				.join(" ") || "defaults"
+		}</td>
+      <td>${f.is_score ?? "—"}</td>
+      <td class="${f.oos_score >= 0 ? "pos" : "neg"}">${f.oos_score ?? "—"}</td>
+      <td class="${kept != null && kept >= 0.5 ? "pos" : "neg"}">${pct(kept)}</td>
+      <td class="${f.oos_return_pct >= 0 ? "pos" : "neg"}">${sgn(f.oos_return_pct, 1)}%</td>
+    </tr>`
+					})
+					.join("")
+
+				const params = Object.entries(st.per_param || {})
+					.map(
+						([k, p]) =>
+							`<div class="sub">${k}: ${p.values.join(" → ")} <span class="${
+								p.cv != null && p.cv < 0.25 ? "pos" : "neg"
+							}">(${p.distinct} distinct)</span></div>`,
+					)
+					.join("")
+
+				$("#wfOut").innerHTML = `
+    <div class="bverdict ${v.read.replace(/ /g, "-")}">
+      <div class="read">${v.read}</div>
+      <div class="detail">${v.detail}</div>
+      ${(v.notes || []).map((n) => `<div class="note">⚠ ${n}</div>`).join("")}
+    </div>
+    <div class="cards">
+      ${statCard("In-sample avg", a.is_mean ?? "—")}
+      ${statCard("Out-of-sample avg", a.oos_mean ?? "—")}
+      ${statCard("Efficiency", pct(a.efficiency))}
+      ${statCard("Folds positive", `${a.oos_positive}/${a.scored}`)}
+      ${statCard("OOS return", sgn(a.oos_total_return_pct, 1) + "%")}
+      ${statCard("OOS max DD", (a.oos_max_drawdown_pct ?? "—") + "%")}
+      ${statCard("Param stability", st.read || "—")}
+    </div>
+    ${params ? `<div style="margin:8px 0 4px">${params}</div>` : ""}
+    <div class="tbl-wrap"><table class="stmt"><thead><tr>
+      <th>Fold</th><th>Chosen on in-sample</th><th>IS</th><th>OOS</th>
+      <th>Kept</th><th>OOS return</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    <div class="bcaveat">${d.caveat}</div>`
+			}
+
+			$("#run").onclick = run
+			async function run() {
+				if (!curSym) {
+					status("pick a symbol")
+					return
+				}
+				const params = {}
+				$("#params")
+					.querySelectorAll("input[data-p]")
+					.forEach((i) => {
+						if (i.value !== "") params[i.dataset.p] = +i.value
+					})
+				const p = new URLSearchParams({
+					symbol: curSym,
+					strategy: $("#strat").value,
+					interval: $("#iv").value,
+					days: $("#days").value,
+					cost_bps: $("#cost").value,
+					params: JSON.stringify(params),
+				})
+				const risk = {
+					sl_pct: $("#r_sl").value,
+					tp_pct: $("#r_tp").value,
+					trail_mult: $("#r_tm").value,
+					trail_period: $("#r_tp2").value,
+					max_bars: $("#r_mb").value,
+				}
+				for (const [k, v] of Object.entries(risk))
+					if (v !== "" && +v > 0) p.set(k, v)
+				if (!p.has("trail_mult")) p.delete("trail_period")
+				status("running…")
+				$("#run").disabled = true
+				$("#out").innerHTML =
+					'<div class="loading">running backtest…</div>'
+				try {
+					const r = await fetch("/api/backtest?" + p)
+					if (!r.ok) {
+						const e = await r.json().catch(() => ({}))
+						status("")
+						$("#out").innerHTML =
+							`<div class="empty">${e.detail || "backtest failed"}</div>`
+						return
+					}
+					render(await r.json())
+					status("")
+				} catch (e) {
+					status("error: " + e.message)
+				} finally {
+					$("#run").disabled = false
+				}
+			}
+
+			function statCard(k, v, bh) {
+				const cls =
+					typeof v === "string" &&
+					v.includes("%") &&
+					parseFloat(v) < 0
+						? "neg"
+						: typeof v === "string" &&
+							  v.includes("%") &&
+							  parseFloat(v) > 0
+							? "pos"
+							: ""
+				return `<div class="stat"><div class="k">${k}</div><div class="v ${cls}">${v}</div>${bh != null ? `<div class="bh">B&H ${bh}</div>` : ""}</div>`
+			}
+
+			let LAST = null
+			let LAST_QS = null
+
+			function render(d) {
+				LAST = d
+				const bits = []
+				if (d.sizing)
+					bits.push(
+						`sized <b>${d.sizing.replace("_", " ")}</b>` +
+							(d.skipped_trades
+								? ` · ${d.skipped_trades} signal(s) skipped as unsizeable`
+								: ""),
+					)
+				if (d.regime)
+					bits.push(
+						`regime filter on — Nifty was above its 200-DMA for ` +
+							`<b>${d.regime_on_pct}%</b> of the window`,
+					)
+				$("#engineNote").innerHTML = bits.join(" · ")
+				$("#btActions").style.display =
+					d.markers && d.markers.length ? "" : "none"
+				const s = d.stats,
+					bh = d.buyhold
+				const riskTxt = Object.keys(d.risk || {}).length
+					? " · risk " +
+						Object.entries(d.risk)
+							.map(([k, v]) => k + "=" + v)
+							.join(" ")
+					: ""
+				$("#meta").textContent =
+					`${d.symbol} · ${d.strategy_name} · ${d.bars} ${d.interval} bars · ${new Date(d.start * 1000).toLocaleDateString("en-IN")} → ${new Date(d.end * 1000).toLocaleDateString("en-IN")} · params ${Object.entries(
+						d.params,
+					)
+						.map(([k, v]) => k + "=" + v)
+						.join(" ")}${riskTxt}`
+				const pct = (v) =>
+					v == null ? "—" : (v > 0 ? "+" : "") + f(v, 2) + "%"
+				let html = `<div class="statgrid">
+    ${statCard("Total return", pct(s.total_return_pct), pct(bh.total_return_pct))}
+    ${statCard("vs Buy & hold", pct(s.vs_buyhold_pct))}
+    ${statCard("CAGR", pct(s.cagr_pct), pct(bh.cagr_pct))}
+    ${statCard("Max drawdown", pct(s.max_drawdown_pct), pct(bh.max_drawdown_pct))}
+    ${statCard("Longest DD", s.longest_dd_bars == null ? "—" : f(s.longest_dd_bars, 0) + " bars", bh.longest_dd_bars == null ? null : f(bh.longest_dd_bars, 0) + " bars")}
+    ${statCard("Sharpe", f(s.sharpe, 2), f(bh.sharpe, 2))}
+    ${statCard("Sortino", f(s.sortino, 2), f(bh.sortino, 2))}
+    ${statCard("Calmar", f(s.calmar, 2), f(bh.calmar, 2))}
+    ${statCard("Volatility", pct(s.volatility_pct), pct(bh.volatility_pct))}
+    ${statCard("Trades", s.open_trades ? `${s.trades} <span class="sub">+${s.open_trades} open</span>` : s.trades)}
+    ${statCard("Win rate", s.win_rate_pct == null ? "—" : f(s.win_rate_pct, 1) + "%")}
+    ${statCard("Profit factor", f(s.profit_factor, 2))}
+    ${statCard("Expectancy / trade", pct(s.expectancy_pct))}
+    ${statCard("Best trade", pct(s.best_trade_pct))}
+    ${statCard("Worst trade", pct(s.worst_trade_pct))}
+    ${statCard("Consec W / L", s.max_consec_wins == null ? "—" : `${s.max_consec_wins} / ${s.max_consec_losses}`)}
+    ${statCard("Exposure", s.exposure_pct == null ? "—" : f(s.exposure_pct, 1) + "%")}
+    ${statCard("Avg win", pct(s.avg_win_pct))}
+    ${statCard("Avg loss", pct(s.avg_loss_pct))}
+    ${statCard("Avg bars held", f(s.avg_bars_held, 1))}
+  </div>
+  <div class="clabel">Price with entries ▲ / exits ▼</div><div id="price"></div>
+  <div class="clabel">Equity curve — <span style="color:#4184e4">strategy</span> vs <span style="color:#8b949e">buy &amp; hold</span> (₹${f(d.capital, 0)} start)</div><div id="equity"></div>
+  <div class="clabel">Drawdown — % below the equity peak</div><div id="dd"></div>`
+
+				if (d.trades.length) {
+					html += `<div class="clabel">Trades (${d.trades.length})</div>
+      <div class="tbl-wrap" style="max-height:320px;overflow-y:auto"><table class="trades">
+      <thead><tr><th>#</th><th>Entry</th><th>@</th><th>Exit</th><th>@</th>
+        <th class="rsn">Reason</th><th>Bars</th><th>Return</th><th>Net</th></tr></thead>
+      <tbody>${d.trades
+			.map(
+				(t, i) => `<tr>
+        <td>${i + 1}${t.open ? ' <span class="sub">(open)</span>' : ""}</td>
+        <td>${new Date(t.entry_time * 1000).toLocaleDateString("en-IN")}</td><td>${f(t.entry)}</td>
+        <td>${new Date(t.exit_time * 1000).toLocaleDateString("en-IN")}</td><td>${f(t.exit)}</td>
+        <td class="rsn">${t.open ? "open" : t.reason || "signal"}</td>
+        <td>${t.bars}</td>
+        <td class="${t.return_pct >= 0 ? "pos" : "neg"}">${(t.return_pct > 0 ? "+" : "") + f(t.return_pct, 2)}%</td>
+        <td class="${t.net_pct >= 0 ? "pos" : "neg"}">${(t.net_pct > 0 ? "+" : "") + f(t.net_pct, 2)}%</td>
+      </tr>`,
+			)
+			.join("")}</tbody></table></div>`
+				}
+				$("#out").innerHTML = html
+				drawCharts(d)
+			}
+
+			function drawCharts(d) {
+				const base = {
+					layout: {
+						background: { color: "#0e1116" },
+						textColor: "#8b949e",
+					},
+					grid: {
+						vertLines: { color: "#161b22" },
+						horzLines: { color: "#161b22" },
+					},
+					timeScale: { timeVisible: false, borderColor: "#2d333b" },
+					rightPriceScale: { borderColor: "#2d333b" },
+					autoSize: true,
+				}
+				const pc = LightweightCharts.createChart($("#price"), base)
+				const line = pc.addLineSeries({
+					color: "#c9d4e0",
+					lineWidth: 1,
+					priceLineVisible: false,
+					lastValueVisible: false,
+					priceFormat: {
+						type: "custom",
+						formatter: (v) => v.toFixed(1),
+					},
+				})
+				line.setData(d.price)
+				const mk = d.markers.map((m) => ({
+					time: m.time,
+					position: m.type === "buy" ? "belowBar" : "aboveBar",
+					color: m.type === "buy" ? "#26a69a" : "#ef5350",
+					shape: m.type === "buy" ? "arrowUp" : "arrowDown",
+					text: m.type === "buy" ? "B" : "S",
+				}))
+				line.setMarkers(mk.sort((a, b) => a.time - b.time))
+
+				const ec = LightweightCharts.createChart($("#equity"), base)
+				const strat = ec.addLineSeries({
+					color: "#4184e4",
+					lineWidth: 2,
+					priceLineVisible: false,
+					lastValueVisible: false,
+				})
+				const hold = ec.addLineSeries({
+					color: "#8b949e",
+					lineWidth: 1,
+					priceLineVisible: false,
+					lastValueVisible: false,
+				})
+				strat.setData(d.equity)
+				hold.setData(d.buyhold_equity)
+
+				const dc = LightweightCharts.createChart($("#dd"), base)
+				const dd = dc.addAreaSeries({
+					lineColor: "#ef5350",
+					topColor: "rgba(239,83,80,0.05)",
+					bottomColor: "rgba(239,83,80,0.30)",
+					lineWidth: 1,
+					priceLineVisible: false,
+					lastValueVisible: false,
+					priceFormat: {
+						type: "custom",
+						formatter: (v) => v.toFixed(1) + "%",
+					},
+				})
+				dd.setData(d.drawdown)
+
+				// time-sync the three panes
+				let sy = false
+				const charts = [pc, ec, dc]
+				charts.forEach((a) =>
+					a.timeScale().subscribeVisibleLogicalRangeChange((r) => {
+						if (sy || !r) return
+						sy = true
+						charts.forEach((b) => {
+							if (b !== a) b.timeScale().setVisibleLogicalRange(r)
+						})
+						sy = false
+					}),
+				)
+				charts.forEach((ch) => ch.timeScale().fitContent())
+			}
+
+			// ---- boot ----
+			// ---------------------------------------------------------------- Monte Carlo
+			async function runMonteCarlo() {
+				if (!LAST || !LAST.trades) {
+					$("#mcOut").innerHTML =
+						'<div class="empty">Run a backtest first — this resamples its trades.</div>'
+					return
+				}
+				const btn = $("#mcRun")
+				btn.disabled = true
+				$("#mcOut").innerHTML = '<div class="loading">resampling…</div>'
+				try {
+					// POST the trades rather than re-running: the page is showing a specific
+					// result, and re-simulating server-side risks quietly analysing a
+					// different one if a control moved between the two requests.
+					const r = await fetch("/api/backtest/montecarlo", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							trades: LAST.trades,
+							mode: $("#mcMode").value,
+							sims: +$("#mcSims").value,
+						}),
+					})
+					if (!r.ok) {
+						const e = await r.json().catch(() => ({}))
+						$("#mcOut").innerHTML =
+							`<div class="empty">${e.detail || "simulation failed"}</div>`
+						return
+					}
+					renderMC(await r.json())
+				} catch (e) {
+					$("#mcOut").innerHTML =
+						`<div class="empty">${e.message}</div>`
+				} finally {
+					btn.disabled = false
+				}
+			}
+
+			function mcBars(h, colour) {
+				const max = Math.max(...h.counts, 1)
+				return (
+					`<div class="mcbars">` +
+					h.counts
+						.map(
+							(c, i) =>
+								`<i style="height:${Math.round((c / max) * 100)}%;background:${colour}"
+        title="${h.edges[i].toFixed(1)}% to ${h.edges[i + 1].toFixed(1)}%: ${c}"></i>`,
+						)
+						.join("") +
+					`</div>
+  <div class="mcaxis"><span>${h.edges[0].toFixed(0)}%</span>
+    <span>${h.edges[h.edges.length - 1].toFixed(0)}%</span></div>`
+				)
+			}
+
+			function renderMC(d) {
+				const dd = d.max_dd_pct
+				const cards = [
+					["95% stayed above", dd.p5.toFixed(1) + "%"],
+					["typical (p50)", dd.p50.toFixed(1) + "%"],
+					["mildest (p95)", dd.p95.toFixed(1) + "%"],
+					["worst seen", d.worst_dd_pct.toFixed(1) + "%"],
+					["this backtest", d.observed.max_dd_pct.toFixed(1) + "%"],
+					[
+						"…its percentile",
+						d.observed_dd_percentile.toFixed(0) + "th",
+					],
+				]
+					.map(
+						([k, v]) => `<div class="stat"><div class="k">${k}</div>
+      <div class="v neg">${v}</div></div>`,
+					)
+					.join("")
+
+				const ret = d.final_pct
+					? `
+    <div class="sub" style="margin-top:14px">Final return across ${d.sims.toLocaleString()} resampled runs</div>
+    ${mcBars(d.final_histogram, "var(--up)")}
+    <div class="sub">p5 ${d.final_pct.p5.toFixed(1)}% · p50 ${d.final_pct.p50.toFixed(1)}%
+      · p95 ${d.final_pct.p95.toFixed(1)}% · <b>${d.loss_probability_pct.toFixed(0)}%
+      of runs finished at a loss</b></div>`
+					: `
+    <div class="caveat" style="margin-top:14px">${d.final_note}</div>`
+
+				$("#mcOut").innerHTML = `
+    <div class="stats" style="margin-top:12px">${cards}</div>
+    <div class="sub" style="margin-top:14px">Max drawdown across ${d.sims.toLocaleString()} orderings of ${d.trades} trades</div>
+    ${mcBars(d.dd_histogram, "var(--down)")}
+    ${ret}
+    <div class="verdict">${d.verdict}</div>
+    <div class="caveat">Both modes assume the order of trades carries no
+      information. Strategies that streak — trend systems win together and lose
+      together — have their clusters broken up by resampling, so these numbers
+      are a floor on how bad it gets, not a ceiling.</div>`
+			}
+
+			// Send the trades to the chart page. Pinned server-side rather than passed in
+			// the URL: a trade list is far too long for a query string, and browser
+			// storage would lose it on exactly the machine switch where you wanted it.
+			async function showOnChart() {
+				if (!LAST || !LAST.markers || !LAST.markers.length) return
+				await fetch("/api/backtest/pin", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						symbol: LAST.symbol,
+						interval: LAST.interval,
+						strategy: LAST.strategy_name,
+						markers: LAST.markers,
+					}),
+				})
+				window.location.href =
+					"/?symbol=" + encodeURIComponent(LAST.symbol)
+			}
+
+			;(async () => {
+				const d = await (await fetch("/api/backtest/strategies")).json()
+				try {
+					HM_METRICS =
+						(await (await fetch("/api/backtest/metrics")).json())
+							.metrics || []
+				} catch (e) {
+					HM_METRICS = [{ key: "sharpe", label: "Sharpe" }]
+				}
+				CAT = Object.fromEntries(d.strategies.map((s) => [s.key, s]))
+				$("#strat").innerHTML = d.strategies
+					.map((s) => `<option value="${s.key}">${s.name}</option>`)
+					.join("")
+				$("#iv").innerHTML = d.intervals
+					.map(
+						(i) =>
+							`<option value="${i}"${i === "day" ? " selected" : ""}>${i}</option>`,
+					)
+					.join("")
+				renderParams()
+				hmSweepControls()
+				wfGridControls()
+				$("#wfRun").onclick = runWalkForward
+				$("#mcRun").onclick = runMonteCarlo
+				$("#showOnChart").onclick = showOnChart
+				$("#dlCsv").onclick = () => {
+					if (!LAST_QS) {
+						status("run a backtest first")
+						return
+					}
+					// Reuses the exact query the result on screen came from, so the file can
+					// never describe a different run than the one you are looking at.
+					const q = new URLSearchParams(LAST_QS)
+					q.delete("params")
+					window.location.href = "/api/backtest/csv?" + q
+				}
+			})()
+		</script>
+	</body>
+</html>

@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>Query — TickerForge</title>
+		<link rel="stylesheet" href="/app.css" />
+		<style>
+			.qbox {
+				display: flex;
+				gap: 10px;
+				align-items: flex-start;
+				margin-top: 12px;
+			}
+			#q {
+				flex: 1;
+				min-height: 64px;
+				background: var(--panel2);
+				color: var(--fg);
+				border: 1px solid var(--border);
+				border-radius: 9px;
+				padding: 11px 13px;
+				font:
+					14px ui-monospace,
+					SFMono-Regular,
+					Menlo,
+					monospace;
+				resize: vertical;
+			}
+			#q:focus {
+				outline: none;
+				border-color: var(--accent);
+			}
+			#q.bad {
+				border-color: var(--down);
+			}
+			.parsed {
+				color: var(--dim);
+				font-size: 12px;
+				margin-top: 6px;
+				font-family: ui-monospace, monospace;
+			}
+			.parsed.bad {
+				color: var(--down);
+			}
+			.cols {
+				display: grid;
+				grid-template-columns: 1fr 300px;
+				gap: 20px;
+				margin-top: 18px;
+			}
+			table {
+				width: 100%;
+				border-collapse: collapse;
+			}
+			th,
+			td {
+				padding: 8px 10px;
+				text-align: right;
+				border-bottom: 1px solid var(--border);
+				font-variant-numeric: tabular-nums;
+			}
+			th:first-child,
+			td:first-child {
+				text-align: left;
+			}
+			th {
+				color: var(--dim);
+				font-weight: 500;
+				font-size: 12px;
+			}
+			.sym {
+				font-weight: 600;
+			}
+			.ex {
+				display: block;
+				width: 100%;
+				text-align: left;
+				background: none;
+				border: 0;
+				color: var(--fg);
+				font:
+					12.5px ui-monospace,
+					monospace;
+				padding: 7px 8px;
+				border-radius: 6px;
+				cursor: pointer;
+			}
+			.ex:hover {
+				background: var(--panel2);
+			}
+			.ex small {
+				display: block;
+				color: var(--dim);
+				font-family: inherit;
+				font-size: 11px;
+				margin-top: 2px;
+			}
+			.fld {
+				font:
+					12px ui-monospace,
+					monospace;
+				color: var(--dim);
+				padding: 3px 0;
+			}
+			/* The reference used to be two headings and one 140-row scroll.
+			   Same content, but grouped and searchable, so finding `cmf`
+			   doesn't mean reading past every field before it. */
+			#ref {
+				position: sticky;
+				top: 12px;
+				align-self: start;
+				max-height: calc(100vh - 90px);
+				display: flex;
+				flex-direction: column;
+			}
+			.reftabs {
+				display: flex;
+				gap: 4px;
+				margin-bottom: 8px;
+			}
+			.rt {
+				flex: 1;
+				background: none;
+				border: 1px solid var(--border);
+				color: var(--dim);
+				border-radius: 7px;
+				padding: 5px 0;
+				font-size: 12px;
+				cursor: pointer;
+			}
+			.rt.on {
+				color: var(--fg);
+				border-color: var(--accent);
+				background: #1c2a41;
+			}
+			#reffilter {
+				width: 100%;
+				padding: 6px 9px;
+				font-size: 12.5px;
+				margin-bottom: 6px;
+			}
+			.refbody {
+				overflow-y: auto;
+				flex: 1;
+				padding-right: 2px;
+			}
+			.refgroup {
+				border-top: 1px solid var(--border);
+			}
+			.refgroup:first-child {
+				border-top: 0;
+			}
+			.refgroup > summary {
+				cursor: pointer;
+				list-style: none;
+				padding: 7px 2px;
+				font-size: 11px;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+				color: var(--dim);
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+			}
+			.refgroup > summary::-webkit-details-marker {
+				display: none;
+			}
+			.refgroup > summary:hover {
+				color: var(--fg);
+			}
+			.refgroup > summary .n {
+				font-size: 10px;
+				border: 1px solid var(--border);
+				border-radius: 9px;
+				padding: 0 6px;
+				line-height: 15px;
+			}
+			.refgroup[open] > summary {
+				color: var(--fg);
+			}
+			.refgroup > div {
+				padding-bottom: 8px;
+			}
+			.fld b {
+				color: var(--fg);
+				font-weight: 500;
+			}
+			.why {
+				font-size: 12px;
+				color: var(--dim);
+			}
+			.why .no {
+				color: var(--down);
+			}
+			.note {
+				border-left: 2px solid var(--border);
+				padding-left: 10px;
+				color: var(--dim);
+				line-height: 1.6;
+				margin: 14px 0;
+			}
+			h3 {
+				margin: 20px 0 4px;
+				font-size: 13px;
+				color: var(--dim);
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+			}
+			@media (max-width: 900px) {
+				.cols {
+					grid-template-columns: 1fr;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div id="nav">
+			<span class="brand">TickerForge</span>
+			<a class="tab" href="/">Chart</a>
+			<a class="tab" href="/desk">Desk</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/scanner">Scanner</a>
+			<a class="tab" href="/screen">Screen</a>
+			<a class="tab on" href="/query">Query</a>
+			<a class="tab" href="/fundamentals">Fundamentals</a>
+			<a class="tab" href="/results">Results</a>
+			<a class="tab" href="/valuation">Valuation</a>
+			<a class="tab" href="/backtest">Backtest</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/metrics">Metrics</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/news">News</a>
+			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/settings">Settings</a>
+			<span class="sp"></span>
+			<span class="status" id="status"></span>
+		</div>
+
+		<div class="wrap">
+			<div class="row">
+				<h2 class="page">Query</h2>
+				<span class="sub"
+					>&mdash; find stocks by any condition you can write
+					down</span
+				>
+			</div>
+
+			<div class="qbox">
+				<textarea
+					id="q"
+					spellcheck="false"
+					placeholder="rsi(14) &gt; 70 and ema(20) crosses_above ema(50)"
+				></textarea>
+				<div>
+					<select id="uni" style="width: 170px">
+						<option value="">watchlist</option>
+					</select>
+					<button
+						class="btn primary"
+						id="go"
+						style="width: 170px; margin-top: 8px"
+					>
+						Run
+					</button>
+					<label class="sub" style="display: block; margin-top: 8px">
+						<input type="checkbox" id="why" checked /> explain
+						misses
+					</label>
+				</div>
+			</div>
+			<div class="parsed" id="parsed"></div>
+
+			<div class="cols">
+				<div id="out">
+					<div class="empty">Write a query, or pick an example.</div>
+				</div>
+				<aside id="ref">
+					<div class="reftabs">
+						<button class="rt on" data-tab="examples">Examples</button>
+						<button class="rt" data-tab="fields">Reference</button>
+					</div>
+					<input
+						id="reffilter"
+						type="search"
+						placeholder="filter…"
+						autocomplete="off"
+					/>
+					<div id="examples" class="refbody"></div>
+					<div id="fields" class="refbody" hidden></div>
+					<div id="refnone" class="empty" hidden>Nothing matches.</div>
+				</aside>
+			</div>
+
+			<div class="note">
+				Conditions combine with <code>and</code>, <code>or</code>,
+				<code>not</code> and brackets. Comparisons read the
+				<b>last closed bar</b>; <code>crosses_above</code> and
+				<code>crosses_below</code> read the last two, so they mean
+				&ldquo;crossed on the most recent bar&rdquo; rather than
+				&ldquo;has ever crossed&rdquo;. <br /><br />
+				A symbol without enough history to evaluate a clause is treated
+				as
+				<b>not matching</b>, never as probably matching &mdash; a screen
+				that guesses hands you a list you can&rsquo;t trust.
+			</div>
+		</div>
+
+		<script>
+			"use strict"
+			const $ = (s) => document.querySelector(s)
+			const status = (m) => {
+				$("#status").textContent = m || ""
+			}
+			const esc = (s) =>
+				String(s ?? "").replace(
+					/[&<>"]/g,
+					(c) =>
+						({
+							"&": "&amp;",
+							"<": "&lt;",
+							">": "&gt;",
+							'"': "&quot;",
+						})[c],
+				)
+			const n2 = (v) => (v == null ? "\u2014" : (+v).toFixed(2))
+
+			let checkTimer = null
+			$("#q").addEventListener("input", () => {
+				clearTimeout(checkTimer)
+				checkTimer = setTimeout(check, 250) // debounced: parse is cheap, not free
+			})
+
+			async function check() {
+				const q = $("#q").value.trim()
+				if (!q) {
+					$("#parsed").textContent = ""
+					$("#q").classList.remove("bad")
+					return
+				}
+				const r = await (
+					await fetch("/api/query/check?q=" + encodeURIComponent(q))
+				).json()
+				$("#q").classList.toggle("bad", !r.ok)
+				$("#parsed").className = "parsed" + (r.ok ? "" : " bad")
+				$("#parsed").textContent = r.ok ? r.parsed : r.error
+			}
+
+			function whyCell(clauses) {
+				return clauses
+					.map(
+						(c) =>
+							`<div class="${c.pass ? "" : "no"}">${c.pass ? "\u2713" : "\u2717"} ` +
+							`${esc(c.clause)} \u2014 ${n2(c.left)} vs ${n2(c.right)}</div>`,
+					)
+					.join("")
+			}
+
+			function render(d) {
+				let html = ""
+				if (d.hits.length) {
+					// Columns asked for by name win. Without a `show` clause
+					// we fall back to guessing at the scalars a row happens to
+					// carry, which is what this page did before the clause
+					// existed and is still the right default for a bare query.
+					const extra = (d.columns || []).length
+						? d.columns
+						: ["rs", "mos_pct", "pe", "roe"].filter((k) =>
+								d.hits.some((h) => h[k] != null),
+							)
+					const arrow = d.sorted_by
+						? d.descending
+							? " \u2193"
+							: " \u2191"
+						: ""
+					html +=
+						`<table><thead><tr><th>Symbol</th><th>Close</th>` +
+						extra
+							.map(
+								(k) =>
+									`<th>${esc(k)}${k === d.sorted_by ? arrow : ""}</th>`,
+							)
+							.join("") +
+						`</tr></thead><tbody>` +
+						d.hits
+							.map(
+								(h) =>
+									`<tr><td class="sym">${esc(h.symbol)}</td>` +
+									`<td>${n2(h.close)}</td>` +
+									extra
+										.map((k) => `<td>${n2(h[k])}</td>`)
+										.join("") +
+									`</tr>`,
+							)
+							.join("") +
+						`</tbody></table>`
+				} else {
+					html += `<div class="empty">Nothing matched.</div>`
+				}
+				// Why a symbol MISSED is usually more useful than the list of hits: it
+				// turns "no results" from a dead end into a specific number to argue with.
+				if (d.misses && d.misses.length) {
+					html +=
+						`<h3>Why these didn\u2019t match</h3><table><tbody>` +
+						d.misses
+							.map(
+								(
+									m,
+								) => `<tr><td class="sym">${esc(m.symbol)}</td>
+        <td style="text-align:left" class="why">${whyCell(m.why)}</td></tr>`,
+							)
+							.join("") +
+						`</tbody></table>`
+				}
+				html += `<div class="note">${esc(d.note)}</div>`
+				$("#out").innerHTML = html
+			}
+
+			async function run() {
+				const q = $("#q").value.trim()
+				if (!q) return
+				$("#go").disabled = true
+				$("#out").innerHTML =
+					'<div class="loading">evaluating\u2026</div>'
+				status("running\u2026")
+				try {
+					const p = new URLSearchParams({
+						q,
+						why: $("#why").checked ? 5 : 0,
+					})
+					if ($("#uni").value) p.set("universe_name", $("#uni").value)
+					const r = await fetch("/api/query?" + p)
+					const d = await r.json()
+					if (!r.ok) {
+						$("#out").innerHTML =
+							`<div class="empty">${esc(d.detail)}</div>`
+						return
+					}
+					render(d)
+					status(`${d.hit_count} of ${d.scanned}`)
+				} catch (e) {
+					$("#out").innerHTML =
+						`<div class="empty">${esc(e.message)}</div>`
+				} finally {
+					$("#go").disabled = false
+				}
+			}
+
+			// Field kinds, in the order they're worth meeting. The catalogue
+			// grew from about twenty entries to a hundred and forty across
+			// the last few passes, which is exactly when a flat list stops
+			// being a reference and becomes a scroll.
+			// Sections in the order they're worth meeting. Matched against
+			// a field's `group` where it has one, falling back to `kind`, so
+			// a new family shows up under its kind rather than vanishing.
+			const KINDS = [
+				["Price & volume", "Price & volume"],
+				["Fundamentals", "Fundamentals"],
+				["Statement shorthands", "Statement shorthands"],
+				["Classification", "Classification"],
+				["statement", "Statement accessors"],
+				["history", "History"],
+				["timeframe", "Timeframes"],
+				["benchmark", "Index"],
+				["cross", "Universe"],
+				["clause", "Clauses"],
+			]
+
+			function group(title, count, inner, open) {
+				return (
+					`<details class="refgroup"${open ? " open" : ""}>` +
+					`<summary>${esc(title)}<span class="n">${count}</span></summary>` +
+					`<div>${inner}</div></details>`
+				)
+			}
+
+			function exampleHtml(e) {
+				return (
+					`<button class="ex" data-q="${esc(e.query)}">${esc(e.query)}` +
+					`<small>${esc(e.means)}</small></button>`
+				)
+			}
+
+			function fieldHtml(f) {
+				const sig = f.name + (f.args ? `(${f.defaults.join(", ")})` : "")
+				return `<div class="fld"><b>${esc(sig)}</b> \u2014 ${esc(f.help)}</div>`
+			}
+
+			let REF = { groups: [], fields: [] }
+
+			function paintRef() {
+				const q = ($("#reffilter").value || "").trim().toLowerCase()
+				const hit = (s) => !q || s.toLowerCase().includes(q)
+
+				// Filtering opens the groups: a closed group with matches in
+				// it looks exactly like no matches at all.
+				const exGroups = REF.groups
+					.map((g) => ({
+						title: g.title,
+						items: g.items.filter(
+							(e) => hit(e.query) || hit(e.means),
+						),
+					}))
+					.filter((g) => g.items.length)
+				$("#examples").innerHTML = exGroups
+					.map((g) =>
+						group(
+							g.title,
+							g.items.length,
+							g.items.map(exampleHtml).join(""),
+							!!q || exGroups.length === 1,
+						),
+					)
+					.join("")
+
+				const fldGroups = KINDS.map(([kind, label]) => ({
+					label,
+					items: REF.fields.filter(
+						(f) =>
+							(f.group || f.kind || "field") === kind &&
+							(hit(f.name) || hit(f.help)),
+					),
+				})).filter((g) => g.items.length)
+				$("#fields").innerHTML = fldGroups
+					.map((g) =>
+						group(
+							g.label,
+							g.items.length,
+							g.items.map(fieldHtml).join(""),
+							!!q,
+						),
+					)
+					.join("")
+
+				const showing = $("#fields").hidden ? exGroups : fldGroups
+				$("#refnone").hidden = showing.length > 0
+
+				for (const b of document.querySelectorAll(".ex"))
+					b.onclick = () => {
+						$("#q").value = b.dataset.q
+						check()
+						run()
+					}
+			}
+
+			async function boot() {
+				const d = await (await fetch("/api/query/fields")).json()
+				REF.fields = d.fields || []
+				REF.groups =
+					d.example_groups ||
+					[{ title: "Examples", items: d.examples || [] }]
+				paintRef()
+
+				$("#reffilter").oninput = paintRef
+				for (const t of document.querySelectorAll(".rt"))
+					t.onclick = () => {
+						for (const o of document.querySelectorAll(".rt"))
+							o.classList.toggle("on", o === t)
+						$("#examples").hidden = t.dataset.tab !== "examples"
+						$("#fields").hidden = t.dataset.tab !== "fields"
+						paintRef()
+					}
+
+				try {
+					const rows = await (await fetch("/api/universe")).json()
+					const list = rows.universes || rows || []
+					$("#uni").innerHTML =
+						'<option value="">watchlist</option>' +
+						list
+							.map(
+								(u) =>
+									`<option value="${esc(u.name)}">${esc(u.name)}</option>`,
+							)
+							.join("")
+				} catch (e) {}
+			}
+
+			$("#go").onclick = run
+			$("#q").addEventListener("keydown", (e) => {
+				if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run()
+			})
+			boot()
+		</script>
+	</body>
+</html>

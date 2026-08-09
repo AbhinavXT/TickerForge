@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>Paper — TickerForge</title>
+		<link rel="stylesheet" href="/app.css" />
+		<style>
+			table {
+				width: 100%;
+				border-collapse: collapse;
+				margin-top: 10px;
+			}
+			th,
+			td {
+				padding: 9px 10px;
+				text-align: right;
+				border-bottom: 1px solid var(--border);
+				font-variant-numeric: tabular-nums;
+			}
+			th:first-child,
+			td:first-child {
+				text-align: left;
+			}
+			th {
+				color: var(--dim);
+				font-weight: 500;
+				font-size: 12px;
+			}
+			.sym {
+				font-weight: 600;
+			}
+			.cards {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+				gap: 10px;
+				margin: 14px 0;
+			}
+			.card {
+				background: var(--panel2);
+				border: 1px solid var(--border);
+				border-radius: 9px;
+				padding: 11px 13px;
+			}
+			.card .k {
+				color: var(--dim);
+				font-size: 11px;
+			}
+			.card .v {
+				font-size: 20px;
+				font-weight: 600;
+				font-variant-numeric: tabular-nums;
+			}
+			.note {
+				border-left: 2px solid var(--border);
+				padding-left: 10px;
+				color: var(--dim);
+				line-height: 1.6;
+				margin: 14px 0;
+			}
+			h3 {
+				margin: 22px 0 2px;
+				font-size: 14px;
+			}
+			.pend {
+				color: var(--accent);
+			}
+		</style>
+	</head>
+	<body>
+		<div id="nav">
+			<span class="brand">TickerForge</span>
+			<a class="tab" href="/">Chart</a>
+			<a class="tab" href="/desk">Desk</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/scanner">Scanner</a>
+			<a class="tab" href="/screen">Screen</a>
+			<a class="tab" href="/query">Query</a>
+			<a class="tab" href="/fundamentals">Fundamentals</a>
+			<a class="tab" href="/results">Results</a>
+			<a class="tab" href="/valuation">Valuation</a>
+			<a class="tab" href="/backtest">Backtest</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/metrics">Metrics</a>
+			<a class="tab on" href="/paper">Paper</a>
+			<a class="tab" href="/news">News</a>
+			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/settings">Settings</a>
+			<span class="sp"></span>
+			<span class="status" id="status"></span>
+		</div>
+
+		<div class="wrap">
+			<div class="row">
+				<h2 class="page">Paper</h2>
+				<span class="sub"
+					>— the edge, tested forward, with nothing at risk</span
+				>
+				<div class="spacer"></div>
+				<button class="btn" id="queue">Queue today\u2019s flips</button>
+				<button class="btn primary" id="fill">Fill due orders</button>
+			</div>
+
+			<div class="note">
+				Orders fill at the <b>next open</b>, never the close that
+				produced the signal &mdash; you didn\u2019t know until it had
+				already happened. The gap between those two prices is where a
+				real strategy\u2019s profit quietly goes, so it is kept rather
+				than hidden. Costs are charged on both legs on the same basis
+				the backtester uses, and positions are sized by the same risk
+				model as <code>/size</code>. <br /><br />
+				These rows live in the journal marked
+				<code>source=paper</code> and are never blended into your real
+				statistics.
+			</div>
+
+			<div id="out"><div class="loading">loading\u2026</div></div>
+		</div>
+
+		<script>
+			"use strict"
+			const $ = (s) => document.querySelector(s)
+			const status = (m) => {
+				$("#status").textContent = m || ""
+			}
+			const esc = (s) =>
+				String(s ?? "").replace(
+					/[&<>"]/g,
+					(c) =>
+						({
+							"&": "&amp;",
+							"<": "&lt;",
+							">": "&gt;",
+							'"': "&quot;",
+						})[c],
+				)
+			const n = (v, d = 2) => (v == null ? "\u2014" : (+v).toFixed(d))
+
+			function card(k, v) {
+				return `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`
+			}
+
+			function render(d) {
+				const s = d.stats || {}
+				const cards = [
+					card("open", d.open.length),
+					card("closed", d.closed),
+					card(
+						"awaiting open",
+						`<span class="pend">${d.pending.length}</span>`,
+					),
+					card(
+						"expectancy",
+						s.trades
+							? (s.expectancy_r >= 0 ? "+" : "") +
+									n(s.expectancy_r) +
+									"R"
+							: "\u2014",
+					),
+					card(
+						"total",
+						s.trades
+							? (s.total_r >= 0 ? "+" : "") +
+									n(s.total_r, 1) +
+									"R"
+							: "\u2014",
+					),
+					card(
+						"win rate",
+						s.trades ? n(s.win_rate_pct, 0) + "%" : "\u2014",
+					),
+				].join("")
+
+				let html = `<div class="cards">${cards}</div>`
+				if (d.started)
+					html += `<div class="sub">running since ${esc(d.started.slice(0, 10))}</div>`
+
+				if (d.pending.length) {
+					html +=
+						`<h3>Awaiting the next open</h3><table>
+      <thead><tr><th>Symbol</th><th>Kind</th><th>Tag</th><th>Signalled at</th>
+        <th>Signal price</th><th></th></tr></thead><tbody>` +
+						d.pending
+							.map(
+								(o) => `<tr>
+        <td class="sym">${esc(o.symbol)}</td><td>${esc(o.kind)}</td>
+        <td>${esc(o.tag || "")}</td><td>${esc((o.signal_time || "").slice(0, 16))}</td>
+        <td>${n(o.signal_price)}</td>
+        <td><button class="btn" data-cancel="${o.id}">cancel</button></td>
+      </tr>`,
+							)
+							.join("") +
+						`</tbody></table>`
+				}
+
+				if (d.open.length) {
+					html +=
+						`<h3>Open paper positions</h3><table>
+      <thead><tr><th>Symbol</th><th>Qty</th><th>Entry</th><th>Stop</th>
+        <th>Tag</th><th>Since</th></tr></thead><tbody>` +
+						d.open
+							.map(
+								(
+									t,
+								) => `<tr><td class="sym">${esc(t.symbol)}</td>
+        <td>${t.qty}</td><td>${n(t.entry)}</td><td>${n(t.stop)}</td>
+        <td>${esc(t.tag || "")}</td>
+        <td>${esc((t.entry_time || "").slice(0, 10))}</td></tr>`,
+							)
+							.join("") +
+						`</tbody></table>`
+				}
+
+				const tags = Object.entries(d.by_tag || {}).filter(
+					([, v]) => v.trades,
+				)
+				if (tags.length) {
+					html +=
+						`<h3>By strategy</h3><table>
+      <thead><tr><th>Tag</th><th>Trades</th><th>Win %</th><th>Expectancy</th>
+        <th>Total R</th></tr></thead><tbody>` +
+						tags
+							.map(
+								([
+									tag,
+									v,
+								]) => `<tr><td class="sym">${esc(tag)}</td>
+        <td>${v.trades}</td><td>${n(v.win_rate_pct, 0)}</td>
+        <td>${(v.expectancy_r >= 0 ? "+" : "") + n(v.expectancy_r)}R</td>
+        <td>${(v.total_r >= 0 ? "+" : "") + n(v.total_r, 1)}R</td></tr>`,
+							)
+							.join("") +
+						`</tbody></table>
+      <div class="note">Compare these against the same tags on the
+        <a href="/journal">journal</a>\u2019s live-vs-backtest table. Paper
+        landing near backtest and live landing well below both is the most
+        informative outcome you can get: the edge is real and the gap is
+        execution.</div>`
+				}
+
+				if (!d.open.length && !d.pending.length && !d.closed)
+					html += `<div class="empty">Nothing yet. Queue today\u2019s flips to start.</div>`
+
+				$("#out").innerHTML = html
+				for (const b of document.querySelectorAll("[data-cancel]"))
+					b.onclick = async () => {
+						await fetch("/api/paper/order/" + b.dataset.cancel, {
+							method: "DELETE",
+						})
+						load()
+					}
+			}
+
+			async function load() {
+				try {
+					render(await (await fetch("/api/paper")).json())
+				} catch (e) {
+					$("#out").innerHTML =
+						`<div class="empty">${esc(e.message)}</div>`
+				}
+			}
+
+			$("#queue").onclick = async () => {
+				status("reading signals\u2026")
+				const r = await fetch("/api/paper/signals", { method: "POST" })
+				const d = await r.json().catch(() => ({}))
+				status(
+					r.ok
+						? `${(d.queued || []).length} queued from ${d.flips || 0} flips`
+						: d.detail || "failed",
+				)
+				load()
+			}
+
+			$("#fill").onclick = async () => {
+				status("filling\u2026")
+				const d = await (
+					await fetch("/api/paper/fill", { method: "POST" })
+				).json()
+				status(
+					`${d.filled.length} filled, ${d.still_pending} still waiting`,
+				)
+				load()
+			}
+
+			load()
+		</script>
+	</body>
+</html>

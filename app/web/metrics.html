@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>TickerForge · Metrics</title>
+		<link rel="stylesheet" href="/app.css" />
+		<style>
+			.layout {
+				display: grid;
+				grid-template-columns: 210px 1fr;
+				gap: 22px;
+				align-items: start;
+			}
+			#toc {
+				position: sticky;
+				top: 70px;
+				align-self: start;
+				max-height: calc(100vh - 90px);
+				overflow-y: auto;
+			}
+			#toc a {
+				display: block;
+				color: var(--dim);
+				font-size: 13px;
+				padding: 3px 0;
+			}
+			#toc a:hover {
+				color: var(--fg);
+				text-decoration: none;
+			}
+			#toc .g {
+				color: var(--fg);
+				font-weight: 600;
+				font-size: 12px;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+				margin: 12px 0 4px;
+			}
+			.metric {
+				background: var(--panel);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 16px 18px;
+				margin-bottom: 14px;
+			}
+			.metric h3 {
+				font-size: 16px;
+				display: flex;
+				align-items: baseline;
+				gap: 10px;
+				flex-wrap: wrap;
+			}
+			.metric h3 .abbr {
+				color: var(--dim);
+				font-size: 13px;
+				font-weight: 400;
+			}
+			.metric .formula {
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+				font-size: 13px;
+				background: var(--bg);
+				border: 1px solid var(--border);
+				border-radius: 7px;
+				padding: 8px 11px;
+				margin: 10px 0;
+				color: #c9d4e0;
+				overflow-x: auto;
+			}
+			.metric p {
+				margin: 8px 0;
+			}
+			.metric .lab {
+				color: var(--accent);
+				font-weight: 600;
+				font-size: 12px;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+			}
+			.metric .drivers {
+				display: flex;
+				gap: 6px;
+				flex-wrap: wrap;
+				margin-top: 6px;
+			}
+			.metric .drivers span {
+				font-size: 12px;
+				background: var(--panel2);
+				border: 1px solid var(--border);
+				border-radius: 14px;
+				padding: 2px 10px;
+				color: var(--fg);
+			}
+			.metric .rule {
+				color: var(--dim);
+				font-size: 13px;
+				border-left: 2px solid var(--border);
+				padding-left: 10px;
+				margin-top: 8px;
+			}
+			.gtitle {
+				font-size: 15px;
+				color: var(--dim);
+				text-transform: uppercase;
+				letter-spacing: 1px;
+				margin: 22px 0 10px;
+			}
+			.hidden {
+				display: none;
+			}
+			mark {
+				background: #3a3f1f;
+				color: #f0e4a0;
+			}
+			@media (max-width: 820px) {
+				.layout {
+					grid-template-columns: 1fr;
+				}
+				#toc {
+					display: none;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div id="nav">
+			<span class="brand">TickerForge</span>
+			<a class="tab" href="/">Chart</a>
+			<a class="tab" href="/desk">Desk</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/scanner">Scanner</a>
+			<a class="tab" href="/screen">Screen</a>
+			<a class="tab" href="/query">Query</a>
+			<a class="tab" href="/fundamentals">Fundamentals</a>
+			<a class="tab" href="/results">Results</a>
+			<a class="tab" href="/valuation">Valuation</a>
+			<a class="tab" href="/backtest">Backtest</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab on" href="/metrics">Metrics</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/news">News</a>
+			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/settings">Settings</a>
+			<span class="sp"></span>
+		</div>
+		<div class="wrap">
+			<div class="row">
+				<h2 class="page">Metrics &amp; concepts</h2>
+				<div class="spacer"></div>
+				<input
+					class="search"
+					id="q"
+					placeholder="Filter metrics… (roe, dcf, moat)"
+					autocomplete="off"
+					style="min-width: 260px"
+				/>
+			</div>
+			<div class="sub" style="margin-bottom: 6px">
+				What each number means, why it matters, and what actually drives
+				it.
+			</div>
+			<div class="layout">
+				<div id="toc"></div>
+				<div id="content"></div>
+			</div>
+		</div>
+
+		<script>
+			"use strict"
+			const $ = (s) => document.querySelector(s)
+
+			// Each: name, abbr, group, formula, meaning, importance, drivers[], rule, caveat, keywords
+			const M = [
+				// ---------------- Profitability & returns ----------------
+				{
+					g: "Profitability & returns",
+					n: "Return on Equity",
+					a: "ROE",
+					formula: "ROE = Net Profit / Shareholders\u2019 Equity",
+					meaning:
+						"How much profit the company generates for every rupee of shareholder capital (equity + retained reserves). It is the headline measure of how effectively owners\u2019 money is put to work.",
+					importance:
+						"Sustained high ROE is the single strongest signal of a quality business — it compounds book value quickly. A company that earns 25% on equity and reinvests it grows intrinsic value far faster than one earning 10%.",
+					drivers: [
+						"Net margin",
+						"Asset turnover",
+						"Financial leverage",
+					],
+					rule: ">15% is good, >20% excellent (Indian context). But check WHY: the DuPont split shows whether it comes from margins, efficiency, or just debt.",
+					caveat: "Leverage inflates ROE. A highly indebted firm can show a great ROE that is really just borrowed risk. Also distorted by buybacks and by low/negative equity.",
+				},
+				{
+					g: "Profitability & returns",
+					n: "Return on Capital Employed",
+					a: "ROCE",
+					formula:
+						"ROCE = EBIT / (Total Equity + Total Debt)   [capital employed]",
+					meaning:
+						"Pre-tax operating return on ALL long-term capital, debt and equity together. Unlike ROE it is capital-structure-neutral, so you can compare a debt-heavy firm with a debt-free one fairly.",
+					importance:
+						"The cleanest read on core business quality. If ROCE comfortably exceeds the cost of that capital, the company creates value every year it reinvests; if not, growth destroys value.",
+					drivers: [
+						"Operating margin (EBIT)",
+						"Capital turnover",
+						"Asset intensity",
+					],
+					rule: "ROCE > cost of capital (~12–14% in India) is the value-creation line. >20% is a strong, capital-light business.",
+					caveat: 'Everyone defines "capital employed" differently (some exclude cash, some use net debt). We store both screener\u2019s ROCE and our own EBIT/(eq+debt) so you can see the definitional gap.',
+				},
+				{
+					g: "Profitability & returns",
+					n: "Return on Assets",
+					a: "ROA",
+					formula: "ROA = Net Profit / Total Assets",
+					meaning:
+						"Profit per rupee of total assets, regardless of how those assets were financed. Shows raw asset productivity.",
+					importance:
+						"Useful for asset-heavy businesses and for comparing banks/NBFCs. A widening gap between ROE and ROA reveals how much leverage is doing the work.",
+					drivers: ["Net margin", "Asset turnover"],
+					rule: "Varies hugely by industry — compare within a sector, not across.",
+					caveat: "For financials, assets are the balance sheet itself, so ROA looks tiny (~1–2% is good for a bank).",
+				},
+				{
+					g: "Profitability & returns",
+					n: "Return on Invested Capital",
+					a: "ROIC",
+					formula:
+						"ROIC = NOPAT / Invested Capital   (NOPAT = EBIT \u00d7 (1 \u2212 tax))",
+					meaning:
+						"After-tax operating return on the capital actually invested in operations (excludes excess cash). Damodaran\u2019s preferred quality gauge.",
+					importance:
+						'ROIC minus WACC (the "economic spread") is the truest test of a moat. A persistent positive spread is what separates compounders from commodity businesses.',
+					drivers: [
+						"After-tax operating margin",
+						"Invested-capital turnover",
+					],
+					rule: "ROIC consistently > WACC = value creation. A wide, durable spread implies a competitive advantage.",
+					caveat: "Sensitive to how invested capital and tax are computed; use multi-year averages to smooth cyclicality.",
+				},
+				{
+					g: "Profitability & returns",
+					n: "Operating / EBITDA / Net Margin",
+					a: "OPM · margins",
+					formula:
+						"OPM = Operating Profit / Sales · Net margin = Net Profit / Sales",
+					meaning:
+						"What fraction of every rupee of sales survives as profit at each level — operating (before interest/tax), EBITDA (before D&A too), and net (bottom line).",
+					importance:
+						"Margins reveal pricing power and cost discipline. Rising margins usually mean a strengthening moat or operating leverage; falling margins warn of competition or cost inflation.",
+					drivers: [
+						"Pricing power",
+						"Cost structure",
+						"Scale / operating leverage",
+						"Product mix",
+					],
+					rule: "Trend matters more than level. Stable-or-rising margins over years beat a high but eroding one.",
+					caveat: 'EBITDA ignores real costs (capex, working capital). "EBITDA is not cash flow" — Damodaran\u2019s constant warning.',
+				},
+
+				// ---------------- Valuation multiples ----------------
+				{
+					g: "Valuation multiples",
+					n: "Price-to-Earnings",
+					a: "P/E",
+					formula: "P/E = Price / EPS   (or Market Cap / Net Profit)",
+					meaning:
+						"Rupees the market pays today for one rupee of annual earnings. The most quoted valuation multiple.",
+					importance:
+						"A quick gauge of how much growth and quality the market has already priced in. Comparing a firm\u2019s P/E to its own history, peers, and growth rate frames whether expectations are cheap or demanding.",
+					drivers: [
+						"Expected growth",
+						"Return quality (ROE)",
+						"Risk / cost of equity",
+						"Payout",
+					],
+					rule: 'A "justified" P/E rises with growth and ROE, and falls with risk. Low P/E is only cheap if growth and returns hold up.',
+					caveat: "Meaningless when earnings are near zero, negative, or one-off-distorted. Never use P/E alone.",
+				},
+				{
+					g: "Valuation multiples",
+					n: "PEG ratio",
+					a: "PEG",
+					formula: "PEG = P/E / earnings growth rate (%)",
+					meaning:
+						"P/E normalised by growth — an attempt to compare fast and slow growers on one scale.",
+					importance:
+						'A rough shortcut: PEG ~1 is often treated as "fairly priced for its growth," <1 as potentially cheap.',
+					drivers: ["P/E", "Sustainable growth"],
+					rule: "PEG < 1 with durable growth is the classic GARP screen.",
+					caveat: "Crude — it assumes a linear P/E–growth link and ignores risk and how long growth lasts. Easy to game with optimistic growth.",
+				},
+				{
+					g: "Valuation multiples",
+					n: "Price-to-Book",
+					a: "P/B",
+					formula: "P/B = Price / Book Value per Share",
+					meaning:
+						"Market value versus accounting net worth. How much premium (or discount) to balance-sheet equity you pay.",
+					importance:
+						"Central for banks, NBFCs, and asset-heavy firms where book value is economically meaningful. Ties directly to ROE via the justified-P/B model.",
+					drivers: ["ROE vs cost of equity", "Growth", "Risk"],
+					rule: "Justified P/B = (ROE \u2212 g)/(r \u2212 g). A firm earning above its cost of equity deserves P/B > 1.",
+					caveat: "Book value is an accounting figure — distorted by intangibles, buybacks, write-offs, and inflation. Weak for asset-light businesses.",
+				},
+				{
+					g: "Valuation multiples",
+					n: "EV / EBITDA",
+					a: "EV/EBITDA",
+					formula:
+						"EV = Market Cap + Debt \u2212 Cash · ratio = EV / EBITDA",
+					meaning:
+						"Capital-structure-neutral price tag: the whole enterprise\u2019s value against its pre-financing operating cash proxy.",
+					importance:
+						"Lets you compare firms with different debt loads and tax situations, and is favoured in M&A and for capital-intensive sectors.",
+					drivers: [
+						"Growth",
+						"Margins",
+						"Reinvestment needs",
+						"Risk",
+					],
+					rule: "Compare within an industry. Lower can be cheaper — if growth and returns are comparable.",
+					caveat: "EBITDA overstates cash for capex-heavy firms; EV needs an accurate debt and cash figure.",
+				},
+				{
+					g: "Valuation multiples",
+					n: "Dividend & Earnings Yield",
+					a: "yield",
+					formula:
+						"Dividend yield = DPS / Price · Earnings yield = EPS / Price (= 1 / P/E)",
+					meaning:
+						"The cash return you collect (dividend yield) and the total earnings you own per rupee invested (earnings yield).",
+					importance:
+						'Earnings yield vs the bond yield is a fast valuation sanity check (the "Fed model" idea). Dividend yield matters for income and signals management confidence.',
+					drivers: ["Payout policy", "Price", "Profitability"],
+					rule: "Earnings yield well above the risk-free rate hints at value (or at risk the market sees).",
+					caveat: "A very high dividend yield can be a falling price in disguise, or an unsustainable payout.",
+				},
+
+				// ---------------- Growth ----------------
+				{
+					g: "Growth",
+					n: "YoY growth",
+					a: "YoY",
+					formula:
+						"YoY % = (This period \u2212 Same period last year) / Same period last year \u00d7 100",
+					meaning:
+						"Change versus the SAME period a year ago — the standard way to read quarterly or annual results without seasonal noise.",
+					importance:
+						"The pulse of the business. Accelerating YoY revenue/profit is what re-rates a stock; decelerating growth de-rates it even if absolute numbers are high.",
+					drivers: [
+						"Volume",
+						"Price/realisation",
+						"New products or markets",
+						"Base effect",
+					],
+					rule: "Compare like-for-like periods (Q2 vs Q2). Watch the trend of the growth rate, not just one print.",
+					caveat: "A low base can flatter YoY; a one-off last year can distort it. Cross-check with QoQ and multi-year CAGR.",
+				},
+				{
+					g: "Growth",
+					n: "CAGR",
+					a: "CAGR",
+					formula: "CAGR = (End / Start)^(1 / years) \u2212 1",
+					meaning:
+						"The smooth, constant annual rate that would take a value from its start to its end over N years — the honest way to summarise multi-year growth.",
+					importance:
+						"Strips out year-to-year lumpiness so you can judge the real long-run trajectory of sales, profit, or EPS. This is the growth input our valuation models lean on.",
+					drivers: [
+						"Reinvestment \u00d7 ROIC",
+						"End-market growth",
+						"Market-share gains",
+					],
+					rule: "Use 5-year (or full-cycle) CAGR of sales, EBIT, and EPS together — divergence between them is informative.",
+					caveat: "Only reflects endpoints, so cyclical start/end years mislead. Negative or zero start values make it undefined.",
+				},
+				{
+					g: "Growth",
+					n: "Sustainable growth rate",
+					a: "g = ROE \u00d7 retention",
+					formula: "g = ROE \u00d7 (1 \u2212 payout ratio)",
+					meaning:
+						"The rate a company can grow from internally generated funds alone, without new equity — profits retained and reinvested at its ROE.",
+					importance:
+						"Anchors realistic long-run growth in valuation. Growth claimed above this must be funded by debt or dilution, or justified by rising returns.",
+					drivers: ["ROE", "Retention (1 \u2212 payout)"],
+					rule: "If assumed growth > ROE \u00d7 retention for long, be skeptical — it needs external capital.",
+					caveat: "Assumes ROE and payout stay constant; both drift over time.",
+				},
+
+				// ---------------- Per-share ----------------
+				{
+					g: "Per-share",
+					n: "Earnings per Share",
+					a: "EPS",
+					formula: "EPS = Net Profit / Shares outstanding",
+					meaning:
+						"Profit attributable to each share — the denominator of P/E and the driver of most earnings-based valuation.",
+					importance:
+						"Long-run share price tends to track EPS growth. Whether EPS grows via real profit or via buybacks tells you a lot.",
+					drivers: [
+						"Net profit",
+						"Share count (buybacks / dilution)",
+					],
+					rule: "Prefer diluted EPS; watch EPS growth vs net-profit growth to catch dilution.",
+					caveat: "Easily managed by one-offs, tax changes, and buybacks. Use normalised/trailing figures.",
+				},
+				{
+					g: "Per-share",
+					n: "Book Value per Share",
+					a: "BVPS",
+					formula:
+						"BVPS = Shareholders\u2019 Equity / Shares outstanding",
+					meaning: "Accounting net worth backing each share.",
+					importance:
+						"The base for P/B and for the justified-P/B and Graham-number valuations. Growth in BVPS is retained-earnings compounding in action.",
+					drivers: [
+						"Retained earnings",
+						"Buybacks",
+						"Revaluations / write-offs",
+					],
+					rule: "Rising BVPS + high ROE = a compounding machine.",
+					caveat: "Historic-cost accounting; understates intangible-rich firms, overstates ones with stale assets.",
+				},
+
+				// ---------------- Leverage & solvency ----------------
+				{
+					g: "Leverage & solvency",
+					n: "Debt-to-Equity",
+					a: "D/E",
+					formula: "D/E = Total Debt / Shareholders\u2019 Equity",
+					meaning:
+						"How much borrowed money the company uses per rupee of owners\u2019 capital.",
+					importance:
+						"The core leverage/risk gauge. Debt magnifies both returns and losses; high D/E raises the odds of distress in a downturn.",
+					drivers: [
+						"Borrowings",
+						"Equity base",
+						"Business cyclicality",
+					],
+					rule: "<0.5 is comfortable for most non-financials; near 0 is very safe. Judge against cash flows, not a fixed number.",
+					caveat: "Sensible levels are industry-specific (utilities/financials run high by design). Off-balance-sheet debt hides here.",
+				},
+				{
+					g: "Leverage & solvency",
+					n: "Interest coverage",
+					a: "ICR",
+					formula: "Interest coverage = EBIT / Interest expense",
+					meaning:
+						"How many times operating profit covers the interest bill — the ability to service debt from earnings.",
+					importance:
+						"A fast solvency check. Thin coverage means little cushion; a small profit dip can threaten debt payments.",
+					drivers: ["EBIT", "Interest cost", "Debt load"],
+					rule: ">3\u00d7 is reasonably safe, <1.5\u00d7 is a red flag.",
+					caveat: "Uses accrual EBIT, not cash; pair with cash-flow coverage for a real picture.",
+				},
+				{
+					g: "Leverage & solvency",
+					n: "Current & Quick ratio",
+					a: "liquidity",
+					formula:
+						"Current = Current Assets / Current Liabilities · Quick = (CA \u2212 Inventory) / CL",
+					meaning:
+						"Short-term solvency: can the firm meet obligations due within a year? Quick ratio is the stricter version excluding inventory.",
+					importance:
+						"Liquidity crunches, not just losses, kill companies. These flag whether near-term bills are covered.",
+					drivers: [
+						"Working-capital management",
+						"Cash",
+						"Inventory & receivables",
+					],
+					rule: "Current ~1.5–3 is healthy; <1 warrants a closer look. Quick >1 is comfortable.",
+					caveat: "Too high can mean idle, poorly deployed capital. Industry norms vary widely.",
+				},
+
+				// ---------------- Efficiency ----------------
+				{
+					g: "Efficiency",
+					n: "Asset turnover",
+					a: "turnover",
+					formula: "Asset turnover = Sales / Total Assets",
+					meaning:
+						"How much revenue each rupee of assets generates — capital efficiency.",
+					importance:
+						"One of the two levers of ROA/ROE (with margin). Asset-light, high-turnover models can earn great returns on thin margins.",
+					drivers: [
+						"Business model (light vs heavy)",
+						"Utilisation",
+						"Working-capital discipline",
+					],
+					rule: "Higher is better within an industry; compare to peers.",
+					caveat: "Old, depreciated assets inflate turnover; capex cycles distort it.",
+				},
+				{
+					g: "Efficiency",
+					n: "Cash conversion cycle",
+					a: "CCC",
+					formula:
+						"CCC = Inventory days + Receivable days \u2212 Payable days",
+					meaning:
+						"How long cash is tied up in operations between paying suppliers and collecting from customers.",
+					importance:
+						"A shrinking CCC frees cash and often signals operational strength or bargaining power; a negative CCC (paid before you pay) is a hallmark of strong franchises.",
+					drivers: [
+						"Inventory management",
+						"Credit terms to customers",
+						"Terms from suppliers",
+					],
+					rule: "Lower (or negative) is better. Watch the trend across years.",
+					caveat: "Seasonal businesses swing it; compare same-period figures.",
+				},
+
+				// ---------------- Cash flow ----------------
+				{
+					g: "Cash flow",
+					n: "Free Cash Flow",
+					a: "FCF · FCFF · FCFE",
+					formula:
+						"FCFF = NOPAT + D&A \u2212 Capex \u2212 \u0394Working Capital · FCFE = FCFF \u2212 net interest\u00d7(1\u2212t) \u2212 net debt repaid",
+					meaning:
+						"Actual cash left after keeping the business running and investing to sustain it. FCFF is to the whole firm; FCFE is to equity holders.",
+					importance:
+						"This is what a business is ultimately worth — the cash it can return. Damodaran: value is the present value of expected cash flows, not earnings. Profits can be accounting fiction; cash is harder to fake.",
+					drivers: [
+						"Operating profit",
+						"Capex intensity",
+						"Working-capital changes",
+						"Taxes",
+					],
+					rule: "Persistent FCF > net profit is a quality sign; chronic capex/working-capital drains are a warning.",
+					caveat: "Lumpy year to year (capex cycles). Normalise over several years before valuing.",
+				},
+				{
+					g: "Cash flow",
+					n: "Operating cash flow",
+					a: "OCF / CFO",
+					formula:
+						"OCF = Net Profit + non-cash items \u00b1 working-capital changes",
+					meaning:
+						"Cash generated by core operations before investing and financing — the top of the cash-flow statement.",
+					importance:
+						"The reality check on reported profit. Profit that never becomes operating cash is a classic accounting red flag.",
+					drivers: ["Profitability", "Working-capital discipline"],
+					rule: "OCF should track (and ideally exceed) net profit over time.",
+					caveat: "Can be flattered by stretching payables or squeezing inventory temporarily.",
+				},
+
+				// ---------------- Valuation concepts ----------------
+				{
+					g: "Valuation concepts",
+					n: "Intrinsic value & DCF",
+					a: "DCF",
+					formula:
+						"Value = \u03a3 CF\u209c / (1+r)\u1d57 + Terminal Value / (1+r)\u207f",
+					meaning:
+						"What a business is really worth: the present value of the cash it will generate over its life, discounted for time and risk. A DCF makes those assumptions explicit.",
+					importance:
+						"The anchor of value investing. Comparing intrinsic value to price gives you the margin of safety and removes the need to rely on Mr. Market\u2019s mood.",
+					drivers: [
+						"Cash-flow growth",
+						"Discount rate (risk)",
+						"Reinvestment",
+						"Terminal value",
+					],
+					rule: "Garbage in, garbage out — the output is only as good as the growth, margin, and discount-rate inputs. Stress-test them.",
+					caveat: "Terminal value often dominates (>60% of the total), so small terminal-growth/discount changes swing the answer hugely.",
+				},
+				{
+					g: "Valuation concepts",
+					n: "Margin of safety",
+					a: "MoS",
+					formula:
+						"MoS = (Intrinsic value \u2212 Price) / Intrinsic value",
+					meaning:
+						"The discount of price to your estimate of worth — Graham\u2019s buffer against error and bad luck.",
+					importance:
+						"Because every valuation is uncertain, buying well below intrinsic value protects you when your assumptions prove optimistic. It is the core discipline of value investing.",
+					drivers: ["Intrinsic-value estimate", "Market price"],
+					rule: "Demand a bigger margin (30–50%) for riskier or harder-to-forecast businesses.",
+					caveat: "A large apparent MoS may just mean your intrinsic estimate is wrong — the market may know something.",
+				},
+				{
+					g: "Valuation concepts",
+					n: "Cost of capital (WACC / rₑ)",
+					a: "discount rate",
+					formula:
+						"r\u2091 = R_f + \u03b2 \u00d7 ERP · WACC = w\u2091\u00b7r\u2091 + w_d\u00b7r_d\u00b7(1\u2212t)",
+					meaning:
+						"The return investors require for the risk taken — the rate future cash flows are discounted at. Cost of equity from CAPM; WACC blends equity and after-tax debt.",
+					importance:
+						"The price of risk in a valuation. A higher discount rate means the market demands more compensation, lowering present value. Small changes move intrinsic value a lot.",
+					drivers: [
+						"Risk-free rate",
+						"Beta / business risk",
+						"Equity risk premium",
+						"Debt mix & cost",
+					],
+					rule: "In India, r\u2091 often lands ~11–14%. Use a rate that reflects the specific business\u2019s risk, not a generic one.",
+					caveat: "Beta is noisy and backward-looking; Damodaran often prefers bottom-up/industry betas and total-risk adjustments.",
+				},
+				{
+					g: "Valuation concepts",
+					n: "Terminal value & growth",
+					a: "TV",
+					formula:
+						"TV = CF\u2099\u208a\u2081 / (r \u2212 g)   [Gordon growth]",
+					meaning:
+						"The value of all cash flows beyond the explicit forecast, capitalised as a perpetuity growing at a modest rate g.",
+					importance:
+						"Usually the majority of a DCF\u2019s value, so the terminal assumptions deserve the most scrutiny.",
+					drivers: [
+						"Terminal growth g",
+						"Discount rate r",
+						"Steady-state cash flow",
+					],
+					rule: "Cap g at (or below) long-run nominal GDP / the risk-free rate — no company outgrows the economy forever.",
+					caveat: "As g approaches r the formula explodes toward infinity — the classic Gordon-growth trap our screener guards against.",
+				},
+				{
+					g: "Valuation concepts",
+					n: "Graham Number & revised value",
+					a: "Graham",
+					formula:
+						"Graham No. = \u221a(22.5 \u00d7 EPS \u00d7 BVPS) · Revised V = EPS \u00d7 (8.5 + 2g) \u00d7 4.4 / Y",
+					meaning:
+						"Benjamin Graham\u2019s quick fair-value rules of thumb — the first a conservative floor blending earnings and book value, the second a growth- and bond-yield-adjusted estimate.",
+					importance:
+						"Fast, transparent sanity checks that need no forecasting. Useful as a cross-reference against a DCF, especially for stable, tangible businesses.",
+					drivers: [
+						"EPS",
+						"Book value",
+						"Expected growth",
+						"Bond yield",
+					],
+					rule: "Treat as a floor / cross-check, not a target. Best for mature, asset-backed firms.",
+					caveat: "Break down for asset-light, high-growth, or loss-making companies (negative EPS/BVPS makes them undefined).",
+				},
+				{
+					g: "Valuation concepts",
+					n: "Economic moat",
+					a: "moat",
+					formula: "Signal: durable ROIC \u2212 WACC spread",
+					meaning:
+						"A structural competitive advantage that protects returns from competition — brands, network effects, switching costs, cost advantages, or regulation.",
+					importance:
+						"Moats are what let high ROIC persist instead of being competed away. They are the real justification for premium multiples and long growth runways.",
+					drivers: [
+						"Brand / pricing power",
+						"Network effects",
+						"Switching costs",
+						"Scale / cost edge",
+					],
+					rule: "Look for high AND stable ROIC/ROCE over a full cycle — durability is the moat\u2019s fingerprint.",
+					caveat: "Moats erode; past persistence doesn\u2019t guarantee future. Test whether the advantage is widening or narrowing.",
+				},
+			]
+
+			const esc = (s) =>
+				s.replace(
+					/[&<>]/g,
+					(c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c],
+				)
+			const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+
+			function card(m) {
+				return `<div class="metric" id="${slug(m.n)}" data-kw="${(m.n + " " + m.a + " " + m.g + " " + m.meaning).toLowerCase()}">
+    <h3>${esc(m.n)} <span class="abbr">${esc(m.a)}</span></h3>
+    <div class="formula">${esc(m.formula)}</div>
+    <p><span class="lab">Meaning</span><br>${esc(m.meaning)}</p>
+    <p><span class="lab">Why it matters</span><br>${esc(m.importance)}</p>
+    <p><span class="lab">What drives it</span></p>
+    <div class="drivers">${m.drivers.map((d) => `<span>${esc(d)}</span>`).join("")}</div>
+    <div class="rule"><b>Rule of thumb.</b> ${esc(m.rule)}</div>
+    <div class="rule"><b>Caveat.</b> ${esc(m.caveat)}</div>
+  </div>`
+			}
+
+			function build() {
+				const groups = [...new Set(M.map((m) => m.g))]
+				$("#content").innerHTML = groups
+					.map(
+						(g) =>
+							`<div class="gtitle" data-g="${g}">${g}</div>` +
+							M.filter((m) => m.g === g)
+								.map(card)
+								.join(""),
+					)
+					.join("")
+				$("#toc").innerHTML = groups
+					.map(
+						(g) =>
+							`<div class="g">${g}</div>` +
+							M.filter((m) => m.g === g)
+								.map(
+									(m) =>
+										`<a href="#${slug(m.n)}">${m.n} <span style="color:#586069">${m.a.split(" ")[0]}</span></a>`,
+								)
+								.join(""),
+					)
+					.join("")
+			}
+
+			$("#q").addEventListener("input", (e) => {
+				const q = e.target.value.trim().toLowerCase()
+				document.querySelectorAll(".metric").forEach((el) => {
+					el.classList.toggle(
+						"hidden",
+						q && !el.dataset.kw.includes(q),
+					)
+				})
+				document.querySelectorAll(".gtitle").forEach((t) => {
+					const g = t.dataset.g
+					const anyVisible = [
+						...document.querySelectorAll(`.metric`),
+					].some(
+						(el) =>
+							el.previousElementSibling &&
+							!el.classList.contains("hidden") &&
+							M.find((m) => slug(m.n) === el.id)?.g === g,
+					)
+					t.classList.toggle("hidden", q && !anyVisible)
+				})
+			})
+
+			build()
+			if (location.hash) {
+				const el = document.querySelector(location.hash)
+				if (el) el.scrollIntoView()
+			}
+		</script>
+	</body>
+</html>

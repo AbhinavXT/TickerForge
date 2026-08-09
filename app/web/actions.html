@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>TickerForge · Corporate Actions</title>
+		<link rel="stylesheet" href="/app.css" />
+	</head>
+	<body>
+		<div id="nav">
+			<span class="brand">TickerForge</span>
+			<a class="tab" href="/">Chart</a>
+			<a class="tab" href="/desk">Desk</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/scanner">Scanner</a>
+			<a class="tab" href="/screen">Screen</a>
+			<a class="tab" href="/query">Query</a>
+			<a class="tab" href="/fundamentals">Fundamentals</a>
+			<a class="tab" href="/results">Results</a>
+			<a class="tab" href="/valuation">Valuation</a>
+			<a class="tab" href="/backtest">Backtest</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/metrics">Metrics</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/news">News</a>
+			<a class="tab on" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/settings">Settings</a>
+			<span class="sp"></span>
+			<span class="status" id="status"></span>
+		</div>
+		<div class="wrap">
+			<div class="row">
+				<h2 class="page">Corporate actions &amp; filings</h2>
+				<div class="spacer"></div>
+				<input
+					class="search"
+					id="symf"
+					placeholder="Filter by symbol…"
+					autocomplete="off"
+					style="min-width: 160px"
+				/>
+				<button class="btn primary" id="poll">Poll NSE now</button>
+			</div>
+
+			<div class="block" style="margin: 12px 0">
+				<div class="row">
+					<div>
+						<b>Market-wide calendar</b>
+						<span class="sub"
+							>— results, dividends &amp; corporate actions for
+							<i>all</i> NSE stocks (not just your
+							watchlist)</span
+						>
+					</div>
+					<div class="spacer"></div>
+					<button class="btn" id="calpreview">Preview</button>
+					<a class="btn primary" id="caldl" href="/api/calendar.xlsx"
+						>⤓ Export to Excel</a
+					>
+				</div>
+				<div id="calbody"></div>
+			</div>
+			<div class="row" style="margin-top: 10px">
+				<div class="chip-toggle" id="cats"></div>
+				<div class="spacer"></div>
+				<div class="chip-toggle" id="srcs"></div>
+			</div>
+			<div class="sub" id="meta" style="margin-top: 8px"></div>
+			<div id="body"></div>
+		</div>
+
+		<script>
+			"use strict"
+			const $ = (s) => document.querySelector(s)
+			const status = (m) => {
+				$("#status").textContent = m || ""
+			}
+			const esc = (s) =>
+				(s || "").replace(
+					/[&<>]/g,
+					(c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c],
+				)
+
+			const SRC_LABEL = {
+				announcement: "Announcement",
+				corp_action: "Corporate action",
+				board_meeting: "Board meeting",
+			}
+			const CAT_CLASS = {
+				RESULTS: "results",
+				DIVIDEND: "dividend",
+				CONCALL: "concall",
+				"CORP ACTION": "corp",
+			}
+			let state = { category: null, source: null, symbol: "" }
+			let watch = new Set()
+
+			function fmtSeen(s) {
+				if (!s) return ""
+				const d = new Date(s.replace(" ", "T"))
+				if (isNaN(d)) return s
+				const mins = Math.round((Date.now() - d) / 60000)
+				if (mins < 60) return `${mins}m ago`
+				if (mins < 1440) return `${Math.round(mins / 60)}h ago`
+				return d.toLocaleDateString("en-IN", {
+					day: "numeric",
+					month: "short",
+				})
+			}
+
+			async function boot() {
+				const wl = await (await fetch("/api/watchlist")).json()
+				watch = new Set(wl.map((w) => w.tradingsymbol))
+				const meta = await (await fetch("/api/events?limit=1")).json()
+				// category chips
+				$("#cats").innerHTML =
+					`<button data-c="" class="on">All</button>` +
+					meta.categories
+						.map((c) => `<button data-c="${c}">${c}</button>`)
+						.join("")
+				$("#srcs").innerHTML =
+					`<button data-s="" class="on">All feeds</button>` +
+					meta.sources
+						.map(
+							(s) =>
+								`<button data-s="${s}">${SRC_LABEL[s] || s}</button>`,
+						)
+						.join("")
+				$("#cats")
+					.querySelectorAll("button")
+					.forEach(
+						(b) =>
+							(b.onclick = () => {
+								$("#cats .on")?.classList.remove("on")
+								b.classList.add("on")
+								state.category = b.dataset.c || null
+								load()
+							}),
+					)
+				$("#srcs")
+					.querySelectorAll("button")
+					.forEach(
+						(b) =>
+							(b.onclick = () => {
+								$("#srcs .on")?.classList.remove("on")
+								b.classList.add("on")
+								state.source = b.dataset.s || null
+								load()
+							}),
+					)
+				load()
+			}
+
+			$("#symf").addEventListener("input", (e) => {
+				clearTimeout(window._d)
+				state.symbol = e.target.value.trim().toUpperCase()
+				window._d = setTimeout(load, 250)
+			})
+
+			// ---- market-wide calendar ----
+			$("#calpreview").onclick = async () => {
+				$("#calbody").innerHTML =
+					'<div class="loading">fetching NSE calendar (all stocks)…</div>'
+				$("#calpreview").disabled = true
+				try {
+					const d = await (await fetch("/api/calendar")).json()
+					const rows = (d.rows || []).filter(
+						(r) => r.type !== "ERROR",
+					)
+					const errs = (d.rows || []).filter(
+						(r) => r.type === "ERROR",
+					)
+					let html = `<div class="sub" style="margin:8px 0">${d.count || rows.length} entries · showing first 60 · full set in the Excel export</div>`
+					if (errs.length)
+						html += `<div class="notice">${errs.map((e) => esc(e.detail)).join(" · ")}</div>`
+					html += `<div class="tbl-wrap" style="max-height:360px;overflow:auto"><table class="stmt" style="white-space:nowrap">
+      <thead><tr><th>Date</th><th>Symbol</th><th>Company</th><th>Type</th><th>Details</th></tr></thead>
+      <tbody>${rows
+			.slice(0, 60)
+			.map(
+				(r) => `<tr>
+        <td style="text-align:left">${esc(r.date)}</td><td style="text-align:left">${esc(r.symbol)}</td>
+        <td style="text-align:left">${esc((r.company || "").slice(0, 30))}</td>
+        <td style="text-align:left">${esc(r.type)}</td>
+        <td style="text-align:left">${esc((r.detail || "").slice(0, 70))}</td></tr>`,
+			)
+			.join("")}</tbody></table></div>`
+					$("#calbody").innerHTML = rows.length
+						? html
+						: '<div class="empty">NSE returned no calendar rows right now — try again shortly.</div>'
+				} catch (e) {
+					$("#calbody").innerHTML =
+						`<div class="empty">calendar error: ${esc(e.message)}</div>`
+				} finally {
+					$("#calpreview").disabled = false
+				}
+			}
+
+			$("#poll").onclick = async () => {
+				status("polling NSE…")
+				$("#poll").disabled = true
+				try {
+					const r = await fetch("/api/events/poll", {
+						method: "POST",
+					})
+					if (!r.ok) {
+						const e = await r.json().catch(() => ({}))
+						status(e.detail || "poll failed")
+					} else {
+						const s = await r.json()
+						status(
+							"polled: " +
+								Object.entries(s)
+									.map(([k, v]) => `${k} ${v}`)
+									.join(" · "),
+						)
+						await load()
+					}
+				} finally {
+					$("#poll").disabled = false
+				}
+			}
+
+			async function load() {
+				const p = new URLSearchParams({ limit: "400" })
+				if (state.category) p.set("category", state.category)
+				if (state.source) p.set("source", state.source)
+				if (state.symbol) p.set("symbol", state.symbol)
+				$("#body").innerHTML = '<div class="loading">loading…</div>'
+				try {
+					const d = await (await fetch("/api/events?" + p)).json()
+					const ev = d.events || []
+					$("#meta").textContent =
+						`${ev.length} filing(s)` +
+						(state.symbol ? ` for ${state.symbol}` : "") +
+						(state.category ? ` · ${state.category}` : "") +
+						(state.source ? ` · ${SRC_LABEL[state.source]}` : "")
+					if (!ev.length) {
+						$("#body").innerHTML =
+							`<div class="empty">No stored filings match. Try “Poll NSE now”, or widen the filters.<br>
+       <span class="sub">(The poller stores watchlist events plus market-wide results/dividends/concalls/corporate-actions.)</span></div>`
+						return
+					}
+					$("#body").innerHTML = ev
+						.map((e) => {
+							const cc = CAT_CLASS[e.category] || "src"
+							const wl = watch.has(e.symbol)
+								? `<span class="badge wl">watchlist</span>`
+								: ""
+							const cat = e.category
+								? `<span class="badge ${cc}">${e.category}</span>`
+								: ""
+							const when = e.when ? ` · ${esc(e.when)}` : ""
+							const link = e.url
+								? ` · <a href="${esc(e.url)}" target="_blank" rel="noopener">attachment</a>`
+								: ""
+							return `<div class="block"><h3>${esc(e.symbol)} ${wl} ${cat}
+        <span class="badge src">${SRC_LABEL[e.source] || e.source}</span>
+        <span class="spacer"></span><span class="sub" style="font-weight:400">${fmtSeen(e.seen_at)}</span></h3>
+        <div class="item" style="border-top:0;padding-top:0">
+          <div class="t">${esc(e.headline)}</div>
+          ${e.detail ? `<div class="m">${esc(e.detail)}</div>` : ""}
+          <div class="m">${when}${link}</div>
+        </div></div>`
+						})
+						.join("")
+				} catch (e) {
+					$("#body").innerHTML =
+						`<div class="empty">error: ${esc(e.message)}</div>`
+				}
+			}
+
+			boot()
+		</script>
+	</body>
+</html>
