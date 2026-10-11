@@ -664,6 +664,40 @@ def api_results_latest_refresh(sort: str = "latest"):
 
 
 # ---------------------------------------------------------------- intraday
+# ---------------------------------------------------------------- the Board
+# Read-only. The board builds from one quote call plus the stored 5m candles
+# (a background sweep keeps those fresh during market hours) and is cached
+# for 60s; outside market hours it serves the last session's board.
+@app.get("/api/board")
+def api_board():
+    from . import board
+    try:
+        return board.get(kite_auth.get_kite)
+    except SystemExit as e:
+        raise HTTPException(401, str(e))
+
+
+@app.get("/api/board/market")
+def api_board_market():
+    """Top-bar status for every page. Never 401s: without a Kite session it
+    still answers open/closed and the IST time, with NIFTY omitted."""
+    from . import board
+    return board.market(kite_auth.get_kite)
+
+
+@app.get("/api/board/{symbol}")
+def api_board_detail(symbol: str):
+    from . import board
+    try:
+        kite = kite_auth.get_kite()
+    except SystemExit as e:
+        raise HTTPException(401, str(e))
+    d = board.detail(kite, symbol)
+    if d is None:
+        raise HTTPException(404, f"Unknown symbol {symbol}")
+    return d
+
+
 @app.get("/api/intraday")
 def api_intraday(symbol: str):
     inst = instruments.lookup(symbol)

@@ -14,20 +14,29 @@ def sync(kite) -> int:
     rows = []
     for ex in config.EXCHANGES:
         rows.extend(kite.instruments(exchange=ex))
+    # Futures only, for the Board's F&O universe and its OI. Options would be
+    # ~80k rows nobody here reads. Every other query in the app filters on
+    # instrument_type='EQ', so these rows are invisible to it.
+    try:
+        rows.extend(r for r in kite.instruments(exchange="NFO")
+                    if r.get("instrument_type") == "FUT")
+    except Exception as e:
+        print(f"[instruments] NFO futures skipped: {e}")
 
     with db.connect() as conn:
         conn.execute("DELETE FROM instruments")
         conn.executemany(
             """INSERT OR REPLACE INTO instruments
                (instrument_token, exchange_token, tradingsymbol, name,
-                exchange, segment, instrument_type, lot_size, tick_size)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                exchange, segment, instrument_type, lot_size, tick_size, expiry)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 (
                     r["instrument_token"], r["exchange_token"], r["tradingsymbol"],
                     r.get("name") or "", r["exchange"], r.get("segment") or "",
                     r.get("instrument_type") or "", r.get("lot_size") or 0,
                     r.get("tick_size") or 0.0,
+                    str(r["expiry"]) if r.get("expiry") else None,
                 )
                 for r in rows
             ],

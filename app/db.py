@@ -23,6 +23,20 @@ CREATE TABLE IF NOT EXISTS instruments (
 CREATE INDEX IF NOT EXISTS idx_instruments_symbol ON instruments (tradingsymbol);
 CREATE INDEX IF NOT EXISTS idx_instruments_name   ON instruments (name);
 
+-- The Board (app/board.py): the last built board, so a restart outside
+-- market hours still serves the previous session; and each future's
+-- previous-session open interest, fetched once a day.
+CREATE TABLE IF NOT EXISTS board_snapshot (
+    id       INTEGER PRIMARY KEY,
+    built_at TEXT,
+    data     TEXT
+);
+CREATE TABLE IF NOT EXISTS board_oi_prev (
+    token INTEGER NOT NULL,
+    day   TEXT NOT NULL,
+    oi    REAL,
+    PRIMARY KEY (token, day)
+);
 CREATE TABLE IF NOT EXISTS watchlist (
     tradingsymbol TEXT NOT NULL,
     exchange      TEXT NOT NULL,
@@ -336,6 +350,8 @@ def init() -> None:
         conn.executescript(SCHEMA)
         # migrations for DBs created by earlier phases
         _ensure_column(conn, "seen_events", "category", "TEXT")
+        # NFO futures carry an expiry; the Board picks the current month by it
+        _ensure_column(conn, "instruments", "expiry", "TEXT")
         _ensure_column(conn, "seen_events", "digested", "INTEGER DEFAULT 1")
         # journals created before the stop was split into current/initial:
         # backfill the R basis from whatever stop is on the row.
