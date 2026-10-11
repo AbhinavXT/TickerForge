@@ -2577,7 +2577,7 @@
 					ctx.stroke()
 					const x1 = Math.min(pts[0].x, pts[1].x)
 					const x2 = Math.max(pts[0].x, pts[1].x)
-					ctx.font = "11px ui-monospace, monospace"
+					ctx.font = "11px " + (TF.cssVar("--mono") || "monospace")
 					ctx.textBaseline = "bottom"
 					for (const lv of FIB_LEVELS) {
 						const y = pts[0].y + (pts[1].y - pts[0].y) * lv

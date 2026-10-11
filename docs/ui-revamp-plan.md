@@ -1,6 +1,6 @@
 # TickerForge UI revamp — plan
 
-Status: **draft, awaiting approval**. No code has been changed yet.
+Status: **done** on branch `ui-revamp`. Section 8 records what shipped, the deviations from this plan, and follow-ups.
 
 ## 1. What's there today
 
@@ -273,3 +273,68 @@ review found 10 issues in that diff, which I'll report separately.
   - OI classes
   - NIFTY in the top bar
   - Desk auto-refresh against real quotes
+
+
+## 8. Outcome
+
+### What changed, per page
+
+| Page | Change |
+|---|---|
+| Shell (`ui.js`, `app.css`) | Tokens (dark + light, OS default, `tf_theme`), IBM Plex Sans/Mono, components: card, stat, seg, chip, delta, score bar, level card, table, drawer/modal/sheet, toast, skeleton, error, empty, collapsible. Rail + top bar (LIVE/CLOSED, IST clock, NIFTY, theme toggle); 5-slot phone tab bar + More sheet; `tf:theme` event; `TF.chartTheme()` |
+| Board | New: ranked list, zone view, Market X-Ray (`board.html`, `app/board.py`) |
+| Chart | Compact shell (icon rail, status + toggle in the chart header); every chart colour from tokens via `PAL`, re-themed live; SVG draw tools; phone search/watchlist sheet; **pane alignment fixed** (see deviations) |
+| Desk | Cockpit grid: quote + position chips, grouped level cards with distance-from-LTP, chart image with fallback, per-TF diverging confluence bars, alerts with collapsible cheatsheet, ticking "updated Ns ago"; phone puts alerts first |
+| Results | Metric-tile cards with ▲/▼ YoY/QoQ; market table; filters reachable on phones (were hidden) |
+| Valuation | Sortable screener; drawer with model bars vs price, reverse-DCF callout, scenario track, single-hue sensitivity grid, quality chips, P/E history band |
+| Backtest | Left control panel / phone sheet, stat grid, themed synced panes, ▲/▼ trade log, collapsible explainers and sweeps |
+| Fundamentals | Stat tiles, tabbed statements, skeleton/error states |
+| Metrics | Sticky TOC with scroll-spy, grouped select on phones, match count |
+| News | Grouped by stock, source + time chips, jump chips |
+| Corporate Actions | Filterable filings table, collapsible calendar preview/export |
+| Portfolio, Scanner, Screen, Query, Journal, Paper, Settings | Shell + tokens; Query editor stacks on phones; Paper's literal `\u2019` text fixed |
+
+### New files
+
+`app/web/ui.js`, `app/web/board.html`, `app/board.py`, `tests/test_board.py`,
+`tests/test_shell_smoke.py`, `tests/js/smoke.js`, `tests/js/package.json` (jsdom, test-only).
+
+### Deviations from the plan
+
+- **Pane alignment was already off.** The draw-tool column sits beside the main chart
+  only (plus a stale 10px margin from an older toolbar), so oscillator panes were ~60px
+  wider than the main plot and their bars landed at different x. Panes are now indented
+  by the column width; plot boxes and price-axis widths match exactly. `padToCandles`,
+  `syncScaleWidths` and the sync handlers are unchanged.
+- **Bull/bear are blue/orange everywhere, including candles** (was teal/red). The
+  Supertrend node test's fallback assertion now checks the theme defaults (`PAL`).
+- **Board OB band** is a positioned overlay kept in step every frame, not a series
+  primitive — lightweight-charts 4.2 has no shaded-band series.
+- **Board candle freshness:** prices/OI refresh every 60s from one quote call; order-block
+  detection uses stored 5m candles that a background sweep refreshes at ≈2.5 calls/s, so a
+  full pass over ~190 stocks takes ~80s.
+- **Palette validator:** the brief's bull `#7BD3EA` fails the dataviz lightness/chroma
+  checks (it's pale) but passes CVD and normal-vision separation against bear and
+  contrast; direction always carries ▲/▼ or a label as well, so it was kept.
+
+### Tests
+
+Baseline 68 failed / 1132 passed → now 5 failed / 1293 passed. The 5 are pre-existing
+and untouched: `test_query` ×2 (indicators missing from `indicators.py`),
+`test_entrypoints` (`/bars`, `/candles` undocumented), `test_commands` (`ACCOUNT_SIZE`
+leaks from the local `.env`), `test_paper_autopilot` (watcher lacks `maybe_evening_queue`).
+
+### Follow-ups
+
+- **`/api/portfolio` without a Kite session kills the server process.** `SystemExit` from
+  `kite_auth.get_kite()` escapes the route; every page dies with it. Wrap it like the other
+  routes (401). Backend, so left alone here.
+- Run `python -m app.cli sync` once so NFO futures (and expiries) land; the Board is empty
+  until then.
+- Market-hours check a live Board: OI change fills ~1 min after the first build of the day;
+  scores and ranks need real data to sanity-check the weights in `board.py`.
+- Some stored screener snapshots are empty strings (e.g. BDL) — a scraper issue, visible on
+  Fundamentals.
+- The `--panel/--fg/--dim/--up/--down` aliases remain for the inline CSS of the seven
+  pages that got the generic treatment; folding those into the new tokens would let the
+  aliases go.
