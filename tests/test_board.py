@@ -398,9 +398,17 @@ def test_universe_is_stock_futures_with_current_month():
 
 
 def test_snapshot_round_trips():
-    data = {"built_at": "2026-10-09T15:29:00+05:30", "rows": [], "bull": []}
+    data = {"built_at": "2026-10-09T15:29:00+05:30", "rows": [{"symbol": "X"}], "bull": []}
     board._save_snapshot(data)
     assert board._load_snapshot() == data
+
+
+def test_empty_board_is_not_kept_as_the_snapshot():
+    good = {"built_at": "2026-10-09T15:29:00+05:30", "rows": [{"symbol": "X"}]}
+    board._save_snapshot(good)
+    board._save_snapshot({"built_at": "2026-10-11T17:04:00+05:30", "rows": [],
+                          "note": "No F&O futures in the instrument index"})
+    assert board._load_snapshot() == good
 
 
 # ------------------------------------------------------------------ routes
@@ -423,7 +431,7 @@ def test_routes_answer_without_a_kite_session(monkeypatch):
 def test_board_serves_the_last_session_outside_hours(monkeypatch):
     from fastapi.testclient import TestClient
     from app import server
-    snap = {"built_at": "2026-10-09T15:29:00+05:30", "rows": [], "bull": [],
+    snap = {"built_at": "2026-10-09T15:29:00+05:30", "rows": [{"symbol": "X"}], "bull": [],
             "bear": [], "breadth": {"bull": 0, "choppy": 0, "bear": 0}}
     board._save_snapshot(snap)
     board._cache.update(at=0.0, data=None)

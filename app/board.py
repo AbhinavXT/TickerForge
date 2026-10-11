@@ -624,6 +624,8 @@ def build(kite) -> dict:
 
 
 def _save_snapshot(data: dict) -> None:
+    if not data["rows"]:          # an empty board would outlive the sync that fixes it
+        return
     from . import db
     with db.connect() as conn:
         conn.execute("INSERT OR REPLACE INTO board_snapshot VALUES (1, ?, ?)",
@@ -650,10 +652,10 @@ def get(kite_factory) -> dict:
                 _cache["at"] = time.time()
                 _save_snapshot(_cache["data"])
             return {**_cache["data"], "stale": False}
-        if _cache["data"]:
+        if _cache["data"] and _cache["data"]["rows"]:
             return {**_cache["data"], "stale": True}
         snap = _load_snapshot()
-        if snap is None:
+        if snap is None or not snap["rows"]:
             snap = build(kite_factory())
             _save_snapshot(snap)
         _cache["data"], _cache["at"] = snap, time.time()
