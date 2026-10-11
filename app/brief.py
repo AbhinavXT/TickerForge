@@ -167,6 +167,20 @@ def results_today_section() -> list[str]:
             "  a held name reporting today can gap through your stop"]
 
 
+def insider_section(days: int = 3) -> list[str]:
+    """Promoter/director trades and pledges on names you follow, recent days.
+    Local read — the events service polls the feed through the day."""
+    from . import insider, portfolio
+    rows = insider.recent(days=days, symbols=list(portfolio.followed(_kite())))
+    if not rows:
+        return []
+    out = [f"INSIDERS ({len(rows)}, last {days}d)"]
+    out += ["  " + insider.line(r) for r in rows[:MAX_LINES_PER_SECTION]]
+    if len(rows) > MAX_LINES_PER_SECTION:
+        out.append(f"  + {len(rows) - MAX_LINES_PER_SECTION} more — /insider")
+    return out
+
+
 def near_alerts_section() -> list[str]:
     """Armed alerts sitting closest to their trigger — likeliest to fire."""
     rows = alerts.active()
@@ -294,6 +308,7 @@ SECTIONS = (
     ("risk", budget_section),
     ("regime", regime_section),
     ("results", results_today_section),
+    ("insider", insider_section),
     ("sips", sips_section),
     ("alerts", near_alerts_section),
     ("signals", flips_section),

@@ -21,6 +21,12 @@ def _delivery_job(client) -> str | None:
     return delivery.maybe_sync(client=client)
 
 
+def _insider_job(client) -> str | None:
+    from . import insider
+    res = insider.maybe_poll(client=client)
+    if res and (res.get("new") or res.get("note")):
+        return f"insider: {res}"
+    return None
 
 def main() -> None:
     db.init()
@@ -164,6 +170,14 @@ def main() -> None:
     dk.add_argument("--ratio", type=float, default=2.0)
     dk.add_argument("--all", action="store_true",
                     help="include down days (default: up days only)")
+
+    inp = sub.add_parser("insider", help="Promoter/director trades and pledges")
+    insub = inp.add_subparsers(dest="incmd", required=True)
+    inpo = insub.add_parser("poll", help="Fetch the last week's disclosures")
+    inpo.add_argument("--no-push", action="store_true")
+    insh = insub.add_parser("show", help="One symbol, fetched from NSE")
+    insh.add_argument("symbol")
+    insh.add_argument("--days", type=int, default=180)
 
 
     ep = sub.add_parser("events", help="Corporate events watcher (NSE)")
@@ -727,6 +741,13 @@ def main() -> None:
                 print(f"{r['symbol']:<14} {r['deliv_ratio']:>5.1f}×  "
                       f"{r['deliv_pct']:>5.1f}% deliv  {chg}")
 
+    elif args.cmd == "insider":
+        from . import insider
+        if args.incmd == "poll":
+            print(insider.poll_once(push=not args.no_push))
+        else:
+            print(insider.as_text(args.symbol, days=args.days))
+
     elif args.cmd == "events":
         import time as _time
         from . import events
@@ -802,6 +823,7 @@ def main() -> None:
                 # take the others with it.
                 for label, job in (
                         ("delivery", _delivery_job),
+                        ("insider", _insider_job),
                 ):
                     try:
                         msg = job(client)

@@ -108,6 +108,7 @@ HELP = (
     "\nResearch (any stock — fetched on demand, watchlist or not):\n"
     "/results [SYM|all|latest]  quarter numbers, the awaited date, or market feed\n"
     "/deliv [SYM]     delivery % vs its average; bare = spikes on your names\n"
+    "/insider [SYM]   promoter/director trades & pledges (bare = your names, 7d)\n"
     "/valuation SYM   ·  /fundamentals SYM  ·  /news SYM  ·  /dividends SYM\n"
     "/candles SYM [day|5minute|minute] [count]   price history for the\n"
     "                NewsForge chart (sent as data, not a picture)\n"
@@ -634,6 +635,22 @@ def cmd_delivery(sym: str) -> str:
         out.append(f"  {r['symbol']:<12} {r['deliv_ratio']:.1f}× · "
                    f"{r['deliv_pct']:.0f}% delivered{chg}")
     return "\n".join(out)
+
+
+def cmd_insider(sym: str) -> str:
+    """/insider SYM — promoter/director trades and pledges; bare /insider
+    lists the last week across the names you follow."""
+    from . import insider
+    sym = (sym or "").strip()
+    if sym:
+        inst = instruments.lookup(sym)
+        return insider.as_text(inst["tradingsymbol"] if inst else sym)
+    from . import portfolio
+    rows = insider.recent(days=7, symbols=list(portfolio.followed()))
+    if not rows:
+        return "No promoter/director trades or pledges on your names this week."
+    return "Insiders · last 7 days\n" + "\n".join(
+        "  " + insider.line(r) for r in rows[:15])
 
 
 def cmd_ob(sym: str) -> str:
@@ -1610,6 +1627,7 @@ HANDLERS = {
     "levels": cmd_levels, "lvl": cmd_levels,
     "board": cmd_board, "ob": cmd_ob,
     "deliv": cmd_delivery, "delivery": cmd_delivery,
+    "insider": cmd_insider, "insiders": cmd_insider,
     "chart": cmd_chart,
     "ind": cmd_indicators, "indicators": cmd_indicators, "ta": cmd_indicators,
     "conf": cmd_confluence, "confluence": cmd_confluence, "mtf": cmd_confluence,

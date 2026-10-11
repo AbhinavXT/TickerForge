@@ -302,6 +302,28 @@ CREATE TABLE IF NOT EXISTS delivery (
 );
 CREATE INDEX IF NOT EXISTS idx_delivery_day ON delivery (day);
 
+-- Insider trading disclosures (SEBI PIT) — promoter and director buys,
+-- sells and pledges (app/insider.py). `id` is a hash of the salient fields,
+-- the same dedupe scheme as seen_events.
+CREATE TABLE IF NOT EXISTS insider_trades (
+    id         TEXT PRIMARY KEY,
+    symbol     TEXT NOT NULL,
+    person     TEXT,
+    category   TEXT,                  -- promoter | director | kmp | other
+    kind       TEXT NOT NULL,         -- buy | sell | pledge | revoke | invoke | other
+    mode       TEXT,                  -- market purchase, off market, ...
+    qty        REAL,
+    value      REAL,                  -- rupees
+    before_pct REAL,
+    after_pct  REAL,
+    trade_from TEXT,
+    trade_to   TEXT,
+    disclosed  TEXT,
+    pushed     INTEGER DEFAULT 0,
+    seen_at    TEXT DEFAULT (datetime('now', 'localtime'))
+);
+CREATE INDEX IF NOT EXISTS idx_insider_sym ON insider_trades (symbol, disclosed);
+
 CREATE TABLE IF NOT EXISTS signal_state (
     symbol     TEXT NOT NULL,
     strategy   TEXT NOT NULL,

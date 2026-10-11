@@ -823,6 +823,36 @@ def api_events_poll():
         raise HTTPException(502, f"NSE poll failed: {e}")
 
 
+@app.get("/api/insider")
+def api_insider(symbol: str | None = None, days: int = 30, scope: str = "all",
+                fetch: bool = False):
+    """Promoter/director trades and pledges. scope=mine limits to the names
+    you follow; fetch=1 pulls one symbol from NSE first."""
+    from . import insider, portfolio
+    if fetch and symbol:
+        try:
+            insider.fetch_symbol(symbol, days=max(days, 30))
+        except Exception as e:
+            raise HTTPException(502, f"NSE insider fetch failed: {e}")
+    syms = list(portfolio.followed()) if scope == "mine" else None
+    rows = insider.recent(symbol=symbol, days=days, symbols=syms)
+    for r in rows:
+        r["market"] = insider.is_market(r)
+    return {"rows": rows,
+            "net": insider.net(symbol, days=days) if symbol else None}
+
+
+@app.post("/api/insider/poll")
+def api_insider_poll():
+    from . import insider
+    try:
+        return insider.poll_once(push=False)
+    except SystemExit as e:
+        raise HTTPException(401, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"NSE insider poll failed: {e}")
+
+
 @app.get("/api/delivery/{symbol}")
 def api_delivery(symbol: str):
     from . import delivery

@@ -234,6 +234,9 @@ tf delivery show BEL                  # last session's delivery % vs its average
 tf delivery spikes --ratio 2.5        # biggest delivery spikes on up days
 tf delivery spikes --all              # include down days
 
+tf insider poll                       # last week's PIT disclosures (pushes)
+tf insider poll --no-push
+tf insider show BEL --days 365        # one symbol, fetched from NSE
 ```
 
 **Delivery** is read from the full bhavcopy NSE posts each evening,
@@ -243,6 +246,12 @@ trade-to-trade series are 100% delivery by rule. Run `delivery sync` once after
 upgrading: the 20-session average needs a month of files before
 `deliv_ratio` means anything.
 
+**Insider trades** are SEBI PIT disclosures by promoters, directors and key
+managers: buys, sells, pledges, pledge releases and pledge invocations. For
+names you follow (watchlist, open trades, holdings) every disclosure pushes.
+Market-wide, only open-market buys of at least `INSIDER_MIN_VALUE`
+(₹1 Cr) and pledge invocations push, batched into one message. The first poll
+stores what's there without pushing.
 
 ---
 
@@ -975,6 +984,9 @@ tf brief --dry                        # print without sending
 tf brief --skip news,gaps             # omit sections
 ```
 
+The brief includes an **INSIDERS** section listing promoter and director
+trades and pledges on your names over the last three days.
+
 ---
 
 ## 7. Configuration
@@ -1055,6 +1067,7 @@ Sent to `NTFY_CMD_TOPIC`. The `remote` service must be running.
 | `/levels SYM` | `/lvl` | VWAP, PDH/PDL, CPR, pivots, ORB |
 | `/board` | — | F&O Board: breadth, leading/lagging sector, top 5 bullish and bearish order-block setups, flagged `REV` (reversal build-up) and `trap ▲/▼` (liquidity sweep). `/board nf` pushes the same board as one structured message for the NewsForge app instead of text |
 | `/deliv [SYM]` | `/delivery` | Last session's delivery % against its 20-session average. Bare: delivery spikes among the names you follow |
+| `/insider [SYM]` | `/insiders` | Promoter/director trades and pledges for one name (fetched from NSE). Bare: the last 7 days across your names |
 | `/ob SYM` | — | One stock's order block, R/S and liquidity, any liquidity trap or reversal build-up, why it ranks, and the retest `/alert` to send |
 | `/ind SYM` | `/indicators` `/ta` | Indicator bundle |
 | `/conf SYM` | `/confluence` `/mtf` | Multi-timeframe agreement score |

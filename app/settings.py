@@ -114,6 +114,12 @@ SETTINGS: tuple[Setting, ...] = (
             "Hard ceiling on one position. 100 = cash account, no margin. "
             "Raise it only if you actually trade on leverage.",
             minimum=1, maximum=500, step=5),
+    # ---- pushes from NSE data
+    Setting("INSIDER_MIN_VALUE", "Insider buy floor (₹)", "number",
+            "Notifications",
+            "Market-wide, only open-market promoter/director buys at least "
+            "this large push. On names you follow, every disclosure pushes.",
+            minimum=0, step=100000),
 
     # ---- backtesting defaults
     Setting("COST_BPS", "Assumed costs (bps per leg)", "number", "Backtesting",

@@ -88,6 +88,7 @@ OVERRIDABLE = frozenset({
     "PAPER_AUTO", "PAPER_STRATEGIES", "PAPER_STOP_PCT",
     "PAPER_MAX_POSITIONS", "PAPER_TRAIL_MULT", "PAPER_TRAIL_PERIOD",
     "PAPER_REGIME_GATE",
+    "INSIDER_MIN_VALUE",
 })
 
 # Built-in defaults for keys that have no module constant above, so `get`
@@ -109,7 +110,11 @@ DEFAULTS = {"COST_BPS": "10", "BACKUP_KEEP_DAYS": "14",
             # compared against measures a different system.
             "PAPER_TRAIL_MULT": "0",
             "PAPER_TRAIL_PERIOD": "22",
-            "PAPER_REGIME_GATE": "0"}
+            "PAPER_REGIME_GATE": "0",
+            # ₹1 Cr. Market-wide insider buys below this are noise; on
+            # names you follow every disclosure pushes regardless.
+            "INSIDER_MIN_VALUE": "10000000",
+            }
 
 
 def _override(name: str) -> str | None:

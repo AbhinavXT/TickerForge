@@ -59,6 +59,30 @@
 				</div>
 			</details>
 
+			<details class="collapsible" id="ins" open style="margin-top: var(--s3)">
+				<summary>
+					<span>Insider trades &amp; pledges</span>
+					<span class="sub" style="font-weight: 400">promoters, directors and key managers — SEBI PIT disclosures</span>
+				</summary>
+				<div class="body">
+					<div class="row" style="margin-bottom: var(--s2)">
+						<div class="seg" id="insScope" aria-label="Scope">
+							<button type="button" data-v="mine" class="on" aria-pressed="true">My names</button>
+							<button type="button" data-v="all" aria-pressed="false">Market-wide</button>
+						</div>
+						<div class="seg" id="insDays" aria-label="Window">
+							<button type="button" data-v="7" aria-pressed="false">7d</button>
+							<button type="button" data-v="30" class="on" aria-pressed="true">30d</button>
+							<button type="button" data-v="90" aria-pressed="false">90d</button>
+						</div>
+						<span class="spacer"></span>
+						<button type="button" class="btn" id="insPoll"></button>
+					</div>
+					<div class="sub" id="insMeta" style="margin-bottom: var(--s2)"></div>
+					<div class="tbl-wrap" style="max-height: 420px; overflow: auto"><div id="insBody"></div></div>
+				</div>
+			</details>
+
 			<div class="card" style="margin-top: var(--s3)">
 				<div class="row">
 					<div class="sbox" style="flex: 1 1 200px; max-width: 280px">
@@ -262,7 +286,92 @@
 				}
 			}
 
+			// ---- insider trades ----
+			const INS_KIND = {
+				buy: ["bull", "▲ Buy"],
+				sell: ["bear", "▼ Sell"],
+				pledge: ["warn", "Pledge"],
+				revoke: ["", "Pledge released"],
+				invoke: ["bear", "⚠ Pledge invoked"],
+			}
+			let ins = { scope: "mine", days: "30" }
+			$("#insPoll").innerHTML = TF.icon("refresh") + "Poll disclosures"
+			TF.seg($("#insScope"), (v) => {
+				ins.scope = v
+				loadInsider()
+			})
+			TF.seg($("#insDays"), (v) => {
+				ins.days = v
+				loadInsider()
+			})
+			$("#insPoll").onclick = async () => {
+				$("#insPoll").disabled = true
+				try {
+					const r = await fetch("/api/insider/poll", { method: "POST" })
+					const d = await r.json().catch(() => ({}))
+					if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`)
+					TF.toast(`insider: ${d.new} new`)
+					await loadInsider()
+				} catch (e) {
+					TF.toast(e.message, "err")
+				} finally {
+					$("#insPoll").disabled = false
+				}
+			}
+			const money = (v) =>
+				v == null ? "—" : v >= 1e7 ? `₹${(v / 1e7).toFixed(2)} Cr` : v >= 1e5 ? `₹${(v / 1e5).toFixed(1)} L` : `₹${Math.round(v).toLocaleString("en-IN")}`
+			async function loadInsider() {
+				const p = new URLSearchParams({ days: ins.days, scope: state.symbol ? "all" : ins.scope })
+				if (state.symbol) {
+					p.set("symbol", state.symbol)
+					p.set("fetch", "1")
+				}
+				$("#insBody").innerHTML = `<div style="padding:var(--s4)">${TF.skeleton(4)}</div>`
+				try {
+					const r = await fetch("/api/insider?" + p)
+					const d = await r.json()
+					if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`)
+					const rows = d.rows || []
+					let meta = `<span class="mono">${rows.length}</span> disclosure(s)`
+					if (d.net && d.net.trades)
+						meta += ` · net on-market ${d.net.value >= 0 ? "buying" : "selling"} <span class="mono">${money(Math.abs(d.net.value))}</span>`
+					$("#insMeta").innerHTML = meta
+					if (!rows.length) {
+						$("#insBody").innerHTML = TF.empty(
+							"No insider trades or pledges in this window",
+							state.symbol ? "Nothing disclosed for this symbol." : "Try Market-wide, a longer window, or Poll disclosures.",
+							"actions",
+						)
+						return
+					}
+					$("#insBody").innerHTML =
+						`<table class="tbl ev"><thead><tr><th>Symbol</th><th>Who</th><th>What</th><th>Value</th><th>Holding</th><th>Disclosed</th></tr></thead><tbody>` +
+						rows
+							.map((x) => {
+								const [kc, kl] = INS_KIND[x.kind] || ["", x.kind]
+								const hold = x.before_pct != null && x.after_pct != null ? `${x.before_pct}% → ${x.after_pct}%` : "—"
+								return `<tr>
+          <td class="mono" style="font-weight:500">${esc(x.symbol)}${watch.has(x.symbol) ? ' <span class="chip bull">watchlist</span>' : ""}</td>
+          <td class="evtext">${esc(x.person || "—")}<div class="faint" style="font-size:var(--fs-12)">${esc(x.category)}</div></td>
+          <td><span class="chip ${kc}">${kl}</span>${x.mode ? `<div class="faint" style="font-size:var(--fs-12);margin-top:2px">${esc(x.mode)}</div>` : ""}</td>
+          <td class="mono">${money(x.value)}<div class="faint" style="font-size:var(--fs-12)">${x.qty == null ? "" : Math.round(x.qty).toLocaleString("en-IN") + " sh"}</div></td>
+          <td class="mono">${hold}</td>
+          <td class="mono faint">${esc(x.disclosed || x.trade_to || "")}</td></tr>`
+							})
+							.join("") +
+						`</tbody></table>`
+				} catch (e) {
+					$("#insBody").innerHTML = ""
+					$("#insBody").appendChild(TF.errorBox(`Couldn't load insider trades: ${e.message}`, loadInsider))
+				}
+			}
+			$("#symf").addEventListener("input", () => {
+				clearTimeout(window._di)
+				window._di = setTimeout(loadInsider, 400)
+			})
+
 			boot()
+			loadInsider()
 		</script>
 		<style>
 			/* filings wrap; the shared table keeps cells on one line */
