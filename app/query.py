@@ -2899,10 +2899,11 @@ def check_alerts(push: bool = True, days: int = 420) -> dict:
         first_run = row["last_run"] is None
         if push and entered and not first_run:
             try:
-                notify.send(
-                    f"{row['name']}\n" + ", ".join(entered)
-                    + f"\n\n{row['expression']}",
-                    title="Query alert", tags="mag")
+                if not notify.send(
+                        f"{row['name']}\n" + ", ".join(entered)
+                        + f"\n\n{row['expression']}",
+                        title="Query alert", tags="mag"):
+                    out["errors"][row["name"]] = "push failed: not delivered"
             except (Exception, SystemExit) as e:      # noqa: BLE001
                 out["errors"][row["name"]] = f"push failed: {e}"
     return out

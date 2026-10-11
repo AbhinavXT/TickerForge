@@ -235,7 +235,9 @@ def series_utc(token: int, interval: str, days: int) -> list[dict]:
     explicitly and the epoch comes out right on any machine, in any zone, with
     no display shift riding along.
     """
-    since = datetime.now() - timedelta(days=days)
+    # The cutoff has to be IST wall clock too, or a box in another zone
+    # shifts the window by its offset.
+    since = datetime.now(IST).replace(tzinfo=None) - timedelta(days=days)
     with _conn(read_only=True) as c:
         rows = c.execute(
             "SELECT ts, open, high, low, close, volume FROM candles "

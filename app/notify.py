@@ -11,6 +11,7 @@ through send() below.
 """
 import threading
 import time
+from email.utils import parsedate_to_datetime
 
 import requests
 
@@ -41,14 +42,41 @@ _throttled_until = 0.0
 
 
 def _wait_turn() -> None:
-    """Block until enough time has passed since the previous publish."""
+    """Block until enough time has passed since the previous publish.
+
+    The slot is claimed under the lock and slept for outside it, so callers
+    still go out one gap apart but a waiting sender never holds up
+    _note_refusal() or the bookkeeping of the senders queued behind it.
+    """
     global _last_sent
     with _lock:
-        gap = _COOLDOWN_GAP_SECONDS if time.time() < _throttled_until else _MIN_GAP_SECONDS
-        wait = _last_sent + gap - time.time()
-        if wait > 0:
-            time.sleep(wait)
-        _last_sent = time.time()
+        now = time.time()
+        gap = _COOLDOWN_GAP_SECONDS if now < _throttled_until else _MIN_GAP_SECONDS
+        slot = max(now, _last_sent + gap)
+        _last_sent = slot
+    if slot > now:
+        time.sleep(slot - now)
+
+
+# Longest single wait a refusal can impose. The listener publishes from its
+# own read loop, so a server asking for minutes would otherwise stop phone
+# commands for minutes; past this it is cheaper to drop the message.
+_MAX_RETRY_WAIT_SECONDS = 30.0
+
+
+def _retry_after(value: str | None, attempt: int) -> float:
+    """Seconds to wait from a Retry-After header, which may be a number of
+    seconds or an HTTP date. Falls back to exponential backoff."""
+    secs = 0.0
+    if value:
+        try:
+            secs = float(value)
+        except ValueError:
+            try:
+                secs = parsedate_to_datetime(value).timestamp() - time.time()
+            except (TypeError, ValueError, IndexError, OverflowError):
+                secs = 0.0
+    return secs if secs > 0 else 5 * 2 ** attempt
 
 
 def _note_refusal(retry_after: float) -> None:
@@ -138,9 +166,9 @@ def _post(url: str, *, data, headers, timeout: int, method=requests.post) -> boo
             return True
 
         # The server says wait. Honour its figure where it gives one.
-        retry_after = float(resp.headers.get("Retry-After") or 0) or (5 * 2 ** attempt)
+        retry_after = _retry_after(resp.headers.get("Retry-After"), attempt)
         _note_refusal(retry_after)
-        if attempt == _ATTEMPTS - 1:
+        if attempt == _ATTEMPTS - 1 or retry_after > _MAX_RETRY_WAIT_SECONDS:
             print(f"  ntfy: rate limited, dropping message (retry-after {retry_after:.0f}s)")
             return False
         print(f"  ntfy: rate limited, waiting {retry_after:.0f}s")

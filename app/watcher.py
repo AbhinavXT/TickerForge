@@ -201,8 +201,11 @@ def _fire(kite, lv: dict, token: int, reason: str, highlight=None) -> None:
         candles = intraday.today_minutes(kite, token, "5minute")
         png = charts.intraday_png(lv, candles, highlight=highlight,
                                   subtitle=datetime.now().strftime("%H:%M"))
-        notify.send_image(png, caption=caption, title="TickerForge alert",
-                          tags="rotating_light", priority="high")
+        # send_image reports failure by return value, not by raising; turn
+        # that into the same text fallback a chart error gets.
+        if not notify.send_image(png, caption=caption, title="TickerForge alert",
+                                 tags="rotating_light", priority="high"):
+            raise RuntimeError("image push failed")
     except (Exception, SystemExit):
         body = reason + "\n\n" + intraday.as_text(lv)
         notify.send(body, title="TickerForge alert",
