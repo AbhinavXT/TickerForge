@@ -788,6 +788,79 @@ def as_text(b: dict, n: int = 5) -> str:
     return "\n".join(lines)
 
 
+# ======================================================== phone payload
+def _num(v) -> str:
+    """A compact number for the wire: no trailing zeros, empty for None."""
+    if v is None:
+        return ""
+    return f"{round(float(v), 2):g}"
+
+
+def _wire(text: str) -> str:
+    """A free-text field made safe for the row and field separators."""
+    return str(text).replace(";", " ").replace("|", " ").strip()
+
+
+def _payload_row(r: dict) -> str:
+    """One ranked stock, positionally:
+    rank|symbol|score|ltp|chg%|oi|ob bottom|ob top|ob dist%|rev|trap|vol×|adx|move ATR
+
+    `oi` is the two-letter read (LB/SB/SC/LU), `rev` is 1 for a reversal
+    build-up, and `trap` is the sweep's direction (+ bull, - bear) followed by
+    the level kind, e.g. `+PDL`."""
+    ob = r.get("ob") or {}
+    t = r.get("trap")
+    trap = f"{'+' if t['dir'] == 'bull' else '-'}{t['kind'].upper()}" if t else ""
+    return "|".join([
+        str(r.get("rank", "")), _wire(r["symbol"]), str(r.get("score", 0)),
+        _num(r.get("ltp")), _num(r.get("chg_pct")),
+        OI_SHORT.get(r.get("oi_read"), ""),
+        _num(ob.get("bottom")), _num(ob.get("top")), _num(r.get("ob_dist_pct")),
+        "1" if r.get("reversal") else "", trap,
+        _num(r.get("vol_ratio")), _num(r.get("adx")), _num(r.get("move_atr")),
+    ])
+
+
+def as_payload(b: dict, limit: int = 4096) -> str:
+    """/board nf: the board as one structured message for the NewsForge app.
+
+    Same conventions as /candles: the phone's reader flattens JSON to dotted
+    keys and skips arrays, so the rows travel as strings (`;` between rows,
+    `|` between fields). Everything is sized to `limit`: the weakest rows go
+    first, alternating from the longer side, then the quietest sectors — a
+    board that arrives short is still a board; one that overflows is nothing.
+    """
+    try:
+        ts = int(datetime.fromisoformat(b.get("built_at")).timestamp())
+    except (TypeError, ValueError):
+        ts = int(time.time())
+    br = b.get("breadth") or {}
+    bull = [_payload_row(r) for r in b.get("bull") or []]
+    bear = [_payload_row(r) for r in b.get("bear") or []]
+    sectors = [f"{_wire(s['sector'])}|{_num(s['chg_pct'])}|{s.get('n', '')}"
+               for s in b.get("sectors") or []]
+
+    def render() -> str:
+        return json.dumps({
+            "nf": 1, "kind": "board", "ts": ts,
+            "live": 1 if b.get("live") else 0,
+            "stale": 1 if b.get("stale") else 0,
+            "breadth": f"{br.get('bull', 0)}|{br.get('choppy', 0)}|{br.get('bear', 0)}",
+            "sectors": ";".join(sectors),
+            "bull": ";".join(bull), "bear": ";".join(bear),
+        }, separators=(",", ":"), ensure_ascii=False)
+
+    out = render()
+    while len(out.encode()) > limit and (bull or bear or sectors):
+        if bull or bear:
+            (bull if len(bull) >= len(bear) else bear).pop()
+        else:
+            # Strongest and weakest are the ones worth keeping; drop from the middle.
+            sectors.pop(len(sectors) // 2)
+        out = render()
+    return out
+
+
 def detail_text(d: dict) -> str:
     """/ob SYM: the zone, its levels and why it ranks."""
     side = {"bull": "▲ bullish", "bear": "▼ bearish"}.get(d.get("side"), "choppy")

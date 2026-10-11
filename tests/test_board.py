@@ -6,6 +6,7 @@ and the alert condition the zone view arms.
 """
 from __future__ import annotations
 
+import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -496,3 +497,52 @@ def test_detail_text_carries_the_retest_alert():
     t = board.detail_text(d)
     assert "OB 2,922.00–2,931.50 (bull)" in t
     assert "retest alert: /alert RELIANCE < 2931.5" in t
+
+
+# ------------------------------------------------------- NewsForge payload
+def _payload_board(n: int = 20) -> dict:
+    def row(i, side):
+        return {"symbol": f"{side.upper()}{i}", "rank": i + 1, "score": 90 - i,
+                "ltp": 1234.5 + i, "chg_pct": 2.1 if side == "bull" else -1.7,
+                "oi_read": "long_buildup" if side == "bull" else "short_buildup",
+                "ob": {"top": 1230.25, "bottom": 1221.0, "dir": side},
+                "ob_dist_pct": -0.4, "vol_ratio": 1.8, "adx": 27.3, "move_atr": 2.2,
+                "reversal": {"at_zone": True, "why": ["oi"]} if i == 0 else None,
+                "trap": {"time": 0, "price": 1220.0, "kind": "pdl", "dir": "bull"} if i == 1 else None}
+    return {"built_at": "2026-10-12T11:42:00+05:30", "live": True, "stale": False,
+            "bull": [row(i, "bull") for i in range(n)], "bear": [row(i, "bear") for i in range(n)],
+            "breadth": {"bull": 40, "choppy": 120, "bear": 25},
+            "sectors": [{"sector": "Oil; Gas | Fuels", "chg_pct": 1.234, "n": 7},
+                        {"sector": "IT", "chg_pct": -0.5, "n": 9}]}
+
+
+def test_board_payload_shape():
+    p = json.loads(board.as_payload(_payload_board(3), limit=100_000))
+    assert p["nf"] == 1 and p["kind"] == "board" and p["live"] == 1 and p["stale"] == 0
+    assert p["ts"] == int(datetime.fromisoformat("2026-10-12T11:42:00+05:30").timestamp())
+    assert p["breadth"] == "40|120|25"
+    first = p["bull"].split(";")[0].split("|")
+    assert first == ["1", "BULL0", "90", "1234.5", "2.1", "LB", "1221", "1230.25",
+                     "-0.4", "1", "", "1.8", "27.3", "2.2"]
+    assert p["bull"].split(";")[1].split("|")[10] == "+PDL"
+    # separators inside a sector name cannot break the rows
+    assert p["sectors"].split(";")[0] == "Oil  Gas   Fuels|1.23|7"
+
+
+def test_board_payload_fits_the_message_limit():
+    out = board.as_payload(_payload_board(20), limit=2048)
+    assert len(out.encode()) <= 2048
+    p = json.loads(out)
+    bull, bear = p["bull"].split(";"), p["bear"].split(";")
+    assert bull[0].startswith("1|") and bear[0].startswith("1|")     # the best survive
+    assert abs(len(bull) - len(bear)) <= 1                           # trimmed evenly
+
+
+def test_board_nf_pushes_a_payload_not_text(monkeypatch):
+    from app import commands
+    sent = []
+    monkeypatch.setattr(board, "get", lambda kf: _payload_board(2))
+    monkeypatch.setattr(commands, "_kite_or_none", lambda: object())
+    monkeypatch.setattr(commands.notify, "send", lambda body, **kw: sent.append((body, kw)) or True)
+    assert commands.cmd_board("nf") is None
+    assert json.loads(sent[0][0])["kind"] == "board" and sent[0][1]["priority"] == "min"

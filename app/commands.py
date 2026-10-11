@@ -592,14 +592,24 @@ def cmd_levels(sym: str) -> str:
 
 
 # ---------------------------------------------------------------- the Board
-def cmd_board(arg: str = "") -> str:
-    """Top 5 each side of the F&O order-block board."""
+def cmd_board(arg: str = ""):
+    """Top 5 each side of the F&O order-block board.
+
+    `/board nf` is the same board for the NewsForge app instead: one
+    structured message (see board.as_payload), pushed at priority=min like
+    /candles, and no text reply to buzz about.
+    """
     from . import board
     kite = _kite_or_none()
     try:
         b = board.get(lambda: kite or kite_auth.get_kite())
     except SystemExit:
         return "No Kite session — log in first."
+    if (arg or "").strip().lower() == "nf":
+        payload = board.as_payload(b, config.NTFY_MESSAGE_LIMIT)
+        if not notify.send(payload, title="Board", priority="min", tags="bar_chart"):
+            return "Board payload could not be sent."
+        return None
     return board.as_text(b, n=5)
 
 

@@ -1014,7 +1014,7 @@ Sent to `NTFY_CMD_TOPIC`. The `remote` service must be running.
 |---|---|---|
 | `/price SYM` | `/quote` | Last price and day change |
 | `/levels SYM` | `/lvl` | VWAP, PDH/PDL, CPR, pivots, ORB |
-| `/board` | — | F&O Board: breadth, leading/lagging sector, top 5 bullish and bearish order-block setups, flagged `REV` (reversal build-up) and `trap ▲/▼` (liquidity sweep) |
+| `/board` | — | F&O Board: breadth, leading/lagging sector, top 5 bullish and bearish order-block setups, flagged `REV` (reversal build-up) and `trap ▲/▼` (liquidity sweep). `/board nf` pushes the same board as one structured message for the NewsForge app instead of text |
 | `/ob SYM` | — | One stock's order block, R/S and liquidity, any liquidity trap or reversal build-up, why it ranks, and the retest `/alert` to send |
 | `/ind SYM` | `/indicators` `/ta` | Indicator bundle |
 | `/conf SYM` | `/confluence` `/mtf` | Multi-timeframe agreement score |
