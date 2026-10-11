@@ -960,6 +960,41 @@
 				}
 			}
 
+			// Trade stats split by the Nifty regime at entry (app/regime.py).
+			// Empty when there was no index data — the run is still valid.
+			const REGIME_LABEL = {
+				"trend-up": "▲ Trend up",
+				"trend-down": "▼ Trend down",
+				choppy: "Choppy",
+				"high-vol": "High volatility",
+				unknown: "Warm-up (unlabelled)",
+			}
+			function regimeTable(rg, pooled) {
+				if (!rg || !rg.order || !rg.order.length) return ""
+				const pc = (x) =>
+					x == null
+						? "—"
+						: `<span class="${x >= 0 ? "pos" : "neg"}">${(x > 0 ? "+" : "") + (+x).toFixed(2)}%</span>`
+				const rows = rg.order
+					.map((k) => {
+						const s = rg.by[k] || {}
+						return `<tr><td>${REGIME_LABEL[k] || k}</td>
+      <td>${s.trades ?? 0}</td>
+      <td>${pc(s.expectancy_pct)}</td>
+      <td>${s.win_rate_pct == null ? "—" : (+s.win_rate_pct).toFixed(1) + "%"}</td>
+      <td>${s.profit_factor ?? "—"}</td>
+      <td>${s.share_pct == null ? "—" : s.share_pct + "%"}</td>
+      ${pooled ? "" : `<td>${s.days_pct == null ? "—" : s.days_pct + "%"}</td>`}
+    </tr>`
+					})
+					.join("")
+				return `<div class="clabel" title="Nifty 50 on the day before entry: high-vol = 20-day realised vol in the top 20% of its year; trend = ADX(14) ≥ 20, side from the 50-DMA; choppy = the rest.">By market regime at entry${pooled ? " — all symbols' trades pooled" : ""}</div>
+  <div class="tbl-wrap"><table class="stmt"><thead><tr>
+    <th>Regime</th><th>Trades</th><th>Expectancy</th><th>Win%</th><th>PF</th><th>Share of trades</th>${pooled ? "" : "<th>Share of days</th>"}
+  </tr></thead><tbody>${rows}</tbody></table></div>
+  ${rg.verdict ? `<div class="notice" style="margin-top:var(--s2)">${TF.esc(rg.verdict)}</div>` : ""}`
+			}
+
 			function renderBatch(d) {
 				const a = d.aggregate,
 					v = d.verdict
@@ -1019,6 +1054,7 @@
       <th>Symbol</th><th>Trades</th><th>Expectancy</th><th>Win%</th>
       <th>PF</th><th>Return</th><th>vs B&H</th><th>Max DD</th><th>Sharpe</th>
     </tr></thead><tbody>${rows}</tbody></table></div>
+    ${regimeTable(d.regimes, true)}
     ${errs}
     <div class="bcaveat">${d.caveat}</div>`
 
@@ -1501,7 +1537,8 @@
   <div class="clabel">Price with entries ▲ / exits ▼</div><div id="price"></div>
   <div class="clabel">Equity curve <span class="key"><i style="background:var(--bull)"></i>strategy</span> <span class="key"><i style="background:var(--text-3)"></i>buy &amp; hold</span> <span class="mono">₹${f(d.capital, 0)}</span> start</div><div id="equity"></div>
   <div class="clabel">Drawdown — % below the equity peak</div><div id="dd"></div>
-  </div>`
+  </div>
+  ${regimeTable(d.regimes, false)}`
 
 				if (d.trades.length) {
 					html += `<div class="clabel">Trades (${d.trades.length})</div>

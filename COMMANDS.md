@@ -643,6 +643,22 @@ Bootstrap is the more honest forecast and the more pessimistic one.
 Position sizing, the regime filter and CSV export live on the **Backtest
 page** in the browser rather than the CLI.
 
+**By market regime.** Every single run and every batch splits its trades by
+the Nifty regime on the day before entry:
+
+| Regime | Rule |
+|---|---|
+| `high-vol` | Nifty's 20-day realised volatility is in the top 20% of its trailing year. Checked first. |
+| `trend-up` / `trend-down` | ADX(14) ≥ 20, with the side taken from close vs the 50-DMA |
+| `choppy` | everything else |
+
+The table shows expectancy, win rate and profit factor per regime. When a
+strategy is positive in one regime and negative in another, it says so and
+names the regime to switch it off in. `batch` pools every symbol's trades
+before splitting, so a regime with three trades on one name doesn't get the
+same weight as one with forty. Treat a regime with fewer than ~20 trades as
+anecdote.
+
 ---
 
 ## 6. Trading

@@ -1149,15 +1149,10 @@ def run(symbol: str, strategy: str, interval: str = "day", days: int = 730,
 
     gate = None
     gate_pct = None
+    nifty = _index_daily(kite, days, required=regime)
     if regime:
-        idx = instruments.lookup(REGIME_INDEX)
-        if not idx:
-            raise ValueError(f"{REGIME_INDEX} is not in the instrument index — "
-                             f"run sync-instruments")
         # Daily regardless of the symbol's interval: a 200-day average of
         # 5-minute bars is not the same idea, and not the one 2.1 means.
-        candles.ensure(kite, idx["instrument_token"], "day", days + 400)
-        nifty = candles.get(idx["instrument_token"], "day", days + 400)
         gate = regime_gate([b["time"] for b in c], nifty)
         gate_pct = round(sum(gate) / len(gate) * 100, 1) if gate else None
 
@@ -1184,6 +1179,8 @@ def run(symbol: str, strategy: str, interval: str = "day", days: int = 730,
         rd.pop("trail_period")
     active_risk = {k: v for k, v in rd.items() if v is not None}
 
+    regimes = regime_split(sim["trades"], c, nifty)
+
     return {
         "symbol": inst["tradingsymbol"], "name": inst["name"],
         "strategy": strategy, "strategy_name": spec["name"],
@@ -1201,7 +1198,46 @@ def run(symbol: str, strategy: str, interval: str = "day", days: int = 730,
         "regime_on_pct": gate_pct,
         "sizing": sim.get("sizing"),
         "skipped_trades": sim.get("skipped", 0),
+        # Trade stats split by the market regime at entry (app/regime.py).
+        "regimes": regimes,
     }
+
+
+def _index_daily(kite, days: int, required: bool = False) -> list[dict]:
+    """Nifty daily bars covering the window plus a year of warm-up.
+
+    Needed by the regime gate (where its absence is an error) and by the
+    regime split (where it isn't — a backtest without the split is still a
+    backtest)."""
+    idx = instruments.lookup(REGIME_INDEX)
+    if not idx:
+        if required:
+            raise ValueError(f"{REGIME_INDEX} is not in the instrument index — "
+                             f"run sync-instruments")
+        return []
+    try:
+        candles.ensure(kite, idx["instrument_token"], "day", days + 400)
+        return candles.get(idx["instrument_token"], "day", days + 400)
+    except Exception:
+        if required:
+            raise
+        return []
+
+
+def regime_split(trades: list[dict], c: list[dict], nifty: list[dict]) -> dict | None:
+    """_trade_stats per market regime at entry, plus a one-line verdict.
+    None without index data. Labels each trade dict with its `regime`."""
+    from . import regime as rg
+    if not nifty or not trades:
+        return None
+    times = [b["time"] for b in c]
+    labels = rg.labels_for(times, nifty)
+    if not any(labels):
+        return None
+    split = rg.split_trades(trades, times, labels, _trade_stats)
+    return {"by": split, "order": [k for k in rg.LABELS + ("unknown",)
+                                   if k in split],
+            "verdict": rg.verdict(split)}
 
 
 def catalog() -> list[dict]:

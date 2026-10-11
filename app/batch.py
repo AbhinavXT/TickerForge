@@ -75,13 +75,14 @@ def run(strategy: str, symbols: list[str] | None = None,
     if not syms:
         raise ValueError("no symbols — pass a list or add some to the watchlist")
 
-    rows, errors = [], []
+    rows, errors, pooled = [], [], []
     for sym in syms:
         try:
             res = backtest.run(sym, strategy, interval=interval, days=days,
                                cost_bps=cost_bps, capital=capital,
                                params=params, risk=risk)
             rows.append(_row(sym, res))
+            pooled += [t for t in res.get("trades", []) if t.get("regime")]
         except (Exception, SystemExit) as e:
             # SystemExit: backtest.run reaches for a Kite session, and
             # config.require raises it when there isn't one.
@@ -101,7 +102,33 @@ def run(strategy: str, symbols: list[str] | None = None,
         "aggregate": agg,
         "verdict": verdict(agg, len(rows)),
         "sort": sort,
+        "regimes": pooled_regimes(pooled),
     }
+
+
+def pooled_regimes(trades: list[dict]) -> dict | None:
+    """Every symbol's trades pooled, then split by the regime at entry.
+
+    Pooled rather than averaged per symbol: a regime with three trades on one
+    name and none elsewhere shouldn't get a vote equal to one with forty.
+    Trades arrive already labelled by backtest.regime_split.
+    """
+    from . import regime as rg
+    if not trades:
+        return None
+    groups: dict[str, list] = {}
+    for t in trades:
+        groups.setdefault(t["regime"], []).append(t)
+    closed = sum(1 for t in trades if not t.get("open")) or 1
+    by = {}
+    for lab in rg.LABELS + ("unknown",):
+        if lab not in groups:
+            continue
+        st = backtest._trade_stats(groups[lab])
+        st["share_pct"] = round(sum(1 for t in groups[lab] if not t.get("open"))
+                                / closed * 100, 1)
+        by[lab] = st
+    return {"by": by, "order": list(by), "verdict": rg.verdict(by)}
 
 
 SORTS = {
@@ -249,6 +276,18 @@ def as_text(res: dict, limit: int = 10) -> str:
         lines.append(f"  + {len(res['rows']) - limit} more")
     for n in v.get("notes", []):
         lines.append(f"  ⚠ {n}")
+    rg = res.get("regimes")
+    if rg:
+        lines.append("")
+        lines.append("By market regime (all trades pooled):")
+        for lab in rg["order"]:
+            st = rg["by"][lab]
+            e = st.get("expectancy_pct")
+            lines.append(f"  {lab:<11} {st['trades']:>4}t  "
+                         f"{('—' if e is None else f'{e:+.2f}%'):>8}/trade  "
+                         f"win {st.get('win_rate_pct') if st.get('win_rate_pct') is not None else '—'}%")
+        if rg.get("verdict"):
+            lines.append(f"  → {rg['verdict']}")
     if res["errors"]:
         lines.append(f"  ! {len(res['errors'])} failed: "
                      + ", ".join(e["symbol"] for e in res["errors"][:5]))
