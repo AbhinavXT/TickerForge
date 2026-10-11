@@ -18,11 +18,12 @@
  *
  * Bump CACHE when the shell changes, or old clients keep the old CSS for ever.
  */
-const CACHE = "tickerforge-shell-v1";
+const CACHE = "tickerforge-shell-v2";
 
 const SHELL = [
   "/desk",
   "/app.css",
+  "/ui.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",

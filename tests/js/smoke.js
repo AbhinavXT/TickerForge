@@ -87,7 +87,7 @@ async function run(file, opts) {
 			w.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
 			w.IntersectionObserver = w.ResizeObserver
 			w.matchMedia = (q) => ({
-				matches: opts.width ? evalMedia(q, opts) : false,
+				matches: evalMedia(q, opts),
 				media: q,
 				addEventListener() {},
 				removeEventListener() {},
@@ -114,7 +114,7 @@ async function run(file, opts) {
 		hasTabbar: !!q(".tf-tabbar"),
 		tabbarSlots: [...d.querySelectorAll(".tf-tabbar > .tf-tab")].map((a) => a.dataset.key),
 		moreLinks: [...d.querySelectorAll(".tf-more a")].map((a) => a.getAttribute("href")),
-		railLinks: [...d.querySelectorAll(".tf-rail a")].map((a) => a.getAttribute("href")),
+		railLinks: [...d.querySelectorAll(".tf-rail a.tf-item")].map((a) => a.getAttribute("href")),
 		activeRail: (q(".tf-rail a[aria-current=page]") || {}).getAttribute?.("href") || null,
 		theme: d.documentElement.getAttribute("data-theme"),
 		hasThemeToggle: !!q("[data-tf-theme-toggle]"),
@@ -152,7 +152,7 @@ async function run(file, opts) {
 
 function evalMedia(q, opts) {
 	let m
-	if ((m = /max-width:\s*(\d+)px/.exec(q))) return opts.width <= +m[1]
+	if ((m = /max-width:\s*(\d+)px/.exec(q))) return (opts.width || 1440) <= +m[1]
 	if ((m = /min-width:\s*(\d+)px/.exec(q))) return opts.width >= +m[1]
 	if (/prefers-color-scheme:\s*light/.test(q)) return opts.prefers === "light"
 	if (/prefers-color-scheme:\s*dark/.test(q)) return opts.prefers !== "light"

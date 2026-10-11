@@ -522,6 +522,17 @@ def page_css():
     return FileResponse(WEB_DIR / "app.css", media_type="text/css")
 
 
+@app.get("/ui.js")
+def page_ui_js():
+    """The shared shell (rail, top bar, theme) and UI helpers."""
+    return FileResponse(WEB_DIR / "ui.js", media_type="text/javascript")
+
+
+@app.get("/board", response_class=HTMLResponse)
+def page_board():
+    return FileResponse(WEB_DIR / "board.html")
+
+
 # ---------------------------------------------------------------- search
 @app.get("/api/search")
 def api_search(q: str):
