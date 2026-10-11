@@ -98,7 +98,7 @@ async function run(file, opts) {
 				Object.defineProperty(w, "innerWidth", { value: opts.width, configurable: true })
 			}
 			if (opts.theme) w.localStorage.setItem("tf_theme", opts.theme)
-			w.HTMLCanvasElement.prototype.getContext = () => null
+			w.HTMLCanvasElement.prototype.getContext = () => chartStub()
 			w.EventSource = class { constructor() {} close() {} addEventListener() {} }
 			w.navigator.serviceWorker = { register: async () => ({}) }
 		},

@@ -29,6 +29,8 @@ HELPERS = re.search(
     r"\(x\.high \+ x\.low \+ x\.close\) / 3\)", HTML).group(0)
 
 BLOCKS = [
+    # chart colours: extracted functions read PAL.up / PAL.down at call time
+    block("const PAL = {"),
     HELPERS,
     block("function _sma(d, p)"),
     block("function _ema(d, p)"),

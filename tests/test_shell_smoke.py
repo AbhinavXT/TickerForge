@@ -116,3 +116,36 @@ def test_theme_follows_the_os_until_chosen():
 def test_stored_theme_wins_over_the_os():
     [r] = smoke("board.html", prefers="light", theme="dark")
     assert r["probes"]["theme"] == "dark"
+
+
+# ------------------------------------------------------------------ the chart
+def test_chart_page_uses_the_compact_shell(desktop):
+    """Full-viewport page: icon rail and tab bar, no top bar; market status
+    and the theme toggle live in the chart's own header."""
+    p = desktop["index.html"]["probes"]
+    assert p["hasRail"] and p["hasTabbar"] and not p["hasTopbar"], p
+    assert p["activeRail"] == "/"
+    assert p["railLinks"] == ui_nav_hrefs()
+    assert p["hasThemeToggle"]
+
+
+def test_chart_static_nav_matches_the_shell():
+    import re
+    html = (WEB / "index.html").read_text()
+    block = html[html.index('<div id="nav"'):]
+    block = block[:block.index("</div>")]
+    assert 'data-shell="compact"' in block
+    assert re.findall(r'href="([^"]+)"', block) == ui_nav_hrefs()
+    assert html.count('id="status"') == 1, "the chart header owns #status"
+
+
+def test_chart_theme_toggle_reaches_the_chart():
+    [r] = smoke("index.html", toggle=True)
+    assert r["errors"] == [], r["errors"]
+    assert r["probes"]["afterToggle"]["theme"] == "light"
+
+
+def test_chart_page_keeps_its_storage_keys():
+    html = (WEB / "index.html").read_text()
+    for key in ("tf_paneh", "tf_side_w", "tf_events"):
+        assert f'"{key}"' in html, key

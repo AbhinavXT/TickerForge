@@ -69,8 +69,9 @@ check('up/dn params are honoured',
 // Defaults must survive a params object that predates the colour fields —
 // saved layouts carry the old shape.
 const legacy = I_super(bars, {length:10, mult:3});
+// (The defaults are the theme's bull/bear, held in PAL.)
 check('missing colour params fall back to defaults',
-      legacy.overlays[0].data.every(x => x.color === UP || x.color === DN));
+      legacy.overlays[0].data.every(x => x.color === PAL.up || x.color === PAL.down));
 
 // A series too short to compute must not throw or emit junk.
 check('short series yields no points', I_super(bars.slice(0,5), {length:10, mult:3})

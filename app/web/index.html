@@ -8,21 +8,19 @@
 		<!-- Shared theme first, so this page's own rules still win. It was
 		     the one page not loading it, which is why its dropdowns, number
 		     inputs and checkboxes rendered as OS widgets. -->
+		<meta name="theme-color" content="#0b0e13" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
 		<link rel="stylesheet" href="/app.css" />
+		<script src="/ui.js"></script>
 		<style>
 			:root {
-				--bg: #0e1116;
-				--panel: #161b22;
-				--border: #2d333b;
-				--fg: #e6edf3;
-				--dim: #8b949e;
-				--up: #26a69a;
-				--down: #ef5350;
-				--accent: #4184e4;
-				--ma20: #f0b429;
-				--ma50: #e4589a;
-				--ma200: #9d6ce4;
-				--ema: #41c4e4;
+				/* indicator line defaults follow the theme's series palette */
+				--ma20: var(--series-1);
+				--ma50: var(--series-2);
+				--ma200: var(--series-3);
+				--ema: var(--series-4);
 			}
 			* {
 				box-sizing: border-box;
@@ -31,12 +29,9 @@
 			body {
 				background: var(--bg);
 				color: var(--fg);
-				font:
-					14px/1.4 -apple-system,
-					"Segoe UI",
-					Roboto,
-					sans-serif;
+				font: 14px/1.4 var(--sans);
 				height: 100vh;
+				height: 100dvh;
 				overflow: hidden;
 				display: grid;
 				/* --side-w is what the drag handle moves; the grid reads it so
@@ -91,7 +86,7 @@
 			}
 			#results div:hover,
 			.wl:hover {
-				background: #1f2733;
+				background: var(--hover);
 			}
 			.sym {
 				font-weight: 600;
@@ -189,7 +184,7 @@
 			.bar button.on {
 				color: var(--fg);
 				border-color: var(--accent);
-				background: #1c2a41;
+				background: var(--bull-bg);
 			}
 			.bar .sep {
 				width: 10px;
@@ -234,7 +229,7 @@
 				border: 1px solid var(--border);
 				border-radius: 9px;
 				padding: 5px;
-				box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+				box-shadow: var(--shadow);
 			}
 			.picker.open {
 				display: block;
@@ -403,7 +398,7 @@
 				border-radius: 8px;
 				padding: 6px;
 				width: 250px;
-				box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+				box-shadow: var(--shadow);
 				display: none;
 			}
 			#evmenu.open,
@@ -471,7 +466,7 @@
 				border-radius: 8px;
 				padding: 6px;
 				width: 280px;
-				box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+				box-shadow: var(--shadow);
 				display: none;
 			}
 			#indmenu.open {
@@ -508,7 +503,7 @@
 				font-size: 13px;
 			}
 			#indlist .il:hover {
-				background: #1f2733;
+				background: var(--hover);
 			}
 			#indlist .il .cat {
 				margin-left: auto;
@@ -531,7 +526,7 @@
 				align-items: center;
 				gap: 6px;
 				font-size: 12px;
-				background: #1c2a41;
+				background: var(--bull-bg);
 				border: 1px solid var(--border);
 				border-radius: 14px;
 				padding: 2px 4px 2px 9px;
@@ -554,7 +549,7 @@
 			.ichip .cfg:hover,
 			.ichip .x:hover {
 				color: var(--fg);
-				background: #2d333b;
+				background: var(--border);
 			}
 			#panes {
 				display: flex;
@@ -639,7 +634,7 @@
 				position: fixed;
 				inset: 0;
 				z-index: 90;
-				background: rgba(4, 6, 10, 0.55);
+				background: var(--scrim);
 				display: none;
 				align-items: center;
 				justify-content: center;
@@ -653,7 +648,7 @@
 				background: var(--panel);
 				border: 1px solid var(--border);
 				border-radius: 10px;
-				box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+				box-shadow: var(--shadow);
 			}
 			#cfgmodal .chead {
 				display: flex;
@@ -674,7 +669,7 @@
 			}
 			#cfgmodal .chead .cx:hover {
 				color: var(--fg);
-				background: #2d333b;
+				background: var(--border);
 			}
 			#cfgmodal .ctabs {
 				display: flex;
@@ -755,7 +750,7 @@
 			}
 			#cfgmodal button.primary {
 				border-color: var(--accent);
-				background: #1c2a41;
+				background: var(--bull-bg);
 			}
 			#cfgmodal button:hover {
 				border-color: var(--accent);
@@ -765,21 +760,21 @@
 			.amenu {
 				position: fixed;
 				z-index: 200;
-				background: #161b22;
-				border: 1px solid #2d333b;
+				background: var(--surface-2);
+				border: 1px solid var(--border);
 				border-radius: 9px;
 				padding: 8px;
 				min-width: 210px;
-				box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+				box-shadow: var(--shadow);
 				font-size: 13px;
 			}
 			.amenu .hd {
-				color: #8b949e;
+				color: var(--text-2);
 				font-size: 12px;
 				padding: 2px 6px 6px;
 			}
 			.amenu .ft {
-				color: #8b949e;
+				color: var(--text-2);
 				font-size: 11.5px;
 				padding: 6px 6px 2px;
 			}
@@ -788,153 +783,83 @@
 				width: 100%;
 				text-align: left;
 				background: none;
-				border: 1px solid #2d333b;
-				color: #e6edf3;
+				border: 1px solid var(--border);
+				color: var(--text);
 				border-radius: 7px;
 				padding: 7px 10px;
 				cursor: pointer;
 				font-size: 13px;
 			}
 			.amenu button:hover {
-				border-color: #4184e4;
-				background: #1c2a41;
+				border-color: var(--bull);
+				background: var(--bull-bg);
+			}
+		
+			/* ---- revamp: numbers mono, panels on the tokens ---- */
+			#drawtools .tf-ic { width: 16px; height: 16px; }
+			#cmpOff .tf-ic, .ichip .tf-ic, .pcfg .tf-ic, .prm .tf-ic, .cx .tf-ic, .wl .rm .tf-ic { width: 12px; height: 12px; vertical-align: -1px; }
+			/* Pane alignment: the draw-tool column sits beside the main chart
+			   only, so the oscillator panes were wider than it and their bars
+			   landed at different x positions. A fixed-width column and the
+			   same indent on #panes give every chart the same plot width;
+			   syncScaleWidths() then equalises the price axes as before. */
+			@media (min-width: 760px) {
+				/* the later #drawtools rule (from when the tools lived in the
+				   toolbar) adds a 10px margin + padding + border; undo it here */
+				#drawtools { width: 48px; flex: none; align-items: center; display: flex; flex-direction: column; margin-left: 0; padding: 6px 0; border-left: 0; }
+				#drawtools .dt { width: 34px; height: 30px; padding: 0; display: grid; place-items: center; }
+				#panes { margin-left: 48px; }
+			}
+			#title { font-family: var(--mono); font-weight: 600; }
+			#legend, #legend b, .ichip, .plabel, #wlist .wl, #results .sym { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+			#head { align-items: center; }
+			#head .tf-slot { display: flex; align-items: center; gap: var(--s2); }
+			#head .tf-mkt { font-size: var(--fs-11); }
+			#side { border-right: 1px solid var(--border); }
+			#sidebtn { display: none; }
+			@media (max-width: 1099px) { #head .tf-mkt .tf-clock, #head .tf-mkt .tf-sep { display: none; } }
+			/* phones: the chart takes the screen; search + watchlist slide over */
+			@media (max-width: 759px) {
+				#drawtools { margin-left: 0; padding: 4px 8px; border-left: 0; }
+				body { grid-template-columns: minmax(0, 1fr); }
+				#sidegrip { display: none; }
+				#side { position: fixed; z-index: 47; inset: 0 auto 0 0; width: min(320px, 86vw);
+				        transform: translateX(-102%); transition: transform 0.2s ease; box-shadow: var(--shadow);
+				        padding-top: calc(12px + env(safe-area-inset-top)); padding-bottom: calc(var(--tabbar-h) + 12px); }
+				body.side-open #side { transform: none; }
+				body.side-open::after { content: ""; position: fixed; inset: 0; z-index: 46; background: var(--scrim); }
+				#sidebtn { display: inline-grid; }
+				#head { padding: 6px 8px 2px; gap: 8px; }
+				#head .tf-mkt .tf-nifty { display: none; }
+				.bar { padding: 4px 8px; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+				.bar > * { flex: none; }
 			}
 		</style>
 	</head>
 	<body>
+		<div id="nav" data-page="chart" data-shell="compact">
+			<span class="brand">TickerForge</span>
+			<a class="tab" href="/board">Board</a>
+			<a class="tab on" href="/">Chart</a>
+			<a class="tab" href="/desk">Desk</a>
+			<a class="tab" href="/scanner">Scanner</a>
+			<a class="tab" href="/screen">Screen</a>
+			<a class="tab" href="/query">Query</a>
+			<a class="tab" href="/fundamentals">Fundamentals</a>
+			<a class="tab" href="/results">Results</a>
+			<a class="tab" href="/valuation">Valuation</a>
+			<a class="tab" href="/metrics">Metrics</a>
+			<a class="tab" href="/news">News</a>
+			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/backtest">Backtest</a>
+			<a class="tab" href="/settings">Settings</a>
+			<span class="sp"></span>
+		</div>
+		<script>TF.shell()</script>
 		<div id="side">
-			<h1>TickerForge</h1>
-			<div
-				style="
-					display: flex;
-					gap: 2px;
-					flex-wrap: wrap;
-					margin-bottom: 10px;
-					font-size: 12px;
-				"
-			>
-				<a
-					href="/"
-					style="
-						color: #e6edf3;
-						background: #1c2a41;
-						padding: 4px 8px;
-						border-radius: 6px;
-						text-decoration: none;
-					"
-					>Chart</a
-				>
-				<a
-					href="/desk"
-					style="
-						color: #8b949e;
-						padding: 4px 8px;
-						border-radius: 6px;
-						text-decoration: none;
-					"
-					>Desk</a
-				>
-				<a
-					href="/portfolio"
-					style="
-						color: #8b949e;
-						padding: 4px 8px;
-						border-radius: 6px;
-						text-decoration: none;
-					"
-					>Portfolio</a
-				>
-				<a
-					href="/scanner"
-					style="
-						color: #8b949e;
-						padding: 4px 8px;
-						border-radius: 6px;
-						text-decoration: none;
-					"
-					>Scanner</a
-				>
-				<a
-					href="/fundamentals"
-					style="
-						color: #8b949e;
-						padding: 4px 8px;
-						border-radius: 6px;
-						text-decoration: none;
-					"
-					>Fundamentals</a
-				>
-				<a
-					href="/results"
-					style="
-						color: #8b949e;
-						padding: 4px 8px;
-						border-radius: 6px;
-						text-decoration: none;
-					"
-					>Results</a
-				>
-				<a
-					href="/valuation"
-					style="
-						color: #8b949e;
-						padding: 4px 8px;
-						border-radius: 6px;
-						text-decoration: none;
-					"
-					>Value</a
-				>
-				<a
-					href="/backtest"
-					style="
-						color: #8b949e;
-						padding: 4px 8px;
-						border-radius: 6px;
-						text-decoration: none;
-					"
-					>Backtest</a
-				>
-				<a
-					href="/journal"
-					style="
-						color: #8b949e;
-						padding: 4px 8px;
-						border-radius: 6px;
-						text-decoration: none;
-					"
-					>Journal</a
-				>
-				<a
-					href="/metrics"
-					style="
-						color: #8b949e;
-						padding: 4px 8px;
-						border-radius: 6px;
-						text-decoration: none;
-					"
-					>Metrics</a
-				>
-				<a
-					href="/news"
-					style="
-						color: #8b949e;
-						padding: 4px 8px;
-						border-radius: 6px;
-						text-decoration: none;
-					"
-					>News</a
-				>
-				<a
-					href="/actions"
-					style="
-						color: #8b949e;
-						padding: 4px 8px;
-						border-radius: 6px;
-						text-decoration: none;
-					"
-					>Actions</a
-				>
-			</div>
 			<input
 				id="search"
 				placeholder="Search stock… (e.g. tata)"
@@ -947,8 +872,9 @@
 		<div id="sidegrip" title="Drag to resize · double-click to reset"></div>
 		<div id="main">
 			<div id="head">
+				<button type="button" class="icon-btn" id="sidebtn" aria-label="Search and watchlist" aria-controls="side" aria-expanded="false"></button>
 				<span id="title">—</span><span id="name"></span
-				><span id="status"></span>
+				><span id="status"></span><span class="tf-slot" data-tf-slot></span>
 			</div>
 			<div id="legend"></div>
 			<div class="bar" id="ivals">
@@ -1034,22 +960,22 @@
 				<span id="cmpbox">
 					<input id="cmpIn" placeholder="compare…" autocomplete="off">
 					<button class="dt" id="cmpGo" title="Overlay indexed to 100">vs</button>
-					<button class="dt" id="cmpOff" title="Remove overlay">&#10005;</button>
+					<button class="dt" id="cmpOff" title="Remove overlay" aria-label="Remove overlay"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
 				</span>
 				<span class="chip2" id="cmpChip" style="display:none"></span>
 				<span class="chip2" id="btChip" style="display:none"></span>
 			</div>
 			<div id="chartrow">
 				<div id="drawtools">
-					<button class="dt on" data-tool="cursor" title="Select and move (Esc)">&#9655;</button>
-					<button class="dt" data-tool="trendline" title="Trendline">&#9585;</button>
-					<button class="dt" data-tool="ray" title="Ray — extends for ever">&#8599;</button>
-					<button class="dt" data-tool="hline" title="Horizontal line">&#8213;</button>
-					<button class="dt" data-tool="rect" title="Rectangle">&#9633;</button>
-					<button class="dt" data-tool="fib" title="Fibonacci retracement">&#8942;</button>
+					<button class="dt on" data-tool="cursor" title="Select and move (Esc)" aria-label="Select and move"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3l13 8-6 1.5L10 19z"/></svg></button>
+					<button class="dt" data-tool="trendline" title="Trendline" aria-label="Trendline"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 19L20 5M4 19h.01M20 5h.01"/></svg></button>
+					<button class="dt" data-tool="ray" title="Ray — extends for ever" aria-label="Ray"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 19L19 5M13 5h6v6"/></svg></button>
+					<button class="dt" data-tool="hline" title="Horizontal line" aria-label="Horizontal line"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12h18"/></svg></button>
+					<button class="dt" data-tool="rect" title="Rectangle" aria-label="Rectangle"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16v12H4z"/></svg></button>
+					<button class="dt" data-tool="fib" title="Fibonacci retracement" aria-label="Fibonacci retracement"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16M4 10h16M4 14h16M4 19h16"/></svg></button>
 					<span class="dsep"></span>
-					<button class="dt" id="rpToggle" title="Bar replay (r)">&#9199;</button>
-					<button class="dt danger" data-tool="clear" title="Delete all drawings on this chart">&#128465;</button>
+					<button class="dt" id="rpToggle" title="Bar replay (r)" aria-label="Bar replay"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5v14M9 5l11 7-11 7z"/></svg></button>
+					<button class="dt danger" data-tool="clear" title="Delete all drawings on this chart" aria-label="Delete all drawings"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
 				</div>
 				<div id="chartwrap">
 					<div id="chart"></div>
@@ -1071,7 +997,7 @@
 			<div id="cfgmodal">
 				<div class="chead">
 					<h4 id="cfgtitle"></h4>
-					<span class="cx" title="close">✕</span>
+					<span class="cx" title="close" role="button" aria-label="Close"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
 				</div>
 				<div class="ctabs">
 					<span class="ct on" data-t="inputs">Inputs</span>
@@ -1093,6 +1019,35 @@
 			</div>
 		</div>
 		<script>
+			// Colours the chart draws with. The defaults are the dark-theme tokens,
+			// so the node tests (which lift functions out of this file) see plain
+			// strings; in the browser applyPalette() refreshes them from app.css
+			// on load and whenever the theme changes.
+			const PAL = {
+				up: "#7bd3ea",
+				down: "#f0874a",
+				accent: "#7bd3ea",
+				violet: "#b8a1f0",
+				warn: "#e4b45a",
+				dim: "#9aa4b2",
+				text: "#e6eaf0",
+				bg: "#0e131a",
+				grid: "#141a22",
+				border: "#1b222c",
+				ref: "#2a3340",
+				s1: "#e4b45a",
+				s2: "#e58fb8",
+				s3: "#b8a1f0",
+				s4: "#7bd3ea",
+				s5: "#9fd38a",
+				// "#rrggbb" + alpha → rgba(); fills want translucency
+				a(hex, al) {
+					const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim())
+					if (!m) return hex
+					const n = parseInt(m[1], 16)
+					return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${al})`
+				},
+			}
 			"use strict"
 			const $ = (s) => document.querySelector(s)
 			const RANGES = {
@@ -1268,17 +1223,17 @@
 					overlays: [
 						{
 							name: "BB upper",
-							color: "#5b7bb5",
+							color: PAL.s3,
 							data: _pts(c, up),
 						},
 						{
 							name: "BB basis",
-							color: "#8b949e",
+							color: PAL.dim,
 							data: _pts(c, b),
 						},
 						{
 							name: "BB lower",
-							color: "#5b7bb5",
+							color: PAL.s3,
 							data: _pts(c, lo),
 						},
 					],
@@ -1303,17 +1258,17 @@
 					overlays: [
 						{
 							name: "Donchian upper",
-							color: "#6ab0a0",
+							color: PAL.s5,
 							data: _pts(c, u),
 						},
 						{
 							name: "Donchian mid",
-							color: "#8b949e",
+							color: PAL.dim,
 							data: _pts(c, m),
 						},
 						{
 							name: "Donchian lower",
-							color: "#b06a6a",
+							color: PAL.s2,
 							data: _pts(c, l),
 						},
 					],
@@ -1333,7 +1288,7 @@
 					overlays: [
 						{
 							name: "VWAP",
-							color: "#e4a541",
+							color: PAL.warn,
 							data: _pts(c, o),
 							width: 2,
 						},
@@ -1378,7 +1333,7 @@
 					overlays: [
 						{
 							name: "PSAR",
-							color: "#c9a0e4",
+							color: PAL.violet,
 							data: _pts(c, o),
 							dots: true,
 						},
@@ -1396,8 +1351,8 @@
 				// points, which is a lot of trust for a cosmetic detail.
 				// LineData takes an optional per-point `color`, so one series can
 				// carry both trends and the failure mode disappears.
-				const up = p.up || "#26a69a",
-					dn = p.dn || "#ef5350"
+				const up = p.up || PAL.up,
+					dn = p.dn || PAL.down
 				const data = []
 				for (let i = 0; i < s.up.length; i++) {
 					const u = s.up[i],
@@ -1431,13 +1386,13 @@
 					overlays: [
 						{
 							name: "52W H",
-							color: "#3a5",
+							color: PAL.up,
 							data: flat(win.high),
 							dashed: true,
 						},
 						{
 							name: "52W L",
-							color: "#a53",
+							color: PAL.down,
 							data: flat(win.low),
 							dashed: true,
 						},
@@ -1470,14 +1425,14 @@
 					panerows: [
 						{
 							name: `RSI ${p.length}`,
-							color: "#e4a541",
+							color: PAL.warn,
 							type: "line",
 							data: _pts(c, o),
 						},
 					],
 					refs: [
-						{ v: 70, color: "#553" },
-						{ v: 30, color: "#355" },
+						{ v: 70, color: PAL.ref },
+						{ v: 30, color: PAL.ref },
 					],
 					range: [0, 100],
 					fmt: 1,
@@ -1510,31 +1465,31 @@
 							value: +hist[i].toFixed(4),
 							color:
 								hist[i] >= 0
-									? "rgba(38,166,154,.6)"
-									: "rgba(239,83,80,.6)",
+									? PAL.a(PAL.up, .6)
+									: PAL.a(PAL.down, .6),
 						})
 				return {
 					panerows: [
 						{
 							name: "Hist",
-							color: "#8b949e",
+							color: PAL.dim,
 							type: "hist",
 							data: hp,
 						},
 						{
 							name: "MACD",
-							color: "#4184e4",
+							color: PAL.accent,
 							type: "line",
 							data: _pts(c, line),
 						},
 						{
 							name: "Signal",
-							color: "#e4a541",
+							color: PAL.warn,
 							type: "line",
 							data: _pts(c, sig),
 						},
 					],
-					refs: [{ v: 0, color: "#3a3f47" }],
+					refs: [{ v: 0, color: PAL.ref }],
 					fmt: 2,
 				}
 			}
@@ -1562,20 +1517,20 @@
 					panerows: [
 						{
 							name: "%K",
-							color: "#4184e4",
+							color: PAL.accent,
 							type: "line",
 							data: _pts(c, k),
 						},
 						{
 							name: "%D",
-							color: "#e4a541",
+							color: PAL.warn,
 							type: "line",
 							data: _pts(c, d),
 						},
 					],
 					refs: [
-						{ v: 80, color: "#553" },
-						{ v: 20, color: "#355" },
+						{ v: 80, color: PAL.ref },
+						{ v: 20, color: PAL.ref },
 					],
 					range: [0, 100],
 					fmt: 1,
@@ -1586,7 +1541,7 @@
 					panerows: [
 						{
 							name: `ATR ${p.length}`,
-							color: "#c9a0e4",
+							color: PAL.violet,
 							type: "line",
 							data: _pts(c, _atr(c, p.length)),
 						},
@@ -1609,14 +1564,14 @@
 					panerows: [
 						{
 							name: `CCI ${p.length}`,
-							color: "#4184e4",
+							color: PAL.accent,
 							type: "line",
 							data: _pts(c, o),
 						},
 					],
 					refs: [
-						{ v: 100, color: "#553" },
-						{ v: -100, color: "#355" },
+						{ v: 100, color: PAL.ref },
+						{ v: -100, color: PAL.ref },
 					],
 					fmt: 1,
 				}
@@ -1637,14 +1592,14 @@
 					panerows: [
 						{
 							name: `Williams %R ${p.length}`,
-							color: "#e4a541",
+							color: PAL.warn,
 							type: "line",
 							data: _pts(c, o),
 						},
 					],
 					refs: [
-						{ v: -20, color: "#553" },
-						{ v: -80, color: "#355" },
+						{ v: -20, color: PAL.ref },
+						{ v: -80, color: PAL.ref },
 					],
 					range: [-100, 0],
 					fmt: 1,
@@ -1668,7 +1623,7 @@
 					panerows: [
 						{
 							name: "OBV",
-							color: "#6ab0a0",
+							color: PAL.s5,
 							type: "line",
 							data: _pts(c, o),
 						},
@@ -1699,14 +1654,14 @@
 					panerows: [
 						{
 							name: `MFI ${p.length}`,
-							color: "#c9a0e4",
+							color: PAL.violet,
 							type: "line",
 							data: _pts(c, o),
 						},
 					],
 					refs: [
-						{ v: 80, color: "#553" },
-						{ v: 20, color: "#355" },
+						{ v: 80, color: PAL.ref },
+						{ v: 20, color: PAL.ref },
 					],
 					range: [0, 100],
 					fmt: 1,
@@ -1774,24 +1729,24 @@
 					panerows: [
 						{
 							name: "+DI",
-							color: "#26a69a",
+							color: PAL.up,
 							type: "line",
 							data: _pts(c, pdi),
 						},
 						{
 							name: "-DI",
-							color: "#ef5350",
+							color: PAL.down,
 							type: "line",
 							data: _pts(c, ndi),
 						},
 						{
 							name: `ADX ${P}`,
-							color: "#e6edf3",
+							color: PAL.text,
 							type: "line",
 							data: _pts(c, adxa),
 						},
 					],
-					refs: [{ v: 25, color: "#3a3f47" }],
+					refs: [{ v: 25, color: PAL.ref }],
 					fmt: 1,
 				}
 			}
@@ -1801,19 +1756,19 @@
 				sma: {
 					name: "Simple MA",
 					cat: "overlay",
-					p: { length: 20, color: "#f0b429" },
+					p: { length: 20, color: PAL.s1 },
 					fn: I_ma("sma"),
 				},
 				ema: {
 					name: "Exponential MA",
 					cat: "overlay",
-					p: { length: 21, color: "#41c4e4" },
+					p: { length: 21, color: PAL.s4 },
 					fn: I_ma("ema"),
 				},
 				wma: {
 					name: "Weighted MA",
 					cat: "overlay",
-					p: { length: 20, color: "#e4589a" },
+					p: { length: 20, color: PAL.s2 },
 					fn: I_ma("wma"),
 				},
 				boll: {
@@ -1832,7 +1787,7 @@
 				super: {
 					name: "Supertrend",
 					cat: "overlay",
-					p: { length: 10, mult: 3, up: "#26a69a", dn: "#ef5350" },
+					p: { length: 10, mult: 3, up: PAL.up, dn: PAL.down },
 					fn: I_super,
 				},
 				psar: {
@@ -1996,8 +1951,8 @@
 				area: { label: "Area", ohlc: false },
 				baseline: { label: "Baseline", ohlc: false },
 			}
-			const UP = "#26a69a",
-				DN = "#ef5350"
+			let UP = PAL.up,
+				DN = PAL.down
 
 			function makeSeries(kind) {
 				if (kind === "candles")
@@ -2023,20 +1978,20 @@
 					})
 				if (kind === "area")
 					return chart.addAreaSeries({
-						lineColor: "#4fc3f7", topColor: "rgba(79,195,247,.28)",
-						bottomColor: "rgba(79,195,247,0)", lineWidth: 2,
+						lineColor: PAL.s4, topColor: PAL.a(PAL.s4, .28),
+						bottomColor: PAL.a(PAL.s4, 0), lineWidth: 2,
 					})
 				if (kind === "baseline")
 					return chart.addBaselineSeries({
 						baseValue: { type: "price", price: 0 },
 						topLineColor: UP, bottomLineColor: DN,
-						topFillColor1: "rgba(38,166,154,.28)",
-						topFillColor2: "rgba(38,166,154,0)",
-						bottomFillColor1: "rgba(239,83,80,0)",
-						bottomFillColor2: "rgba(239,83,80,.28)",
+						topFillColor1: PAL.a(PAL.up, .28),
+						topFillColor2: PAL.a(PAL.up, 0),
+						bottomFillColor1: PAL.a(PAL.down, 0),
+						bottomFillColor2: PAL.a(PAL.down, .28),
 					})
 				return chart.addLineSeries({
-					color: "#4fc3f7",
+					color: PAL.s4,
 					lineWidth: 2,
 					lineType: kind === "step" ? 1 : 0,
 					pointMarkersVisible: kind === "markers",
@@ -2219,7 +2174,7 @@
 				const d = sparkPath(closes, 54, 16)
 				if (!d) return ""
 				return `<svg class="spark" width="54" height="16" viewBox="0 0 54 16">
-					<path d="${d}" fill="none" stroke="${up ? "#26a69a" : "#ef5350"}"
+					<path d="${d}" fill="none" stroke="${up ? PAL.up : PAL.down}"
 					      stroke-width="1.2"/></svg>`
 			}
 
@@ -2327,7 +2282,7 @@
 					// showing real rupees.
 					const norm = indexTo100(other.map((c) => c.close))
 					compareSeries = chart.addLineSeries({
-						color: "#f0a202",
+						color: PAL.warn,
 						lineWidth: 1.5,
 						priceScaleId: "cmp",
 						lastValueVisible: false,
@@ -2441,7 +2396,7 @@
 					const mk = p.markers.map((m) => ({
 						time: m.time,
 						position: m.type === "buy" ? "belowBar" : "aboveBar",
-						color: m.type === "buy" ? "#26a69a" : "#ef5350",
+						color: m.type === "buy" ? PAL.up : PAL.down,
 						shape: m.type === "buy" ? "arrowUp" : "arrowDown",
 						text: m.type === "buy" ? "B" : "S",
 					}))
@@ -2591,7 +2546,7 @@
 			}
 
 			function drawShape(ctx, kind, pts, style, selected, W, H) {
-				const colour = style.color || "#4fc3f7"
+				const colour = style.color || PAL.s4
 				ctx.save()
 				ctx.strokeStyle = colour
 				ctx.lineWidth = style.width || 1.5
@@ -2660,8 +2615,8 @@
 
 			function drawHandles(ctx, pts) {
 				ctx.save()
-				ctx.fillStyle = "#0d1117"
-				ctx.strokeStyle = "#4fc3f7"
+				ctx.fillStyle = PAL.bg
+				ctx.strokeStyle = PAL.s4
 				ctx.lineWidth = 1.5
 				for (const p of pts) {
 					ctx.beginPath()
@@ -3044,34 +2999,34 @@
 			const EVENTS = {
 				st_flip: {
 					label: "Supertrend flip",
-					color: "#26a69a",
+					color: PAL.up,
 					fn: (c) =>
 						supertrend(c, 10, 3).flips.map((f) => ({
 							time: f.time,
 							dir: f.dir,
 							text: f.dir === "up" ? "ST↑" : "ST↓",
-							color: f.dir === "up" ? "#26a69a" : "#ef5350",
+							color: f.dir === "up" ? PAL.up : PAL.down,
 						})),
 				},
 				rsi_ob: {
 					label: "RSI crosses 70 / 30",
-					color: "#e3b341",
+					color: PAL.warn,
 					fn: (c) => {
 						const r = _rsiSeries(_cl(c), 14)
 						const out = []
 						for (let i = 1; i < c.length; i++) {
 							if (r[i] == null || r[i - 1] == null) continue
 							if (r[i - 1] <= 70 && r[i] > 70)
-								out.push({ time: c[i].time, dir: "down", text: "RSI 70", color: "#ef5350" })
+								out.push({ time: c[i].time, dir: "down", text: "RSI 70", color: PAL.down })
 							else if (r[i - 1] >= 30 && r[i] < 30)
-								out.push({ time: c[i].time, dir: "up", text: "RSI 30", color: "#26a69a" })
+								out.push({ time: c[i].time, dir: "up", text: "RSI 30", color: PAL.up })
 						}
 						return out
 					},
 				},
 				macd_cross: {
 					label: "MACD signal cross",
-					color: "#4184e4",
+					color: PAL.accent,
 					fn: (c) => {
 						const cl = _cl(c)
 						const f = _ema(cl, 12),
@@ -3085,12 +3040,12 @@
 						let k = 0
 						for (let i = 0; i < macd.length; i++)
 							if (macd[i] != null) sig[i] = sigVals[k++]
-						return _crossEvents(c, macd, sig, "MACD↑", "MACD↓", "#26a69a", "#ef5350")
+						return _crossEvents(c, macd, sig, "MACD↑", "MACD↓", PAL.up, PAL.down)
 					},
 				},
 				ma_cross: {
 					label: "Golden / death cross (50/200)",
-					color: "#c9a0e4",
+					color: PAL.violet,
 					fn: (c) => {
 						const cl = _cl(c)
 						return _crossEvents(
@@ -3099,14 +3054,14 @@
 							_sma(cl, 200),
 							"Golden",
 							"Death",
-							"#26a69a",
-							"#ef5350",
+							PAL.up,
+							PAL.down,
 						)
 					},
 				},
 				bb_break: {
 					label: "Bollinger band break",
-					color: "#8b949e",
+					color: PAL.dim,
 					fn: (c) => {
 						const cl = _cl(c),
 							m = _sma(cl, 20),
@@ -3124,7 +3079,7 @@
 									time: c[i].time,
 									dir: now === 1 ? "up" : "down",
 									text: now === 1 ? "BB↑" : "BB↓",
-									color: now === 1 ? "#26a69a" : "#ef5350",
+									color: now === 1 ? PAL.up : PAL.down,
 								})
 							outside = now
 						}
@@ -3133,7 +3088,7 @@
 				},
 				vol_surge: {
 					label: "Volume ≥ 2× average",
-					color: "#4184e4",
+					color: PAL.accent,
 					fn: (c) => {
 						const v = _vol(c),
 							a = _sma(v, 20)
@@ -3145,7 +3100,7 @@
 									time: c[i].time,
 									dir: c[i].close >= c[i].open ? "up" : "down",
 									text: (v[i] / a[i]).toFixed(1) + "×",
-									color: "#4184e4",
+									color: PAL.accent,
 								})
 						}
 						return out
@@ -3357,37 +3312,76 @@
 			}
 
 			// ------------------------------------------------------------- charts
-			function makeCharts() {
-				const opts = {
-					layout: {
-						background: { color: "#0e1116" },
-						textColor: "#8b949e",
-					},
-					grid: {
-						vertLines: { color: "#161b22" },
-						horzLines: { color: "#161b22" },
-					},
+			// Chart chrome from the design tokens (TF.chartTheme) plus this page's
+			// own scale/crosshair settings.
+			function chartOpts() {
+				const th = window.TF ? TF.chartTheme() : {}
+				return {
+					...th,
 					timeScale: {
+						...(th.timeScale || {}),
 						timeVisible: true,
 						secondsVisible: false,
-						borderColor: "#2d333b",
 					},
-					rightPriceScale: { borderColor: "#2d333b" },
-					crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+					crosshair: {
+						...(th.crosshair || {}),
+						mode: LightweightCharts.CrosshairMode.Normal,
+					},
 					autoSize: true,
 				}
+			}
+			// Refresh PAL from the tokens. Series colours are read from PAL when
+			// they're built, so a theme change rebuilds them (see tf:theme below).
+			function applyPalette() {
+				if (!window.TF) return
+				const c = TF.colors()
+				Object.assign(PAL, {
+					up: c.bull, down: c.bear, accent: c.bull, violet: c.violet,
+					warn: c.warn, dim: c.text2, text: c.text, bg: c.surface1,
+					grid: c.border, border: c.border, ref: TF.cssVar("--border-2"),
+					s1: c.series[0], s2: c.series[1], s3: c.series[2], s4: c.series[3], s5: c.series[4],
+				})
+				UP = PAL.up
+				DN = PAL.down
+			}
+			function volData() {
+				return candles.map((c) => ({
+					time: c.time,
+					value: c.volume,
+					color: c.close >= c.open ? PAL.a(PAL.up, 0.35) : PAL.a(PAL.down, 0.35),
+				}))
+			}
+			window.addEventListener("tf:theme", () => {
+				applyPalette()
+				if (!chart) return
+				const o = chartOpts()
+				paneOpts = o
+				chart.applyOptions(o)
+				for (const p of oscPanes)
+					p.chart.applyOptions({ ...o, timeScale: { ...o.timeScale, visible: true } })
+				setChartType(state.ctype) // rebuild the main series in the new colours
+				if (candles.length) volSeries.setData(volData())
+				reapplyIndicators()
+				refreshAlertLines()
+				if (typeof refreshMarkers === "function") refreshMarkers()
+				syncScaleWidths()
+			})
+
+			function makeCharts() {
+				applyPalette()
+				const opts = chartOpts()
 				chart = LightweightCharts.createChart($("#chart"), opts)
 				series = chart.addCandlestickSeries({
-					upColor: "#26a69a",
-					downColor: "#ef5350",
-					wickUpColor: "#26a69a",
-					wickDownColor: "#ef5350",
+					upColor: PAL.up,
+					downColor: PAL.down,
+					wickUpColor: PAL.up,
+					wickDownColor: PAL.down,
 					borderVisible: false,
 				})
 				volSeries = chart.addHistogramSeries({
 					priceScaleId: "vol",
 					priceFormat: { type: "volume" },
-					color: "#2d333b",
+					color: PAL.ref,
 				})
 				chart
 					.priceScale("vol")
@@ -3440,8 +3434,8 @@
 				el.innerHTML =
 					`<div class="pgrip" title="drag to resize · double-click to reset"></div>` +
 					`<div class="plabel"></div>` +
-					`<div class="pcfg" title="settings">⚙</div>` +
-					`<div class="prm" title="remove">✕</div>`
+					`<div class="pcfg" title="settings" role="button" tabindex="0" aria-label="Indicator settings"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M16 5v4M10 15v4"/></svg></div>` +
+					`<div class="prm" title="remove" role="button" tabindex="0" aria-label="Remove indicator"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></div>`
 				$("#panes").appendChild(el)
 				const host = document.createElement("div")
 				host.style.cssText = "position:absolute;inset:0;"
@@ -3783,10 +3777,10 @@
 							: ""
 						const ps = pstr(inst)
 						return (
-							`<span class="ichip" data-id="${inst.id}">${sw}${def.name}${ps ? ` <span style="color:#8b949e">${ps}</span>` : ""}` +
-							` <span class="ival" style="color:#e6edf3;font-variant-numeric:tabular-nums"></span>` +
-							`${Object.keys(inst.p).length ? `<span class="cfg" title="settings">⚙</span>` : ""}` +
-							`<span class="x" title="remove">✕</span></span>`
+							`<span class="ichip" data-id="${inst.id}">${sw}${def.name}${ps ? ` <span class="faint">${ps}</span>` : ""}` +
+							` <span class="ival" style="color:var(--text);font-variant-numeric:tabular-nums"></span>` +
+							`${Object.keys(inst.p).length ? `<span class="cfg" title="settings" role="button" aria-label="Settings"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M16 5v4M10 15v4"/></svg></span>` : ""}` +
+							`<span class="x" title="remove" role="button" aria-label="Remove"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></span></span>`
 						)
 					})
 					.join("")
@@ -4099,16 +4093,7 @@
 					loadDrawings()
 					showPinnedBacktest()
 					syncScaleWidths()
-					volSeries.setData(
-						candles.map((c) => ({
-							time: c.time,
-							value: c.volume,
-							color:
-								c.close >= c.open
-									? "rgba(38,166,154,.35)"
-									: "rgba(239,83,80,.35)",
-						})),
-					)
+					volSeries.setData(volData())
 					lastBar = candles[candles.length - 1] || null
 					chart.timeScale().fitContent()
 					status(`${candles.length} candles`)
@@ -4141,7 +4126,7 @@
 			function alertColor(kind, price) {
 				// Above spot = a level you're waiting to break up through.
 				const spot = lastBar ? lastBar.close : price
-				return price >= spot ? "#26a69a" : "#ef5350"
+				return price >= spot ? PAL.up : PAL.down
 			}
 
 			function drawAlertLines(rows) {
@@ -4409,7 +4394,7 @@
 						.map(
 							(r) =>
 								`<div data-s="${r.tradingsymbol}"><span class="sym">${r.tradingsymbol}</span>
-       <span style="color:#8b949e;font-size:11px">${r.exchange}</span>
+       <span class="faint" style="font-size:11px">${r.exchange}</span>
        <div class="nm">${r.name || ""}</div></div>`,
 						)
 						.join("")
@@ -4554,7 +4539,7 @@
        <span><span class="sym">${r.symbol}</span>
        <div class="nm">${r.name || ""}</div></span>
        <span class="right">${sparkSVG(r.closes, up)}${chg}
-       <span class="rm" title="remove">✕</span></span></div>`
+       <span class="rm" title="remove" role="button" aria-label="Remove from watchlist"><svg class="tf-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></span></span></div>`
 					})
 					.join("")
 				$("#wlist")
@@ -4597,11 +4582,30 @@
 					const s = await (await fetch("/api/session")).json()
 					if (!s.kite.startsWith("valid"))
 						$("#status").innerHTML =
-							`no Kite session — <a style="color:#4184e4" href="${s.login_url}">log in</a>`
+							`no Kite session — <a href="${s.login_url}">log in</a>`
 				})()
 			} catch (e) {
 				status("init error: " + e.message)
 			}
+		
+			// phones: search + watchlist slide over the chart
+			;(() => {
+				const btn = $("#sidebtn")
+				if (!btn) return
+				btn.innerHTML = TF.icon("search")
+				const set = (open) => {
+					document.body.classList.toggle("side-open", open)
+					btn.setAttribute("aria-expanded", open ? "true" : "false")
+					if (open) $("#search").focus()
+				}
+				btn.onclick = () => set(!document.body.classList.contains("side-open"))
+				document.addEventListener("click", (e) => {
+					if (!document.body.classList.contains("side-open")) return
+					if (e.target.closest("#side") && !e.target.closest(".wl, #results div")) return
+					if (e.target.closest("#sidebtn")) return
+					set(false)
+				})
+			})()
 		</script>
 	</body>
 </html>

@@ -406,12 +406,17 @@
 		if (!nav) return
 		mounted = true
 		const page = opts.page || nav.dataset.page || ""
+		// compact: icon-only rail and no top bar — for full-viewport pages (the
+		// chart) that carry their own header. Market status + theme toggle go
+		// into the page's [data-tf-slot] instead.
+		const compact = opts.compact || nav.dataset.shell === "compact"
 		const here = ALL.find((x) => x[0] === page)
 		const title = opts.title || nav.dataset.title || (here ? here[1] : doc.title)
 		const cur = (k) => (k === page ? ' aria-current="page"' : "")
 
 		nav.classList.add("tf-mounted")
 		doc.body.classList.add("tf-app")
+		if (compact) doc.body.classList.add("tf-compact")
 
 		// rail
 		const rail = doc.createElement("aside")
@@ -430,7 +435,7 @@
 		top.innerHTML = `<h1 class="tf-title">${esc(title)}</h1><span class="sp"></span>` +
 			`<div class="tf-mkt" aria-live="off"><span><span class="tf-dot" aria-hidden="true"></span><span class="tf-state">—</span></span><span class="tf-sep"></span><span class="tf-clock"></span><span class="tf-sep"></span><span class="tf-nifty" hidden></span></div>` +
 			`<button type="button" class="icon-btn" data-tf-theme-toggle></button>`
-		const status = doc.getElementById("status")
+		const status = compact ? null : doc.getElementById("status")
 		if (status) top.insertBefore(status, top.querySelector(".sp").nextSibling)
 		if (opts.actions) top.insertBefore(opts.actions, top.querySelector(".tf-mkt"))
 
@@ -464,10 +469,20 @@
 		scrim.onclick = () => setMore(false)
 		more.addEventListener("keydown", (e) => { if (e.key === "Escape") { setMore(false); moreBtn.focus() } })
 
-		nav.append(rail, top, tabbar, scrim, more)
 		const t = top.querySelector("[data-tf-theme-toggle]")
 		paintToggle(t)
 		t.onclick = toggleTheme
+		if (compact) {
+			// shell() runs before the page header is parsed; slot in once it is
+			const place = () => {
+				const slot = doc.querySelector("[data-tf-slot]")
+				if (slot) slot.append(top.querySelector(".tf-mkt"), t)
+				paintMarket()
+			}
+			if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", place)
+			else place()
+			nav.append(rail, tabbar, scrim, more)
+		} else nav.append(rail, top, tabbar, scrim, more)
 
 		paintMarket()
 		setInterval(paintMarket, 1000)
