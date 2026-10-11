@@ -4,7 +4,12 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width,initial-scale=1" />
 		<title>Portfolio — TickerForge</title>
+		<meta name="theme-color" content="#0b0e13" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
 		<link rel="stylesheet" href="/app.css" />
+		<script src="/ui.js"></script>
 		<style>
 			.pos {
 				color: var(--up);
@@ -81,30 +86,32 @@
 		</style>
 	</head>
 	<body>
-		<div id="nav">
+		<div id="nav" data-page="portfolio">
 			<span class="brand">TickerForge</span>
+			<a class="tab" href="/board">Board</a>
 			<a class="tab" href="/">Chart</a>
 			<a class="tab" href="/desk">Desk</a>
-			<a class="tab on" href="/portfolio">Portfolio</a>
 			<a class="tab" href="/scanner">Scanner</a>
 			<a class="tab" href="/screen">Screen</a>
 			<a class="tab" href="/query">Query</a>
 			<a class="tab" href="/fundamentals">Fundamentals</a>
 			<a class="tab" href="/results">Results</a>
 			<a class="tab" href="/valuation">Valuation</a>
-			<a class="tab" href="/backtest">Backtest</a>
-			<a class="tab" href="/journal">Journal</a>
 			<a class="tab" href="/metrics">Metrics</a>
-			<a class="tab" href="/paper">Paper</a>
 			<a class="tab" href="/news">News</a>
 			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab on" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/backtest">Backtest</a>
 			<a class="tab" href="/settings">Settings</a>
 			<span class="sp"></span>
 			<span class="status" id="status"></span>
 		</div>
+		<script>TF.shell()</script>
 
 		<div class="wrap">
-			<div class="row">
+			<div class="page-head">
 				<h2 class="page">Portfolio</h2>
 				<span
 					class="ro"
