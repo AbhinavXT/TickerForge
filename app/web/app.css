@@ -584,7 +584,13 @@ details.collapsible > .body { padding:0 var(--s4) var(--s4); }
 
 /* ===================================================== phones: touch targets */
 @media (max-width:759px) {
-	.btn, button.btn, .seg button, .chip-toggle button, .tabs button, .icon-btn { min-height:44px; }
+	.btn, button.btn, .seg button, .chip-toggle button, .tabs button, .icon-btn,
+	button.chip { min-height:44px; }
+	/* segmented controls scroll sideways rather than wrapping into a grid */
+	.seg { flex-wrap:nowrap; overflow-x:auto; max-width:100%; scrollbar-width:none; }
+	.seg button { flex:none; }
+	.tabs { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+	.tabs button { flex:none; }
 	.icon-btn { width:44px; height:44px; }
 	select, textarea,
 	input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]) {

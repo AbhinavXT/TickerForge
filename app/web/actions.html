@@ -4,69 +4,74 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>TickerForge · Corporate Actions</title>
+		<meta name="theme-color" content="#0b0e13" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
 		<link rel="stylesheet" href="/app.css" />
+		<script src="/ui.js"></script>
 	</head>
 	<body>
-		<div id="nav">
+		<div id="nav" data-page="actions">
 			<span class="brand">TickerForge</span>
+			<a class="tab" href="/board">Board</a>
 			<a class="tab" href="/">Chart</a>
 			<a class="tab" href="/desk">Desk</a>
-			<a class="tab" href="/portfolio">Portfolio</a>
 			<a class="tab" href="/scanner">Scanner</a>
 			<a class="tab" href="/screen">Screen</a>
 			<a class="tab" href="/query">Query</a>
 			<a class="tab" href="/fundamentals">Fundamentals</a>
 			<a class="tab" href="/results">Results</a>
 			<a class="tab" href="/valuation">Valuation</a>
-			<a class="tab" href="/backtest">Backtest</a>
-			<a class="tab" href="/journal">Journal</a>
 			<a class="tab" href="/metrics">Metrics</a>
-			<a class="tab" href="/paper">Paper</a>
 			<a class="tab" href="/news">News</a>
 			<a class="tab on" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/backtest">Backtest</a>
 			<a class="tab" href="/settings">Settings</a>
 			<span class="sp"></span>
 			<span class="status" id="status"></span>
 		</div>
+		<script>TF.shell()</script>
 		<div class="wrap">
-			<div class="row">
-				<h2 class="page">Corporate actions &amp; filings</h2>
+			<div class="page-head">
+				<div>
+					<h2 class="page">Corporate actions &amp; filings</h2>
+					<div class="sub">Stored NSE filings for your watchlist, plus market-wide results, dividends, concalls and corporate actions.</div>
+				</div>
 				<div class="spacer"></div>
-				<input
-					class="search"
-					id="symf"
-					placeholder="Filter by symbol…"
-					autocomplete="off"
-					style="min-width: 160px"
-				/>
-				<button class="btn primary" id="poll">Poll NSE now</button>
+				<button type="button" class="btn primary" id="poll"></button>
 			</div>
 
-			<div class="block" style="margin: 12px 0">
-				<div class="row">
-					<div>
-						<b>Market-wide calendar</b>
-						<span class="sub"
-							>— results, dividends &amp; corporate actions for
-							<i>all</i> NSE stocks (not just your
-							watchlist)</span
-						>
+			<details class="collapsible" id="cal">
+				<summary>
+					<span>Market-wide calendar</span>
+					<span class="sub" style="font-weight: 400">results, dividends &amp; corporate actions for <i>all</i> NSE stocks</span>
+				</summary>
+				<div class="body">
+					<div class="row" style="margin-bottom: var(--s3)">
+						<button type="button" class="btn" id="calpreview">Preview</button>
+						<a class="btn primary" id="caldl" href="/api/calendar.xlsx"></a>
 					</div>
-					<div class="spacer"></div>
-					<button class="btn" id="calpreview">Preview</button>
-					<a class="btn primary" id="caldl" href="/api/calendar.xlsx"
-						>⤓ Export to Excel</a
-					>
+					<div id="calbody"></div>
 				</div>
-				<div id="calbody"></div>
+			</details>
+
+			<div class="card" style="margin-top: var(--s3)">
+				<div class="row">
+					<div class="sbox" style="flex: 1 1 200px; max-width: 280px">
+						<input class="search" id="symf" placeholder="Filter by symbol…" autocomplete="off" aria-label="Filter by symbol" style="min-width: 0; width: 100%" />
+					</div>
+					<div class="seg" id="srcs" aria-label="Feed"></div>
+				</div>
+				<div class="row" style="margin-top: var(--s2)" id="cats" role="group" aria-label="Category"></div>
 			</div>
-			<div class="row" style="margin-top: 10px">
-				<div class="chip-toggle" id="cats"></div>
-				<div class="spacer"></div>
-				<div class="chip-toggle" id="srcs"></div>
+			<div class="row" style="margin: var(--s3) 0 var(--s2)">
+				<div class="sub" id="meta"></div>
 			</div>
-			<div class="sub" id="meta" style="margin-top: 8px"></div>
-			<div id="body"></div>
+			<div class="tbl-wrap" id="bodywrap"><div id="body"></div></div>
 		</div>
 
 		<script>
@@ -75,11 +80,9 @@
 			const status = (m) => {
 				$("#status").textContent = m || ""
 			}
-			const esc = (s) =>
-				(s || "").replace(
-					/[&<>]/g,
-					(c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c],
-				)
+			const esc = TF.esc
+			$("#poll").innerHTML = TF.icon("refresh") + "Poll NSE now"
+			$("#caldl").innerHTML = TF.icon("download") + "Export to Excel"
 
 			const SRC_LABEL = {
 				announcement: "Announcement",
@@ -87,10 +90,10 @@
 				board_meeting: "Board meeting",
 			}
 			const CAT_CLASS = {
-				RESULTS: "results",
-				DIVIDEND: "dividend",
-				CONCALL: "concall",
-				"CORP ACTION": "corp",
+				RESULTS: "bull",
+				DIVIDEND: "warn",
+				CONCALL: "",
+				"CORP ACTION": "violet",
 			}
 			let state = { category: null, source: null, symbol: "" }
 			let watch = new Set()
@@ -109,45 +112,40 @@
 			}
 
 			async function boot() {
-				const wl = await (await fetch("/api/watchlist")).json()
-				watch = new Set(wl.map((w) => w.tradingsymbol))
-				const meta = await (await fetch("/api/events?limit=1")).json()
-				// category chips
+				try {
+					const wl = await (await fetch("/api/watchlist")).json()
+					watch = new Set((Array.isArray(wl) ? wl : []).map((w) => w.tradingsymbol))
+				} catch (e) {}
+				let meta = { categories: [], sources: [] }
+				try {
+					const r = await fetch("/api/events?limit=1")
+					if (r.ok) meta = await r.json()
+				} catch (e) {}
 				$("#cats").innerHTML =
-					`<button data-c="" class="on">All</button>` +
-					meta.categories
-						.map((c) => `<button data-c="${c}">${c}</button>`)
+					`<button type="button" class="chip on" data-c="" aria-pressed="true">All categories</button>` +
+					(meta.categories || [])
+						.map((c) => `<button type="button" class="chip" data-c="${esc(c)}" aria-pressed="false">${esc(c)}</button>`)
 						.join("")
 				$("#srcs").innerHTML =
-					`<button data-s="" class="on">All feeds</button>` +
-					meta.sources
-						.map(
-							(s) =>
-								`<button data-s="${s}">${SRC_LABEL[s] || s}</button>`,
-						)
+					`<button type="button" data-v="" class="on" aria-pressed="true">All feeds</button>` +
+					(meta.sources || [])
+						.map((s) => `<button type="button" data-v="${esc(s)}" aria-pressed="false">${SRC_LABEL[s] || esc(s)}</button>`)
 						.join("")
-				$("#cats")
-					.querySelectorAll("button")
-					.forEach(
-						(b) =>
-							(b.onclick = () => {
-								$("#cats .on")?.classList.remove("on")
-								b.classList.add("on")
-								state.category = b.dataset.c || null
-								load()
-							}),
-					)
-				$("#srcs")
-					.querySelectorAll("button")
-					.forEach(
-						(b) =>
-							(b.onclick = () => {
-								$("#srcs .on")?.classList.remove("on")
-								b.classList.add("on")
-								state.source = b.dataset.s || null
-								load()
-							}),
-					)
+				$("#cats").querySelectorAll("button").forEach(
+					(b) =>
+						(b.onclick = () => {
+							for (const x of $("#cats").querySelectorAll("button")) {
+								x.classList.toggle("on", x === b)
+								x.setAttribute("aria-pressed", x === b)
+							}
+							state.category = b.dataset.c || null
+							load()
+						}),
+				)
+				TF.seg($("#srcs"), (v) => {
+					state.source = v || null
+					load()
+				})
 				load()
 			}
 
@@ -159,38 +157,33 @@
 
 			// ---- market-wide calendar ----
 			$("#calpreview").onclick = async () => {
-				$("#calbody").innerHTML =
-					'<div class="loading">fetching NSE calendar (all stocks)…</div>'
+				$("#calbody").innerHTML = TF.skeleton(5)
 				$("#calpreview").disabled = true
 				try {
 					const d = await (await fetch("/api/calendar")).json()
-					const rows = (d.rows || []).filter(
-						(r) => r.type !== "ERROR",
-					)
-					const errs = (d.rows || []).filter(
-						(r) => r.type === "ERROR",
-					)
-					let html = `<div class="sub" style="margin:8px 0">${d.count || rows.length} entries · showing first 60 · full set in the Excel export</div>`
+					const rows = (d.rows || []).filter((r) => r.type !== "ERROR")
+					const errs = (d.rows || []).filter((r) => r.type === "ERROR")
+					let html = `<div class="sub" style="margin-bottom:var(--s2)"><span class="mono">${d.count || rows.length}</span> entries · showing first 60 · full set in the Excel export</div>`
 					if (errs.length)
 						html += `<div class="notice">${errs.map((e) => esc(e.detail)).join(" · ")}</div>`
-					html += `<div class="tbl-wrap" style="max-height:360px;overflow:auto"><table class="stmt" style="white-space:nowrap">
+					html += `<div class="tbl-wrap" style="max-height:360px;overflow:auto"><table class="tbl">
       <thead><tr><th>Date</th><th>Symbol</th><th>Company</th><th>Type</th><th>Details</th></tr></thead>
       <tbody>${rows
 			.slice(0, 60)
 			.map(
 				(r) => `<tr>
-        <td style="text-align:left">${esc(r.date)}</td><td style="text-align:left">${esc(r.symbol)}</td>
-        <td style="text-align:left">${esc((r.company || "").slice(0, 30))}</td>
-        <td style="text-align:left">${esc(r.type)}</td>
-        <td style="text-align:left">${esc((r.detail || "").slice(0, 70))}</td></tr>`,
+        <td class="mono">${esc(r.date)}</td><td class="mono">${esc(r.symbol)}</td>
+        <td>${esc((r.company || "").slice(0, 30))}</td>
+        <td><span class="chip">${esc(r.type)}</span></td>
+        <td class="muted">${esc((r.detail || "").slice(0, 70))}</td></tr>`,
 			)
 			.join("")}</tbody></table></div>`
 					$("#calbody").innerHTML = rows.length
 						? html
-						: '<div class="empty">NSE returned no calendar rows right now — try again shortly.</div>'
+						: TF.empty("NSE returned no calendar rows right now", "Try again shortly.", "actions")
 				} catch (e) {
-					$("#calbody").innerHTML =
-						`<div class="empty">calendar error: ${esc(e.message)}</div>`
+					$("#calbody").innerHTML = ""
+					$("#calbody").appendChild(TF.errorBox(`Calendar error: ${e.message}`, () => $("#calpreview").click()))
 				} finally {
 					$("#calpreview").disabled = false
 				}
@@ -206,14 +199,12 @@
 					if (!r.ok) {
 						const e = await r.json().catch(() => ({}))
 						status(e.detail || "poll failed")
+						TF.toast(e.detail || "Poll failed", "err")
 					} else {
 						const s = await r.json()
-						status(
-							"polled: " +
-								Object.entries(s)
-									.map(([k, v]) => `${k} ${v}`)
-									.join(" · "),
-						)
+						const msg = "polled: " + Object.entries(s).map(([k, v]) => `${k} ${v}`).join(" · ")
+						status(msg)
+						TF.toast(msg)
 						await load()
 					}
 				} finally {
@@ -226,51 +217,58 @@
 				if (state.category) p.set("category", state.category)
 				if (state.source) p.set("source", state.source)
 				if (state.symbol) p.set("symbol", state.symbol)
-				$("#body").innerHTML = '<div class="loading">loading…</div>'
+				$("#body").innerHTML = `<div style="padding:var(--s4)">${TF.skeleton(6)}</div>`
 				try {
-					const d = await (await fetch("/api/events?" + p)).json()
+					const r = await fetch("/api/events?" + p)
+					const d = await r.json()
+					if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`)
 					const ev = d.events || []
-					$("#meta").textContent =
-						`${ev.length} filing(s)` +
-						(state.symbol ? ` for ${state.symbol}` : "") +
-						(state.category ? ` · ${state.category}` : "") +
-						(state.source ? ` · ${SRC_LABEL[state.source]}` : "")
+					$("#meta").innerHTML =
+						`<span class="mono">${ev.length}</span> filing(s)` +
+						(state.symbol ? ` for <span class="mono">${esc(state.symbol)}</span>` : "") +
+						(state.category ? ` · ${esc(state.category)}` : "") +
+						(state.source ? ` · ${SRC_LABEL[state.source] || esc(state.source)}` : "")
 					if (!ev.length) {
-						$("#body").innerHTML =
-							`<div class="empty">No stored filings match. Try “Poll NSE now”, or widen the filters.<br>
-       <span class="sub">(The poller stores watchlist events plus market-wide results/dividends/concalls/corporate-actions.)</span></div>`
+						$("#body").innerHTML = TF.empty(
+							"No stored filings match",
+							"Try “Poll NSE now”, or widen the filters.",
+							"actions",
+						)
 						return
 					}
-					$("#body").innerHTML = ev
-						.map((e) => {
-							const cc = CAT_CLASS[e.category] || "src"
-							const wl = watch.has(e.symbol)
-								? `<span class="badge wl">watchlist</span>`
-								: ""
-							const cat = e.category
-								? `<span class="badge ${cc}">${e.category}</span>`
-								: ""
-							const when = e.when ? ` · ${esc(e.when)}` : ""
-							const link = e.url
-								? ` · <a href="${esc(e.url)}" target="_blank" rel="noopener">attachment</a>`
-								: ""
-							return `<div class="block"><h3>${esc(e.symbol)} ${wl} ${cat}
-        <span class="badge src">${SRC_LABEL[e.source] || e.source}</span>
-        <span class="spacer"></span><span class="sub" style="font-weight:400">${fmtSeen(e.seen_at)}</span></h3>
-        <div class="item" style="border-top:0;padding-top:0">
-          <div class="t">${esc(e.headline)}</div>
-          ${e.detail ? `<div class="m">${esc(e.detail)}</div>` : ""}
-          <div class="m">${when}${link}</div>
-        </div></div>`
-						})
-						.join("")
-				} catch (e) {
 					$("#body").innerHTML =
-						`<div class="empty">error: ${esc(e.message)}</div>`
+						`<table class="tbl ev"><thead><tr><th>Symbol</th><th>Filing</th><th>Seen</th></tr></thead><tbody>` +
+						ev
+							.map((e) => {
+								const cc = CAT_CLASS[e.category] ?? ""
+								const wl = watch.has(e.symbol) ? `<span class="chip bull">watchlist</span>` : ""
+								const cat = e.category ? `<span class="chip ${cc}">${esc(e.category)}</span>` : ""
+								const when = e.when ? `<span class="chip mono">${esc(e.when)}</span>` : ""
+								const link = e.url
+									? `<a class="chip" href="${esc(e.url)}" target="_blank" rel="noopener">${TF.icon("external")}attachment</a>`
+									: ""
+								return `<tr>
+          <td class="mono" style="vertical-align:top;font-weight:500">${esc(e.symbol)}</td>
+          <td class="evtext"><div>${esc(e.headline)}</div>
+            ${e.detail ? `<div class="faint" style="font-size:var(--fs-12);margin-top:2px">${esc(e.detail)}</div>` : ""}
+            <div class="row" style="gap:6px;margin-top:6px">${cat}<span class="chip">${SRC_LABEL[e.source] || esc(e.source)}</span>${wl}${when}${link}</div></td>
+          <td class="mono faint" style="vertical-align:top;text-align:right">${fmtSeen(e.seen_at)}</td></tr>`
+							})
+							.join("") +
+						`</tbody></table>`
+				} catch (e) {
+					$("#body").innerHTML = ""
+					$("#body").appendChild(TF.errorBox(`Couldn't load filings: ${e.message}`, load))
 				}
 			}
 
 			boot()
 		</script>
+		<style>
+			/* filings wrap; the shared table keeps cells on one line */
+			table.ev td.evtext { white-space: normal; min-width: 240px; }
+			#cats .chip svg, .ev .chip svg { width: 12px; height: 12px; }
+			#bodywrap { overflow-x: auto; }
+		</style>
 	</body>
 </html>
