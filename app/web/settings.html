@@ -4,7 +4,12 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width,initial-scale=1" />
 		<title>Settings — TickerForge</title>
+		<meta name="theme-color" content="#0b0e13" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
 		<link rel="stylesheet" href="/app.css" />
+		<script src="/ui.js"></script>
 		<style>
 			.grp {
 				margin: 26px 0 6px;
@@ -90,7 +95,7 @@
 			}
 			button {
 				background: var(--accent);
-				color: #04121a;
+				color: var(--on-accent);
 				border: 0;
 				border-radius: 8px;
 				padding: 8px 18px;
@@ -134,30 +139,32 @@
 		</style>
 	</head>
 	<body>
-		<div id="nav">
+		<div id="nav" data-page="settings">
 			<span class="brand">TickerForge</span>
+			<a class="tab" href="/board">Board</a>
 			<a class="tab" href="/">Chart</a>
 			<a class="tab" href="/desk">Desk</a>
-			<a class="tab" href="/portfolio">Portfolio</a>
 			<a class="tab" href="/scanner">Scanner</a>
 			<a class="tab" href="/screen">Screen</a>
 			<a class="tab" href="/query">Query</a>
 			<a class="tab" href="/fundamentals">Fundamentals</a>
 			<a class="tab" href="/results">Results</a>
 			<a class="tab" href="/valuation">Valuation</a>
-			<a class="tab" href="/backtest">Backtest</a>
-			<a class="tab" href="/journal">Journal</a>
 			<a class="tab" href="/metrics">Metrics</a>
-			<a class="tab" href="/paper">Paper</a>
 			<a class="tab" href="/news">News</a>
 			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/backtest">Backtest</a>
 			<a class="tab on" href="/settings">Settings</a>
 			<span class="sp"></span>
 			<span class="status" id="status"></span>
 		</div>
+		<script>TF.shell()</script>
 
 		<div class="wrap">
-			<h1>Settings</h1>
+			<h2 class="page">Settings</h2>
 			<div id="body"><div class="help">Loading…</div></div>
 
 			<div class="bar">
