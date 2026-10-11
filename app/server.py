@@ -570,7 +570,12 @@ def api_watchlist():
 @app.post("/api/watchlist/{symbol}")
 def api_watch_add(symbol: str):
     # autofetch fundamentals+results in the background so the add stays instant
-    return watchlist.add(symbol, background=True)
+    try:
+        return watchlist.add(symbol, background=True)
+    except SystemExit as e:
+        # add() exits CLI-style on an unknown symbol; in the server that would
+        # stop the whole process, so it's a 404 here.
+        raise HTTPException(404, str(e))
 
 
 @app.delete("/api/watchlist/{symbol}")

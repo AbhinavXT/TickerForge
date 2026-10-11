@@ -294,7 +294,12 @@ def snapshot(kite=None, annotate_rows: bool = True) -> dict:
     Raises PortfolioError if the broker can't be reached — callers decide
     whether that's a 401, a phone message or a skipped section.
     """
-    kite = kite or kite_auth.get_kite()
+    # get_kite() raises SystemExit without a session. Outside this try it
+    # escaped the route's `except PortfolioError` and stopped the server.
+    try:
+        kite = kite or kite_auth.get_kite()
+    except SystemExit as e:
+        raise PortfolioError(str(e)) from e
 
     holdings = [_norm_holding(h) for h in raw_holdings(kite)]
     holdings = [h for h in holdings if h["qty"]]

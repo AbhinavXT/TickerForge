@@ -101,3 +101,32 @@ def test_brief_section_isolation_covers_systemexit():
     assert out.startswith("Pre-market —")
     assert "RISK" in out
     assert "unavailable: regime" in out
+
+
+# ------------------------------------------------------------ routes, live
+# The static audit above only sees `except Exception` blocks. A bare
+# get_kite() outside any try slips past it — /api/portfolio did exactly that
+# and a page load without a session stopped the server. These call the
+# routes for real with the session gone.
+def _client_without_session(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app import kite_auth, server
+
+    def no_session(*a, **k):
+        raise SystemExit("No valid Kite session for today.")
+    monkeypatch.setattr(kite_auth, "get_kite", no_session)
+    return TestClient(server.app, base_url="http://127.0.0.1:5000")
+
+
+def test_portfolio_without_a_session_is_a_401(monkeypatch):
+    from app import portfolio
+    portfolio.clear_cache()
+    r = _client_without_session(monkeypatch).get("/api/portfolio")
+    assert r.status_code == 401
+    assert "session" in r.json()["detail"].lower()
+
+
+def test_watching_an_unknown_symbol_is_a_404(monkeypatch):
+    r = _client_without_session(monkeypatch).post("/api/watchlist/NOSUCHSYMBOLXYZ")
+    assert r.status_code == 404
