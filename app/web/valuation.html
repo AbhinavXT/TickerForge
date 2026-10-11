@@ -4,251 +4,110 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>TickerForge · Valuation</title>
+		<meta name="theme-color" content="#0b0e13" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
 		<link rel="stylesheet" href="/app.css" />
+		<script src="/ui.js"></script>
 		<style>
-			.assume {
-				display: flex;
-				gap: 14px;
-				flex-wrap: wrap;
-				align-items: flex-end;
-				background: var(--panel);
-				border: 1px solid var(--border);
-				border-radius: 10px;
-				padding: 12px 14px;
-				margin: 12px 0;
-			}
-			.assume .fld {
-				display: flex;
-				flex-direction: column;
-				gap: 3px;
-			}
-			.assume label {
-				color: var(--dim);
-				font-size: 11px;
-			}
-			.assume input {
-				width: 88px;
-				padding: 6px 8px;
-				background: var(--bg);
-				color: var(--fg);
-				border: 1px solid var(--border);
-				border-radius: 6px;
-				outline: none;
-			}
-			table.screen {
-				width: 100%;
-				border-collapse: collapse;
-				font-variant-numeric: tabular-nums;
-				font-size: 13px;
-			}
-			table.screen th,
-			table.screen td {
-				padding: 8px 10px;
-				border-bottom: 1px solid var(--border);
-				text-align: right;
-			}
-			table.screen th {
-				color: var(--dim);
-				font-weight: 500;
-				cursor: pointer;
-				white-space: nowrap;
-				position: sticky;
-				top: 0;
-				background: var(--bg);
-			}
-			table.screen td:first-child,
-			table.screen th:first-child {
-				text-align: left;
-				position: sticky;
-				left: 0;
-				background: var(--bg);
-			}
-			table.screen tbody tr {
-				cursor: pointer;
-			}
-			table.screen tbody tr:hover td {
-				background: var(--panel2);
-			}
-			.verdict {
-				font-size: 11px;
-				padding: 1px 8px;
-				border-radius: 5px;
-				border: 1px solid var(--border);
-				white-space: nowrap;
-			}
-			.verdict.undervalued {
-				color: #8fd3c9;
-				border-color: #2f5b54;
-			}
-			.verdict.fair {
-				color: #e4c07a;
-				border-color: #5b4c2f;
-			}
-			.verdict.rich {
-				color: #e4a58a;
-				border-color: #5b3d2f;
-			}
-			.verdict.overvalued {
-				color: #ef8a8a;
-				border-color: #5b2f2f;
-			}
-			.verdict.na {
-				color: var(--dim);
-			}
-			.pos {
-				color: var(--up);
-			}
-			.neg {
-				color: var(--down);
-			}
-			/* detail drawer */
-			#drawer {
-				position: fixed;
-				top: 0;
-				right: 0;
-				bottom: 0;
-				width: min(560px, 94vw);
-				background: var(--panel);
-				border-left: 1px solid var(--border);
-				z-index: 50;
-				transform: translateX(100%);
-				transition: transform 0.2s;
-				overflow-y: auto;
-				padding: 18px;
-			}
-			#drawer.open {
-				transform: none;
-				box-shadow: -16px 0 40px rgba(0, 0, 0, 0.5);
-			}
-			#drawer .close {
-				position: absolute;
-				top: 14px;
-				right: 16px;
-				cursor: pointer;
-				color: var(--dim);
-				font-size: 18px;
-			}
-			#drawer h2 {
-				font-size: 18px;
-			}
-			#drawer .mtable {
-				width: 100%;
-				border-collapse: collapse;
-				margin-top: 10px;
-			}
-			#drawer .mtable td {
-				padding: 7px 8px;
-				border-bottom: 1px solid var(--border);
-			}
-			#drawer .mtable td:last-child {
-				text-align: right;
-				font-variant-numeric: tabular-nums;
-			}
-			#drawer .bar2 {
-				position: relative;
-				height: 26px;
-				background: var(--panel2);
-				border: 1px solid var(--border);
-				border-radius: 6px;
-				margin: 14px 0;
-				overflow: hidden;
-			}
-			#drawer .bar2 .pr {
-				position: absolute;
-				top: 0;
-				bottom: 0;
-				width: 2px;
-				background: var(--fg);
-			}
-			#drawer .bar2 .cm {
-				position: absolute;
-				top: 0;
-				bottom: 0;
-				width: 2px;
-				background: var(--accent);
-			}
-			#drawer .note {
-				color: var(--dim);
-				font-size: 12px;
-				margin-top: 14px;
-				line-height: 1.6;
+			.assume { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) auto; gap: var(--s3); align-items: end; }
+			.assume input { width: 100%; }
+			.vtbl th.sortable { cursor: pointer; user-select: none; }
+			.vtbl th.sortable:hover { color: var(--text); }
+			.vtbl th[aria-sort] { color: var(--text); }
+			.vtbl td.stk .nm { color: var(--text-3); font-size: var(--fs-11); font-family: var(--sans); max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+			.vtbl td.stk b { font-family: var(--mono); font-weight: 500; }
+			.verdict { font-size: var(--fs-11); }
+			/* drawer content */
+			.vd h3 { font-size: var(--fs-13); font-weight: 600; margin: var(--s5) 0 var(--s2); display: flex; align-items: center; gap: var(--s2); }
+			.vd .note { color: var(--text-3); font-size: var(--fs-12); margin-top: var(--s2); line-height: 1.55; }
+			.mbars { display: flex; flex-direction: column; gap: 6px; }
+			.mbar { display: grid; grid-template-columns: 150px minmax(0, 1fr) 92px; gap: var(--s2); align-items: center; font-size: var(--fs-12); }
+			.mbar .lab { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+			.mbar .track { position: relative; height: 14px; background: var(--surface-3); border-radius: 3px; }
+			.mbar .fill { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: color-mix(in srgb, var(--bull) 55%, transparent); }
+			.mbar .fill.below { background: color-mix(in srgb, var(--bear) 55%, transparent); }
+			.mbar .px { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); }
+			.mbar .val { text-align: right; font-family: var(--mono); }
+			.mbar .val small { display: block; font-size: var(--fs-11); }
+			.callout { background: var(--surface-1); border: 1px solid var(--border); border-left: 3px solid var(--violet); border-radius: var(--radius-sm); padding: var(--s3) var(--s4); }
+			.callout .big { font: 500 var(--fs-24)/1.2 var(--mono); }
+			.scen { position: relative; height: 36px; margin: var(--s6) var(--s2) var(--s1); }
+			.scen .line { position: absolute; left: 0; right: 0; top: 17px; height: 2px; background: var(--surface-3); border-radius: 1px; }
+			.scen .rng { position: absolute; top: 15px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--violet) 40%, transparent); }
+			.scen .dot { position: absolute; top: 11px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid var(--surface-2); }
+			.scen .dot.bear { background: var(--bear); } .scen .dot.base { background: var(--text-2); } .scen .dot.bull { background: var(--bull); }
+			.scen .px { position: absolute; top: 2px; bottom: 2px; width: 2px; margin-left: -1px; background: var(--text); }
+			.scen .pxl { position: absolute; top: -14px; transform: translateX(-50%); font: var(--fs-11)/1 var(--mono); color: var(--text-2); white-space: nowrap; }
+			.scenrows { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
+			.sens { border-collapse: separate; border-spacing: 2px; width: 100%; font-family: var(--mono); font-size: var(--fs-12); }
+			.sens th { color: var(--text-3); font-weight: 400; padding: 4px; text-align: center; font-size: var(--fs-11); }
+			.sens td { text-align: center; padding: 6px 4px; border-radius: 4px; color: var(--text); }
+			.sens td .u { font-size: var(--fs-11); color: var(--text-2); }
+			.sens td.base { outline: 1.5px solid var(--text); outline-offset: -1.5px; }
+			.qgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
+			.hist { position: relative; height: 10px; background: var(--surface-3); border-radius: 5px; margin: var(--s4) 0 var(--s2); }
+			.hist .med { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text-3); }
+			.hist .cur { position: absolute; top: -5px; width: 12px; height: 20px; margin-left: -6px; border-radius: 3px; background: var(--violet); }
+			@media (max-width: 1099px) { .assume { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+			@media (max-width: 759px) {
+				.assume { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+				.assume #run { grid-column: 1 / -1; }
+				.mbar { grid-template-columns: 96px minmax(0, 1fr) 76px; }
+				.qgrid, .scenrows { grid-template-columns: minmax(0, 1fr); }
 			}
 		</style>
 	</head>
 	<body>
-		<div id="nav">
+		<div id="nav" data-page="valuation">
 			<span class="brand">TickerForge</span>
+			<a class="tab" href="/board">Board</a>
 			<a class="tab" href="/">Chart</a>
 			<a class="tab" href="/desk">Desk</a>
-			<a class="tab" href="/portfolio">Portfolio</a>
 			<a class="tab" href="/scanner">Scanner</a>
 			<a class="tab" href="/screen">Screen</a>
 			<a class="tab" href="/query">Query</a>
 			<a class="tab" href="/fundamentals">Fundamentals</a>
 			<a class="tab" href="/results">Results</a>
 			<a class="tab on" href="/valuation">Valuation</a>
-			<a class="tab" href="/backtest">Backtest</a>
-			<a class="tab" href="/journal">Journal</a>
 			<a class="tab" href="/metrics">Metrics</a>
-			<a class="tab" href="/paper">Paper</a>
 			<a class="tab" href="/news">News</a>
 			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/backtest">Backtest</a>
 			<a class="tab" href="/settings">Settings</a>
 			<span class="sp"></span>
 			<span class="status" id="status"></span>
 		</div>
+		<script>TF.shell()</script>
 		<div class="wrap">
-			<div class="row">
-				<h2 class="page">Valuation screener</h2>
-				<span class="sub"
-					>Damodaran-flavoured intrinsic value across your watchlist ·
-					<a href="/metrics">what do these mean?</a></span
-				>
+			<div class="page-head">
+				<div>
+					<h2 class="page">Valuation screener</h2>
+					<div class="sub">Damodaran-flavoured intrinsic value across your watchlist · <a href="/metrics">what do these mean?</a></div>
+				</div>
 			</div>
 
-			<div class="assume">
-				<div class="fld">
-					<label>Cost of equity (rₑ)</label
-					><input id="a_re" type="number" step="0.005" value="0.12" />
-				</div>
-				<div class="fld">
-					<label>Terminal growth</label
-					><input id="a_gt" type="number" step="0.005" value="0.05" />
-				</div>
-				<div class="fld">
-					<label>High-growth years</label
-					><input id="a_yr" type="number" step="1" value="10" />
-				</div>
-				<div class="fld">
-					<label>Growth cap</label
-					><input id="a_gc" type="number" step="0.01" value="0.18" />
-				</div>
-				<div class="fld">
-					<label>AAA bond yield</label
-					><input
-						id="a_by"
-						type="number"
-						step="0.005"
-						value="0.072"
-					/>
-				</div>
-				<button class="btn primary" id="run">Run screen</button>
-				<div class="spacer"></div>
-				<div class="sub" id="meta"></div>
+			<div class="card assume">
+				<label class="field"><span>Cost of equity (rₑ)</span><input id="a_re" type="number" step="0.005" value="0.12" /></label>
+				<label class="field"><span>Terminal growth</span><input id="a_gt" type="number" step="0.005" value="0.05" /></label>
+				<label class="field"><span>High-growth years</span><input id="a_yr" type="number" step="1" value="10" /></label>
+				<label class="field"><span>Growth cap</span><input id="a_gc" type="number" step="0.01" value="0.18" /></label>
+				<label class="field"><span>AAA bond yield</span><input id="a_by" type="number" step="0.005" value="0.072" /></label>
+				<button type="button" class="btn primary" id="run">Run screen</button>
 			</div>
+			<div class="sub" id="meta" style="margin: var(--s3) 0 var(--s2)"></div>
 
-			<div class="tbl-wrap">
-				<table class="screen" id="tbl">
+			<div class="tbl-wrap" id="tblwrap">
+				<table class="tbl vtbl" id="tbl">
 					<thead></thead>
 					<tbody></tbody>
 				</table>
 			</div>
-			<div id="empty" class="empty" style="display: none"></div>
-		</div>
-
-		<div id="drawer">
-			<span class="close" onclick="closeDrawer()">✕</span>
-			<div id="dbody"></div>
+			<div id="empty" style="display: none"></div>
 		</div>
 
 		<script>
@@ -257,13 +116,15 @@
 			const status = (m) => {
 				$("#status").textContent = m || ""
 			}
+			const esc = TF.esc
 			const f = (v, d = 2) =>
 				v == null
 					? "—"
 					: (+v).toLocaleString("en-IN", { maximumFractionDigits: d })
 			let rows = [],
 				sortKey = "mos_pct",
-				sortDir = -1
+				sortDir = -1,
+				drawer = null
 
 			function assumptions() {
 				return {
@@ -279,6 +140,9 @@
 					.map(([k, v]) => `${k}=${v}`)
 					.join("&")
 			}
+			// verdict → chip colour (colour carries meaning; the word is always shown)
+			const VCLS = { undervalued: "bull", fair: "", rich: "warn", overvalued: "bear" }
+			const verdictChip = (v) => `<span class="chip verdict ${VCLS[v] ?? ""}">${esc(v || "n/a")}</span>`
 
 			const COLS = [
 				["symbol", "Stock", 0],
@@ -288,37 +152,43 @@
 				["g_used_pct", "g used%", 1],
 				["composite", "Intrinsic", 1],
 				["mos_pct", "MoS%", 1],
-				["verdict", "", 0],
+				["verdict", "Verdict", 0],
 			]
 
 			async function run() {
 				status("valuing…")
 				$("#run").disabled = true
+				$("#tbl tbody").innerHTML = Array.from({ length: 8 }, () => `<tr>${COLS.map(() => `<td><span class="skel"></span></td>`).join("")}</tr>`).join("")
 				try {
-					const d = await (
-						await fetch(
-							"/api/valuation/screen?" + qs(assumptions()),
-						)
-					).json()
+					const r = await fetch("/api/valuation/screen?" + qs(assumptions()))
+					const d = await r.json()
+					if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`)
 					rows = d.rows || []
-					$("#meta").textContent =
-						`${rows.length} valued` +
+					$("#meta").innerHTML =
+						`<span class="mono">${rows.length}</span> valued` +
 						(d.missing && d.missing.length
-							? ` · ${d.missing.length} without fundamentals (${d.missing.slice(0, 6).join(", ")}${d.missing.length > 6 ? "…" : ""})`
-							: "")
+							? ` · ${d.missing.length} without fundamentals (${esc(d.missing.slice(0, 6).join(", "))}${d.missing.length > 6 ? "…" : ""})`
+							: "") + " · click a row for the deep view"
 					if (!rows.length) {
-						$("#tbl").style.display = "none"
+						$("#tblwrap").style.display = "none"
 						$("#empty").style.display = "block"
-						$("#empty").innerHTML =
-							"No stocks could be valued. Add stocks to your watchlist and fetch their fundamentals first (Fundamentals page → Fetch from screener.in)."
+						$("#empty").innerHTML = TF.empty(
+							"No stocks could be valued",
+							"Add stocks to your watchlist and fetch their fundamentals first (Fundamentals → Fetch from screener.in).",
+							"valuation",
+						)
 					} else {
-						$("#tbl").style.display = ""
+						$("#tblwrap").style.display = ""
 						$("#empty").style.display = "none"
 						draw()
 					}
 					status("")
 				} catch (e) {
-					status("error: " + e.message)
+					status("error")
+					$("#tbl tbody").innerHTML = ""
+					$("#empty").style.display = "block"
+					$("#empty").innerHTML = ""
+					$("#empty").appendChild(TF.errorBox(`Couldn't run the screen: ${e.message}`, run))
 				} finally {
 					$("#run").disabled = false
 				}
@@ -335,236 +205,217 @@
 				$("#tbl thead").innerHTML =
 					"<tr>" +
 					COLS.map(
-						([k, l]) =>
-							`<th data-k="${k}">${l}${k === sortKey ? (sortDir < 0 ? " ▾" : " ▴") : ""}</th>`,
+						([k, l, num]) =>
+							`<th class="sortable${num ? " num" : ""}" data-k="${k}" tabindex="0"${k === sortKey ? ` aria-sort="${sortDir < 0 ? "descending" : "ascending"}"` : ""}>${l}${k === sortKey ? (sortDir < 0 ? " ▾" : " ▴") : ""}</th>`,
 					).join("") +
 					"</tr>"
 				$("#tbl thead")
 					.querySelectorAll("th")
-					.forEach(
-						(th) =>
-							(th.onclick = () => {
-								const k = th.dataset.k
-								if (k === sortKey) sortDir *= -1
-								else {
-									sortKey = k
-									sortDir = k === "symbol" ? 1 : -1
-								}
-								draw()
-							}),
-					)
-				$("#tbl tbody").innerHTML = rows
-					.map((r) => {
-						const mosCls =
-							r.mos_pct == null
-								? ""
-								: r.mos_pct >= 0
-									? "pos"
-									: "neg"
-						return `<tr data-s="${r.symbol}">
-      <td>${r.symbol}<div class="sub" style="font-size:11px">${(r.name || "").slice(0, 26)}</div></td>
-      <td>${f(r.price)}</td><td>${f(r.pe, 1)}</td><td>${f(r.roe, 1)}</td>
-      <td>${f(r.g_used_pct, 1)}</td><td>${f(r.composite)}</td>
-      <td class="${mosCls}">${r.mos_pct == null ? "—" : (r.mos_pct > 0 ? "+" : "") + f(r.mos_pct, 1) + "%"}</td>
-      <td><span class="verdict ${r.verdict.replace("/", "")}">${r.verdict}</span></td></tr>`
+					.forEach((th) => {
+						const go = () => {
+							const k = th.dataset.k
+							if (k === sortKey) sortDir *= -1
+							else {
+								sortKey = k
+								sortDir = k === "symbol" ? 1 : -1
+							}
+							draw()
+						}
+						th.onclick = go
+						th.onkeydown = (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), go())
 					})
+				$("#tbl tbody").innerHTML = rows
+					.map(
+						(r) => `<tr class="click" data-s="${esc(r.symbol)}" tabindex="0">
+      <td class="stk"><b>${esc(r.symbol)}</b><div class="nm">${esc((r.name || "").slice(0, 32))}</div></td>
+      <td class="num">${f(r.price)}</td><td class="num">${f(r.pe, 1)}</td><td class="num">${f(r.roe, 1)}</td>
+      <td class="num">${f(r.g_used_pct, 1)}</td><td class="num">${f(r.composite)}</td>
+      <td class="num">${TF.delta(r.mos_pct, 1)}</td>
+      <td>${verdictChip(r.verdict)}</td></tr>`,
+					)
 					.join("")
 				$("#tbl tbody")
 					.querySelectorAll("tr")
-					.forEach(
-						(tr) => (tr.onclick = () => openDrawer(tr.dataset.s)),
-					)
+					.forEach((tr) => {
+						tr.onclick = () => openDrawer(tr.dataset.s)
+						tr.onkeydown = (e) => e.key === "Enter" && openDrawer(tr.dataset.s)
+					})
 			}
 
-			async function openDrawer(sym) {
-				const r = rows.find((x) => x.symbol === sym)
-				if (!r) return
-				$("#dbody").innerHTML =
-					`<h2>${r.symbol}</h2><div class="sub">${r.name || ""}</div><div class="loading">Loading deep view…</div>`
-				$("#drawer").classList.add("open")
-				// pull the rich single-stock view with the current assumptions
-				let d = r
-				try {
-					d = await (
-						await fetch(
-							`/api/valuation?symbol=${sym}&rich=1&` +
-								qs(assumptions()),
-						)
-					).json()
-				} catch (e) {}
-				const models = Object.entries(d.models || {})
-				const lo =
-					Math.min(
-						d.price || 1e9,
-						...models.map(([, v]) => v).filter((v) => v),
-					) * 0.9
-				const hi =
-					Math.max(
-						d.price || 0,
-						...models.map(([, v]) => v).filter((v) => v),
-					) * 1.05
-				const pos = (v) => ((v - lo) / (hi - lo)) * 100
-				const bars = models
-					.filter(([, v]) => v != null)
-					.map(
-						([k, v]) =>
-							`<div class="bar2" title="${k}: ${f(v)}"><div class="cm" style="left:${pos(v)}%"></div>
-       <div class="pr" style="left:${pos(d.price)}%"></div>
-       <div style="position:absolute;left:6px;top:5px;font-size:11px;color:var(--dim)">${k}</div>
-       <div style="position:absolute;right:6px;top:5px;font-size:11px">${f(v)}</div></div>`,
-					)
-					.join("")
+			// ------------------------------------------------------------ drawer
+			function modelBars(d) {
+				const models = Object.entries(d.models || {}).filter(([, v]) => v != null)
+				if (!models.length) return '<div class="note">No earnings-based models could run (EPS ≤ 0 or missing).</div>'
+				const hi = Math.max(d.price || 0, ...models.map(([, v]) => v)) * 1.08
+				const pos = (v) => Math.max(0, Math.min(100, (v / hi) * 100))
+				return (
+					`<div class="mbars">` +
+					models
+						.sort((a, b) => b[1] - a[1])
+						.map(([k, v]) => {
+							const up = d.price ? ((v - d.price) / d.price) * 100 : null
+							return `<div class="mbar" title="${esc(k)}: ₹${f(v)}">
+        <span class="lab">${esc(k)}</span>
+        <span class="track"><span class="fill${d.price && v < d.price ? " below" : ""}" style="width:${pos(v)}%"></span><span class="px" style="left:${pos(d.price)}%"></span></span>
+        <span class="val">₹${f(v, 0)}<small>${TF.delta(up, 0)}</small></span></div>`
+						})
+						.join("") +
+					`</div><div class="note">Bars are each model's fair value; the vertical line is today's price (₹${f(d.price)}). Bars past the line suggest upside.</div>`
+				)
+			}
 
-				// --- reverse DCF ---
-				let revHTML = ""
+			function reverseDcf(d) {
 				const rd = d.reverse_dcf
 				if (rd && rd.implied_growth_pct != null) {
 					const demanding = rd.gap_pp != null && rd.gap_pp > 3
 					const conservative = rd.gap_pp != null && rd.gap_pp < -3
 					const tag = demanding
-						? '<span class="neg">demanding</span>'
+						? '<span class="chip bear">demanding</span>'
 						: conservative
-							? '<span class="pos">conservative</span>'
-							: "in line"
-					revHTML = `<div class="rvblock"><h3>Reverse DCF — what the price assumes</h3>
-      <div class="big">${f(rd.implied_growth_pct, 1)}% <span class="sub">implied EPS growth</span></div>
-      <div class="sub">vs ${f(rd.hist_growth_pct, 1)}% historical — ${tag}${rd.gap_pp != null ? ` (${rd.gap_pp > 0 ? "+" : ""}${f(rd.gap_pp, 1)}pp)` : ""}</div>
+							? '<span class="chip bull">conservative</span>'
+							: '<span class="chip">in line</span>'
+					return `<h3>Reverse DCF — what the price assumes</h3><div class="callout">
+      <div class="row" style="align-items:baseline"><span class="big">${f(rd.implied_growth_pct, 1)}%</span><span class="sub">implied EPS growth</span><span class="spacer"></span>${tag}</div>
+      <div class="sub" style="margin-top:4px">vs <span class="mono">${f(rd.hist_growth_pct, 1)}%</span> historical${rd.gap_pp != null ? ` · gap <span class="mono">${TF.signed(rd.gap_pp, 1, "pp")}</span>` : ""}</div>
       <div class="note">If the market's baked-in growth looks unreachable, the stock is priced for perfection; if it's below what the business has delivered, expectations are modest.</div></div>`
-				} else if (rd && rd.note) {
-					revHTML = `<div class="rvblock"><h3>Reverse DCF</h3><div class="sub">${rd.note}</div></div>`
 				}
+				if (rd && rd.note) return `<h3>Reverse DCF</h3><div class="callout"><div class="sub">${esc(rd.note)}</div></div>`
+				return ""
+			}
 
-				// --- scenarios ---
-				let scHTML = ""
-				if (d.scenarios) {
-					const order = ["bear", "base", "bull"]
-					const fvs = order
-						.map((k) => d.scenarios[k]?.fair)
-						.filter((v) => v)
-					const smin = Math.min(d.price || 1e9, ...fvs) * 0.9,
-						smax = Math.max(d.price || 0, ...fvs) * 1.05
-					const sp = (v) => ((v - smin) / (smax - smin)) * 100
-					scHTML =
-						`<h3>Scenarios</h3><div class="scen">` +
-						order
-							.map((k) => {
-								const s = d.scenarios[k]
-								if (!s || s.fair == null) return ""
-								const cls =
-									k === "bull"
-										? "pos"
-										: k === "bear"
-											? "neg"
-											: ""
-								return `<div class="scenrow"><div class="scenlab ${cls}">${k}</div>
-        <div class="track"><div class="mk" style="left:${sp(s.fair)}%"></div>
-          <div class="prmk" style="left:${sp(d.price)}%"></div></div>
-        <div class="scenval">₹${f(s.fair)} <span class="sub">g ${f(s.g_pct, 0)}% · rₑ ${f(s.re_pct, 1)}% · MoS ${s.mos_pct == null ? "—" : (s.mos_pct > 0 ? "+" : "") + f(s.mos_pct, 0) + "%"}</span></div></div>`
-							})
-							.join("") +
-						`</div><div class="note">▮ marks fair value, │ marks today's price.</div>`
+			function scenarios(d) {
+				if (!d.scenarios) return ""
+				const order = ["bear", "base", "bull"]
+				const sc = order.map((k) => [k, d.scenarios[k]]).filter(([, s]) => s && s.fair != null)
+				if (!sc.length) return ""
+				const vals = sc.map(([, s]) => s.fair).concat(d.price ? [d.price] : [])
+				const lo = Math.min(...vals) * 0.92,
+					hi = Math.max(...vals) * 1.05
+				const sp = (v) => ((v - lo) / (hi - lo)) * 100
+				const fair = sc.map(([, s]) => s.fair)
+				return (
+					`<h3>Scenarios</h3><div class="scen" role="img" aria-label="Bear, base and bull fair values against today's price">
+        <div class="line"></div>
+        <div class="rng" style="left:${sp(Math.min(...fair))}%;width:${sp(Math.max(...fair)) - sp(Math.min(...fair))}%"></div>
+        ${d.price ? `<div class="px" style="left:${sp(d.price)}%"></div><div class="pxl" style="left:${sp(d.price)}%;transform:translateX(${sp(d.price) < 12 ? "0" : sp(d.price) > 88 ? "-100%" : "-50%"})">price ${f(d.price, 0)}</div>` : ""}
+        ${sc.map(([k, s]) => `<div class="dot ${k}" style="left:${sp(s.fair)}%" title="${k}: ₹${f(s.fair)}"></div>`).join("")}
+      </div><div class="scenrows">` +
+					sc
+						.map(
+							([k, s]) => `<div class="stat"><div class="k">${k === "bull" ? "▲ " : k === "bear" ? "▼ " : "■ "}${k}</div>
+          <div class="v">₹${f(s.fair, 0)}</div>
+          <div class="c">g ${f(s.g_pct, 0)}% · rₑ ${f(s.re_pct, 1)}% · MoS ${TF.delta(s.mos_pct, 0)}</div></div>`,
+						)
+						.join("") +
+					`</div>`
+				)
+			}
+
+			// Sequential single-hue scale: one colour, opacity by upside rank.
+			// Not red→green: the signed % in each cell carries the direction.
+			function sensitivity(d) {
+				if (!d.sensitivity || !d.sensitivity.grid) return ""
+				const S = d.sensitivity
+				const ups = S.grid.flat().filter((c) => c && c.upside_pct != null).map((c) => c.upside_pct)
+				const lo = Math.min(...ups),
+					hi = Math.max(...ups)
+				const re0 = (d.assumptions?.re || 0) * 100
+				const reIdx = S.re_axis_pct.reduce((bi, r, i, a) => (Math.abs(r - re0) < Math.abs(a[bi] - re0) ? i : bi), 0)
+				const gIdx = S.g_axis_pct.reduce((bi, g, i, a) => (Math.abs(g - d.g_used_pct) < Math.abs(a[bi] - d.g_used_pct) ? i : bi), 0)
+				const cell = (c, i, j) => {
+					if (!c || c.upside_pct == null) return "<td>—</td>"
+					const t = hi > lo ? (c.upside_pct - lo) / (hi - lo) : 0.5
+					const pct = Math.round(6 + t * 54)
+					const base = i === gIdx && j === reIdx ? " base" : ""
+					return `<td class="${base.trim()}" style="background:color-mix(in srgb, var(--bull) ${pct}%, transparent)" title="fair ₹${f(c.fair, 0)} · upside ${TF.signed(c.upside_pct, 0, "%")}">${f(c.fair, 0)}<div class="u">${TF.signed(c.upside_pct, 0, "%")}</div></td>`
 				}
+				return `<h3>Sensitivity — fair value &amp; upside</h3>
+      <div style="overflow-x:auto"><table class="sens"><thead><tr><th>g ╲ rₑ</th>${S.re_axis_pct.map((r) => `<th>${f(r, 1)}%</th>`).join("")}</tr></thead>
+      <tbody>${S.grid.map((row, i) => `<tr><th>${f(S.g_axis_pct[i], 0)}%</th>${row.map((c, j) => cell(c, i, j)).join("")}</tr>`).join("")}</tbody></table></div>
+      <div class="note">Rows are the high-growth rate, columns the discount rate. Deeper shade = more upside; the outlined cell is closest to the current assumptions.</div>`
+			}
 
-				// --- sensitivity grid ---
-				let snHTML = ""
-				if (d.sensitivity && d.sensitivity.grid) {
-					const S = d.sensitivity
-					const cell = (c) => {
-						if (!c || c.upside_pct == null) return "<td>—</td>"
-						const u = c.upside_pct
-						const bg =
-							u >= 30
-								? "rgba(38,166,154,.35)"
-								: u >= 0
-									? "rgba(38,166,154,.15)"
-									: u >= -25
-										? "rgba(239,83,80,.15)"
-										: "rgba(239,83,80,.35)"
-						return `<td style="background:${bg}" title="upside ${u > 0 ? "+" : ""}${f(u, 0)}%">₹${f(c.fair, 0)}<div class="usub">${u > 0 ? "+" : ""}${f(u, 0)}%</div></td>`
-					}
-					snHTML = `<h3>Sensitivity — fair value & upside</h3>
-      <table class="sens"><thead><tr><th>g ╲ rₑ</th>${S.re_axis_pct.map((r) => `<th>${f(r, 1)}%</th>`).join("")}</tr></thead>
-      <tbody>${S.grid.map((row, i) => `<tr><th>${f(S.g_axis_pct[i], 0)}%</th>${row.map(cell).join("")}</tr>`).join("")}</tbody></table>
-      <div class="note">Rows = high-growth rate, columns = discount rate. Green where price offers upside to fair value, red where it doesn't.</div>`
+			function quality(d) {
+				if (!d.quality || !Object.keys(d.quality).length) return ""
+				const q = d.quality
+				const chips = []
+				if (q.roic_pct != null) {
+					const good = q.roic_vs_re_pp != null && q.roic_vs_re_pp > 0
+					chips.push(`<div class="stat"><div class="k">ROIC</div><div class="v">${f(q.roic_pct, 1)}%</div>
+          <div class="c">${q.roic_vs_re_pp != null ? `<span class="chip ${good ? "bull" : "bear"}">${good ? "▲" : "▼"} ${TF.signed(q.roic_vs_re_pp, 1, "pp")} vs rₑ</span>` : ""}</div></div>`)
 				}
-
-				// --- quality / risk ---
-				let qHTML = ""
-				if (d.quality && Object.keys(d.quality).length) {
-					const q = d.quality
-					const chips = []
-					if (q.roic_pct != null) {
-						const good =
-							q.roic_vs_re_pp != null && q.roic_vs_re_pp > 0
-						chips.push(
-							`<div class="qchip ${good ? "pos" : "neg"}"><div class="qv">${f(q.roic_pct, 1)}%</div><div class="ql">ROIC${q.roic_vs_re_pp != null ? ` (${q.roic_vs_re_pp > 0 ? "+" : ""}${f(q.roic_vs_re_pp, 1)} vs rₑ)` : ""}</div></div>`,
-						)
-					}
-					if (q.f_score != null) {
-						const good = q.f_score >= 7,
-							bad = q.f_score <= 3
-						chips.push(
-							`<div class="qchip ${good ? "pos" : bad ? "neg" : ""}"><div class="qv">${q.f_score}/${q.f_checked || 9}</div><div class="ql">Piotroski F</div></div>`,
-						)
-					}
-					if (q.altman_z != null) {
-						const cls =
-							q.altman_zone === "safe"
-								? "pos"
-								: q.altman_zone === "distress"
-									? "neg"
-									: ""
-						chips.push(
-							`<div class="qchip ${cls}"><div class="qv">${f(q.altman_z, 2)}</div><div class="ql">Altman Z · ${q.altman_zone}</div></div>`,
-						)
-					}
-					if (chips.length)
-						qHTML = `<h3>Quality & risk</h3><div class="qgrid">${chips.join("")}</div>
+				if (q.f_score != null) {
+					const good = q.f_score >= 7,
+						bad = q.f_score <= 3
+					chips.push(`<div class="stat"><div class="k">Piotroski F</div><div class="v">${q.f_score}/${q.f_checked || 9}</div>
+          <div class="c"><span class="chip ${good ? "bull" : bad ? "bear" : ""}">${good ? "strong" : bad ? "weak" : "middling"}</span></div></div>`)
+				}
+				if (q.altman_z != null) {
+					const cls = q.altman_zone === "safe" ? "bull" : q.altman_zone === "distress" ? "bear" : "warn"
+					chips.push(`<div class="stat"><div class="k">Altman Z</div><div class="v">${f(q.altman_z, 2)}</div>
+          <div class="c"><span class="chip ${cls}">${esc(q.altman_zone)}</span></div></div>`)
+				}
+				if (!chips.length) return ""
+				return `<h3>Quality &amp; risk</h3><div class="qgrid">${chips.join("")}</div>
       <div class="note">ROIC above your cost of equity = value creation. F-score is a 9-point fundamental-momentum check (higher is better). Altman Z flags bankruptcy risk (&gt;2.99 safe, &lt;1.81 distress). Scores use whatever line items screener provided.</div>`
-				}
+			}
 
-				// --- history bands ---
-				let hHTML = ""
-				if (d.history && d.history.pe) {
-					const pe = d.history.pe
-					const span = Math.max(pe.max - pe.min, 1e-6)
-					const p = (v) => ((v - pe.min) / span) * 100
-					hHTML = `<h3>Valuation vs its own history</h3>
-      <div class="track hist"><div class="band"></div>
-        <div class="medmk" style="left:${p(pe.median)}%" title="median ${pe.median}"></div>
-        <div class="curmk" style="left:${p(pe.current)}%" title="now ${pe.current}"></div></div>
-      <div class="sub">P/E now <b>${f(pe.current, 1)}</b> · median ${f(pe.median, 1)} · range ${f(pe.min, 1)}–${f(pe.max, 1)} (${pe.n}y) — <b>${pe.read}</b> · ${pe.percentile}th pctile</div>
-      <div class="note">Where today's P/E sits in the stock's own multi-year range — a mean-reversion read, not a cross-company one.</div>`
-				}
+			function history(d) {
+				if (!d.history || !d.history.pe) return ""
+				const pe = d.history.pe
+				const span = Math.max(pe.max - pe.min, 1e-6)
+				const p = (v) => Math.max(0, Math.min(100, ((v - pe.min) / span) * 100))
+				return `<h3>Valuation vs its own history</h3>
+      <div class="hist"><div class="med" style="left:${p(pe.median)}%" title="median ${pe.median}"></div>
+        <div class="cur" style="left:${p(pe.current)}%" title="now ${pe.current}"></div></div>
+      <div class="row" style="justify-content:space-between;font:var(--fs-11)/1.4 var(--mono);color:var(--text-3)"><span>${f(pe.min, 1)}</span><span>median ${f(pe.median, 1)}</span><span>${f(pe.max, 1)}</span></div>
+      <div class="sub" style="margin-top:6px">P/E now <b class="mono">${f(pe.current, 1)}</b> over ${pe.n}y — <b>${esc(pe.read)}</b> · <span class="mono">${pe.percentile}</span>th percentile</div>`
+			}
 
-				$("#dbody").innerHTML =
-					`<h2>${d.symbol}</h2><div class="sub">${d.name || ""}</div>
-    <table class="mtable">
-      <tr><td>Price</td><td>₹${f(d.price)}</td></tr>
-      <tr><td>Composite intrinsic (median)</td><td><b>₹${f(d.composite)}</b></td></tr>
-      <tr><td>Margin of safety</td><td class="${d.mos_pct >= 0 ? "pos" : "neg"}">${d.mos_pct == null ? "—" : (d.mos_pct > 0 ? "+" : "") + f(d.mos_pct, 1) + "%"} · ${d.verdict}</td></tr>
-      <tr><td>EPS (ttm) · BVPS</td><td>${f(d.eps)} · ${f(d.bvps)}</td></tr>
-      <tr><td>P/E · ROE · Div yield</td><td>${f(d.pe, 1)} · ${f(d.roe, 1)}% · ${f(d.div_yield, 2)}%</td></tr>
-      <tr><td>Growth — historical / used</td><td>${f(d.g_hist_pct, 1)}% / ${f(d.g_used_pct, 1)}%</td></tr>
-      <tr><td>Cost of equity (rₑ)</td><td>${f((d.assumptions?.re || 0) * 100, 1)}%${d.assumptions?.re_is_smart ? " · smart (size-based)" : ""}</td></tr>
-    </table>
-    ${revHTML}
-    ${scHTML}
-    ${snHTML}
-    ${qHTML}
-    ${hHTML}
-    <div class="sub" style="margin-top:16px">Model estimates vs price <span style="color:var(--accent)">▮ intrinsic</span> <span>▮ price</span></div>
-    ${bars || '<div class="note">No earnings-based models could run (EPS ≤ 0 or missing).</div>'}
-    <div class="note">Composite is the <b>median</b> of the models that could run, so one runaway
-      estimate doesn't dominate. Transparent, assumption-driven estimates — not price targets. Tune the
-      assumptions up top and re-run. See <a href="/metrics">Metrics</a> for what each input means.</div>`
+			async function openDrawer(sym) {
+				const r = rows.find((x) => x.symbol === sym)
+				if (!r) return
+				if (drawer) drawer.close()
+				drawer = TF.overlay({
+					kind: "drawer",
+					title: `${r.symbol}${r.name ? " · " + r.name : ""}`,
+					actions: `<a class="btn sm" href="/fundamentals?symbol=${encodeURIComponent(r.symbol)}">Fundamentals</a>`,
+					body: `<div class="vd">${TF.skeleton(1, "lg")}<div class="stats">${`<div class="stat">${TF.skeleton(2)}</div>`.repeat(4)}</div>${TF.skeleton(6)}</div>`,
+					onClose: () => (drawer = null),
+				})
+				const mine = drawer
+				// pull the rich single-stock view with the current assumptions
+				let d = r
+				try {
+					const res = await fetch(`/api/valuation?symbol=${encodeURIComponent(sym)}&rich=1&` + qs(assumptions()))
+					if (res.ok) d = await res.json()
+				} catch (e) {}
+				if (drawer !== mine) return
+				drawer.body.innerHTML = `<div class="vd">
+    <div class="stats" style="margin-top:0">
+      <div class="stat"><div class="k">Price</div><div class="v">₹${f(d.price)}</div></div>
+      <div class="stat"><div class="k">Composite intrinsic</div><div class="v">₹${f(d.composite)}</div><div class="c">median of ${d.n_models ?? "—"} models</div></div>
+      <div class="stat"><div class="k">Margin of safety</div><div class="v">${TF.delta(d.mos_pct, 1)}</div><div class="c">${verdictChip(d.verdict)}</div></div>
+      <div class="stat"><div class="k">Cost of equity</div><div class="v">${f((d.assumptions?.re || 0) * 100, 1)}%</div><div class="c">${d.assumptions?.re_is_smart ? "smart (size-based)" : "as set"}</div></div>
+    </div>
+    <h3>Model estimates vs price</h3>
+    ${modelBars(d)}
+    ${reverseDcf(d)}
+    ${scenarios(d)}
+    ${sensitivity(d)}
+    ${quality(d)}
+    ${history(d)}
+    <h3>Inputs</h3>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><td>EPS (ttm) · BVPS</td><td class="num">${f(d.eps)} · ${f(d.bvps)}</td></tr>
+      <tr><td>P/E · ROE · Div yield</td><td class="num">${f(d.pe, 1)} · ${f(d.roe, 1)}% · ${f(d.div_yield, 2)}%</td></tr>
+      <tr><td>Growth — historical / used</td><td class="num">${f(d.g_hist_pct, 1)}% / ${f(d.g_used_pct, 1)}%</td></tr>
+    </table></div>
+    <div class="note">Composite is the <b>median</b> of the models that could run, so one runaway estimate doesn't dominate. Transparent, assumption-driven estimates — not price targets. Tune the assumptions and re-run. See <a href="/metrics">Metrics</a> for what each input means.</div></div>`
 			}
 			function closeDrawer() {
-				$("#drawer").classList.remove("open")
+				if (drawer) drawer.close()
 			}
-			document.addEventListener("keydown", (e) => {
-				if (e.key === "Escape") closeDrawer()
-			})
 
 			$("#run").onclick = run
 			run()
