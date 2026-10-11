@@ -319,22 +319,21 @@ review found 10 issues in that diff, which I'll report separately.
 
 ### Tests
 
-Baseline 68 failed / 1132 passed → now 5 failed / 1293 passed. The 5 are pre-existing
+Baseline 68 failed / 1132 passed → now 5 failed / 1295 passed. The 5 are pre-existing
 and untouched: `test_query` ×2 (indicators missing from `indicators.py`),
 `test_entrypoints` (`/bars`, `/candles` undocumented), `test_commands` (`ACCOUNT_SIZE`
 leaks from the local `.env`), `test_paper_autopilot` (watcher lacks `maybe_evening_queue`).
 
 ### Follow-ups
 
-- **`/api/portfolio` without a Kite session kills the server process.** `SystemExit` from
-  `kite_auth.get_kite()` escapes the route; every page dies with it. Wrap it like the other
-  routes (401). Backend, so left alone here.
+- ~~`/api/portfolio` without a Kite session kills the server process.~~ **Fixed**
+  (`061526d`), along with `POST /api/watchlist/{unknown}`, which did the same. Every
+  `/api` route was then called with the session removed; none lets `SystemExit` escape.
 - Run `python -m app.cli sync` once so NFO futures (and expiries) land; the Board is empty
   until then.
 - Market-hours check a live Board: OI change fills ~1 min after the first build of the day;
   scores and ranks need real data to sanity-check the weights in `board.py`.
 - Some stored screener snapshots are empty strings (e.g. BDL) — a scraper issue, visible on
   Fundamentals.
-- The `--panel/--fg/--dim/--up/--down` aliases remain for the inline CSS of the seven
-  pages that got the generic treatment; folding those into the new tokens would let the
-  aliases go.
+- ~~Compatibility aliases~~ **Done:** every page now uses the real tokens, and the
+  aliases are gone from `app.css` (only `--accent`, which native controls use, remains).

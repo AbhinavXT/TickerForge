@@ -20,8 +20,8 @@
 			#q {
 				flex: 1;
 				min-height: 64px;
-				background: var(--panel2);
-				color: var(--fg);
+				background: var(--surface-3);
+				color: var(--text);
 				border: 1px solid var(--border);
 				border-radius: 9px;
 				padding: 11px 13px;
@@ -33,16 +33,16 @@
 				border-color: var(--accent);
 			}
 			#q.bad {
-				border-color: var(--down);
+				border-color: var(--bear);
 			}
 			.parsed {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12px;
 				margin-top: 6px;
 				font-family: var(--mono);
 			}
 			.parsed.bad {
-				color: var(--down);
+				color: var(--bear);
 			}
 			.cols {
 				display: grid;
@@ -66,7 +66,7 @@
 				text-align: left;
 			}
 			th {
-				color: var(--dim);
+				color: var(--text-2);
 				font-weight: 500;
 				font-size: 12px;
 			}
@@ -79,25 +79,25 @@
 				text-align: left;
 				background: none;
 				border: 0;
-				color: var(--fg);
+				color: var(--text);
 				font: 12.5px var(--mono);
 				padding: 7px 8px;
 				border-radius: 6px;
 				cursor: pointer;
 			}
 			.ex:hover {
-				background: var(--panel2);
+				background: var(--surface-3);
 			}
 			.ex small {
 				display: block;
-				color: var(--dim);
+				color: var(--text-2);
 				font-family: inherit;
 				font-size: 11px;
 				margin-top: 2px;
 			}
 			.fld {
 				font: 12px var(--mono);
-				color: var(--dim);
+				color: var(--text-2);
 				padding: 3px 0;
 			}
 			/* The reference used to be two headings and one 140-row scroll.
@@ -120,14 +120,14 @@
 				flex: 1;
 				background: none;
 				border: 1px solid var(--border);
-				color: var(--dim);
+				color: var(--text-2);
 				border-radius: 7px;
 				padding: 5px 0;
 				font-size: 12px;
 				cursor: pointer;
 			}
 			.rt.on {
-				color: var(--fg);
+				color: var(--text);
 				border-color: var(--accent);
 				background: var(--bull-bg);
 			}
@@ -155,7 +155,7 @@
 				font-size: 11px;
 				letter-spacing: 0.06em;
 				text-transform: uppercase;
-				color: var(--dim);
+				color: var(--text-2);
 				display: flex;
 				justify-content: space-between;
 				align-items: center;
@@ -164,7 +164,7 @@
 				display: none;
 			}
 			.refgroup > summary:hover {
-				color: var(--fg);
+				color: var(--text);
 			}
 			.refgroup > summary .n {
 				font-size: 10px;
@@ -174,33 +174,33 @@
 				line-height: 15px;
 			}
 			.refgroup[open] > summary {
-				color: var(--fg);
+				color: var(--text);
 			}
 			.refgroup > div {
 				padding-bottom: 8px;
 			}
 			.fld b {
-				color: var(--fg);
+				color: var(--text);
 				font-weight: 500;
 			}
 			.why {
 				font-size: 12px;
-				color: var(--dim);
+				color: var(--text-2);
 			}
 			.why .no {
-				color: var(--down);
+				color: var(--bear);
 			}
 			.note {
 				border-left: 2px solid var(--border);
 				padding-left: 10px;
-				color: var(--dim);
+				color: var(--text-2);
 				line-height: 1.6;
 				margin: 14px 0;
 			}
 			h3 {
 				margin: 20px 0 4px;
 				font-size: 13px;
-				color: var(--dim);
+				color: var(--text-2);
 				text-transform: uppercase;
 				letter-spacing: 0.05em;
 			}

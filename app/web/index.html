@@ -28,7 +28,7 @@
 			}
 			body {
 				background: var(--bg);
-				color: var(--fg);
+				color: var(--text);
 				font: 14px/1.4 var(--sans);
 				height: 100vh;
 				height: 100dvh;
@@ -41,7 +41,7 @@
 				grid-template-rows: minmax(0, 1fr);
 			}
 			#side {
-				background: var(--panel);
+				background: var(--surface-2);
 				padding: 12px;
 				overflow-y: auto;
 			}
@@ -75,7 +75,7 @@
 				background: var(--bg);
 				border: 1px solid var(--border);
 				border-radius: 6px;
-				color: var(--fg);
+				color: var(--text);
 				outline: none;
 			}
 			#results div,
@@ -92,7 +92,7 @@
 				font-weight: 600;
 			}
 			.nm {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12px;
 				white-space: nowrap;
 				overflow: hidden;
@@ -100,7 +100,7 @@
 			}
 			#wl-title {
 				margin: 14px 0 4px;
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12px;
 				text-transform: uppercase;
 				letter-spacing: 1px;
@@ -111,7 +111,7 @@
 				align-items: center;
 			}
 			.wl .rm {
-				color: var(--dim);
+				color: var(--text-2);
 				visibility: hidden;
 				padding: 0 4px;
 			}
@@ -137,25 +137,25 @@
 				font-weight: 700;
 			}
 			#name {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12px;
 			}
 			#status {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12px;
 				margin-left: auto;
 			}
 			#legend {
 				padding: 0 16px 4px;
 				font-size: 12px;
-				color: var(--dim);
+				color: var(--text-2);
 				font-variant-numeric: tabular-nums;
 				display: flex;
 				gap: 14px;
 				flex-wrap: wrap;
 			}
 			#legend b {
-				color: var(--fg);
+				color: var(--text);
 				font-weight: 600;
 			}
 			.bar {
@@ -166,7 +166,7 @@
 				align-items: center;
 			}
 			.bar .lbl {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 11px;
 				text-transform: uppercase;
 				letter-spacing: 1px;
@@ -175,14 +175,14 @@
 			.bar button {
 				background: none;
 				border: 1px solid var(--border);
-				color: var(--dim);
+				color: var(--text-2);
 				border-radius: 6px;
 				padding: 3px 9px;
 				cursor: pointer;
 				font-size: 12px;
 			}
 			.bar button.on {
-				color: var(--fg);
+				color: var(--text);
 				border-color: var(--accent);
 				background: var(--bull-bg);
 			}
@@ -206,7 +206,7 @@
 				gap: 3px;
 				padding: 6px 5px;
 				border-right: 1px solid var(--border);
-				background: var(--panel);
+				background: var(--surface-2);
 			}
 			#drawtools .dsep {
 				height: 1px;
@@ -225,7 +225,7 @@
 				min-width: 196px;
 				max-height: 68vh;
 				overflow-y: auto;
-				background: var(--panel2);
+				background: var(--surface-3);
 				border: 1px solid var(--border);
 				border-radius: 9px;
 				padding: 5px;
@@ -242,26 +242,26 @@
 				border: 0;
 				border-radius: 6px;
 				padding: 7px 10px;
-				color: var(--fg);
+				color: var(--text);
 				font: inherit;
 				cursor: pointer;
 			}
 			.picker button:hover {
-				background: var(--panel);
+				background: var(--surface-2);
 			}
 			.picker button.on {
-				background: var(--panel);
+				background: var(--surface-2);
 				color: var(--accent);
 			}
 			.picker .pgrp {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 11px;
 				text-transform: uppercase;
 				letter-spacing: 0.05em;
 				padding: 9px 10px 3px;
 			}
 			.picker .pnote {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 11.5px;
 				line-height: 1.5;
 				padding: 8px 10px 4px;
@@ -307,8 +307,8 @@
 			}
 			#cmpIn {
 				width: 92px;
-				background: var(--panel2);
-				color: var(--fg);
+				background: var(--surface-3);
+				color: var(--text);
 				border: 1px solid var(--border);
 				border-radius: 6px;
 				padding: 2px 7px;
@@ -328,14 +328,14 @@
 				gap: 6px;
 				padding: 6px 10px;
 				border-top: 1px solid var(--border);
-				background: var(--panel);
+				background: var(--surface-2);
 			}
 			#rpSlider {
 				flex: 1;
 				accent-color: var(--accent);
 			}
 			.rpinfo {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12px;
 				font-variant-numeric: tabular-nums;
 				min-width: 150px;
@@ -362,8 +362,8 @@
 				border-left: 1px solid var(--border);
 			}
 			#drawtools .dt {
-				background: var(--panel2);
-				color: var(--dim);
+				background: var(--surface-3);
+				color: var(--text-2);
 				border: 1px solid var(--border);
 				border-radius: 6px;
 				padding: 2px 8px;
@@ -372,28 +372,28 @@
 				cursor: pointer;
 			}
 			#drawtools .dt:hover {
-				color: var(--fg);
+				color: var(--text);
 			}
 			#drawtools .dt.on {
 				color: var(--accent);
 				border-color: var(--accent);
 			}
 			#drawtools .dt.danger:hover {
-				color: var(--down);
-				border-color: var(--down);
+				color: var(--bear);
+				border-color: var(--bear);
 			}
 			.up {
-				color: var(--up);
+				color: var(--bull);
 			}
 			.down {
-				color: var(--down);
+				color: var(--bear);
 			}
 			/* ---- indicator catalog + chips + panes ---- */
 			#evmenu,
 			#laymenu {
 				position: fixed;
 				z-index: 60;
-				background: var(--panel);
+				background: var(--surface-2);
 				border: 1px solid var(--border);
 				border-radius: 8px;
 				padding: 6px;
@@ -415,7 +415,7 @@
 				font-size: 13px;
 			}
 			#evmenu label:hover {
-				background: var(--panel2);
+				background: var(--surface-3);
 			}
 			#evmenu .dot {
 				width: 9px;
@@ -424,7 +424,7 @@
 				flex: none;
 			}
 			#evmenu .hint {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 11.5px;
 				padding: 6px 7px 2px;
 				line-height: 1.45;
@@ -444,24 +444,24 @@
 				font-size: 13px;
 			}
 			#laylist .row:hover {
-				background: var(--panel2);
+				background: var(--surface-3);
 			}
 			#laylist .row .x {
 				margin-left: auto;
-				color: var(--dim);
+				color: var(--text-2);
 			}
 			#laylist .row .x:hover {
-				color: var(--down);
+				color: var(--bear);
 			}
 			#laylist .empty {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12px;
 				padding: 6px 7px;
 			}
 			#indmenu {
 				position: fixed;
 				z-index: 60;
-				background: var(--panel);
+				background: var(--surface-2);
 				border: 1px solid var(--border);
 				border-radius: 8px;
 				padding: 6px;
@@ -476,7 +476,7 @@
 				width: 100%;
 				padding: 7px 9px;
 				background: var(--bg);
-				color: var(--fg);
+				color: var(--text);
 				border: 1px solid var(--border);
 				border-radius: 6px;
 				outline: none;
@@ -487,7 +487,7 @@
 				overflow-y: auto;
 			}
 			#indlist .grphead {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 10px;
 				text-transform: uppercase;
 				letter-spacing: 1px;
@@ -508,10 +508,10 @@
 			#indlist .il .cat {
 				margin-left: auto;
 				font-size: 10px;
-				color: var(--dim);
+				color: var(--text-2);
 			}
 			#indlist .none {
-				color: var(--dim);
+				color: var(--text-2);
 				padding: 8px;
 				font-size: 12px;
 			}
@@ -530,7 +530,7 @@
 				border: 1px solid var(--border);
 				border-radius: 14px;
 				padding: 2px 4px 2px 9px;
-				color: var(--fg);
+				color: var(--text);
 			}
 			.ichip .sw {
 				width: 9px;
@@ -541,14 +541,14 @@
 			.ichip .cfg,
 			.ichip .x {
 				cursor: pointer;
-				color: var(--dim);
+				color: var(--text-2);
 				padding: 0 3px;
 				border-radius: 9px;
 				font-size: 11px;
 			}
 			.ichip .cfg:hover,
 			.ichip .x:hover {
-				color: var(--fg);
+				color: var(--text);
 				background: var(--border);
 			}
 			#panes {
@@ -567,7 +567,7 @@
 				left: 8px;
 				z-index: 4;
 				font-size: 11px;
-				color: var(--dim);
+				color: var(--text-2);
 				pointer-events: none;
 			}
 			.pane .prm {
@@ -576,11 +576,11 @@
 				right: 8px;
 				z-index: 4;
 				cursor: pointer;
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12px;
 			}
 			.pane .prm:hover {
-				color: var(--fg);
+				color: var(--text);
 			}
 			/* pane resize grip + pane settings */
 			.pane .pgrip {
@@ -623,11 +623,11 @@
 				right: 26px;
 				z-index: 4;
 				cursor: pointer;
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12px;
 			}
 			.pane .pcfg:hover {
-				color: var(--fg);
+				color: var(--text);
 			}
 			/* indicator settings modal (Kite-style) */
 			#cfgwrap {
@@ -645,7 +645,7 @@
 			#cfgmodal {
 				width: 340px;
 				max-width: calc(100vw - 32px);
-				background: var(--panel);
+				background: var(--surface-2);
 				border: 1px solid var(--border);
 				border-radius: 10px;
 				box-shadow: var(--shadow);
@@ -662,13 +662,13 @@
 			#cfgmodal .chead .cx {
 				margin-left: auto;
 				cursor: pointer;
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 15px;
 				padding: 2px 6px;
 				border-radius: 6px;
 			}
 			#cfgmodal .chead .cx:hover {
-				color: var(--fg);
+				color: var(--text);
 				background: var(--border);
 			}
 			#cfgmodal .ctabs {
@@ -679,13 +679,13 @@
 			}
 			#cfgmodal .ct {
 				cursor: pointer;
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 13px;
 				padding-bottom: 8px;
 				border-bottom: 2px solid transparent;
 			}
 			#cfgmodal .ct.on {
-				color: var(--fg);
+				color: var(--text);
 				border-bottom-color: var(--accent);
 			}
 			#cfgmodal .cbody {
@@ -700,7 +700,7 @@
 				gap: 12px;
 				margin-bottom: 12px;
 				font-size: 13px;
-				color: var(--fg);
+				color: var(--text);
 			}
 			#cfgmodal .crow:last-child {
 				margin-bottom: 2px;
@@ -710,7 +710,7 @@
 				width: 110px;
 				padding: 6px 8px;
 				background: var(--bg);
-				color: var(--fg);
+				color: var(--text);
 				border: 1px solid var(--border);
 				border-radius: 6px;
 				outline: none;
@@ -726,7 +726,7 @@
 				cursor: pointer;
 			}
 			#cfgmodal .cnone {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12.5px;
 			}
 			#cfgmodal .cfoot {
@@ -742,7 +742,7 @@
 			#cfgmodal button {
 				background: none;
 				border: 1px solid var(--border);
-				color: var(--fg);
+				color: var(--text);
 				border-radius: 6px;
 				padding: 6px 14px;
 				cursor: pointer;

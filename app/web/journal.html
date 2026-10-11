@@ -16,14 +16,14 @@
 				border-radius: 10px;
 				padding: 10px 14px;
 				margin: 12px 0;
-				background: var(--panel);
+				background: var(--surface-2);
 				display: flex;
 				gap: 18px;
 				align-items: center;
 				flex-wrap: wrap;
 			}
 			.guard.blocked {
-				border-color: var(--down);
+				border-color: var(--bear);
 				background: var(--bear-bg);
 			}
 			.guard .big {
@@ -32,28 +32,28 @@
 				font-variant-numeric: tabular-nums;
 			}
 			.guard .lbl {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12px;
 			}
 			.meter {
 				flex: 1;
 				min-width: 160px;
 				height: 7px;
-				background: var(--panel2);
+				background: var(--surface-3);
 				border-radius: 4px;
 				overflow: hidden;
 			}
 			.meter i {
 				display: block;
 				height: 100%;
-				background: var(--down);
+				background: var(--bear);
 				width: 0;
 			}
 			.pos {
-				color: var(--up);
+				color: var(--bull);
 			}
 			.neg {
-				color: var(--down);
+				color: var(--bear);
 			}
 			.r {
 				font-variant-numeric: tabular-nums;
@@ -64,20 +64,20 @@
 				font-size: 15px;
 			}
 			.empty {
-				color: var(--dim);
+				color: var(--text-2);
 				padding: 14px;
 			}
 			.tag {
 				display: inline-block;
-				background: var(--panel2);
+				background: var(--surface-3);
 				border: 1px solid var(--border);
 				border-radius: 20px;
 				padding: 1px 9px;
 				font-size: 12px;
-				color: var(--dim);
+				color: var(--text-2);
 			}
 			.act {
-				color: var(--dim);
+				color: var(--text-2);
 				cursor: pointer;
 				padding: 0 4px;
 			}
@@ -88,7 +88,7 @@
 				font-weight: 600;
 			}
 			.caveat {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12.5px;
 				line-height: 1.55;
 				margin-top: 8px;
@@ -96,8 +96,8 @@
 				padding-left: 10px;
 			}
 			dialog {
-				background: var(--panel);
-				color: var(--fg);
+				background: var(--surface-2);
+				color: var(--text);
 				border: 1px solid var(--border);
 				border-radius: 12px;
 				padding: 18px;
@@ -113,7 +113,7 @@
 				margin-bottom: 10px;
 			}
 			dialog label {
-				color: var(--dim);
+				color: var(--text-2);
 				font-size: 12px;
 			}
 		</style>
@@ -241,9 +241,9 @@
       <div class="meter"><i style="width:${(used * 100).toFixed(0)}%"></i></div>
     </div>
     <div><div class="lbl">positions</div>
-      <div class="big">${g.open_positions}<small style="color:var(--dim);font-size:13px">/${g.max_positions}</small></div></div>
+      <div class="big">${g.open_positions}<small style="color:var(--text-2);font-size:13px">/${g.max_positions}</small></div></div>
     <div><div class="lbl">risking</div>
-      <div class="big">${f(s.risk_pct, 1)}%<small style="color:var(--dim);font-size:13px"> of ₹${(s.account / 100000).toFixed(1)}L</small></div></div>`
+      <div class="big">${f(s.risk_pct, 1)}%<small style="color:var(--text-2);font-size:13px"> of ₹${(s.account / 100000).toFixed(1)}L</small></div></div>`
 			}
 
 			function card(k, v, extra = "") {

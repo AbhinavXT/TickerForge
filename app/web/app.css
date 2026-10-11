@@ -69,15 +69,7 @@
 	--top-h: 52px;
 	--tabbar-h: 60px;
 
-	/* Compatibility aliases. Older page markup and the chart page still say
-	   --panel / --fg / --up; these keep it on the new palette. --accent stays
-	   for good (controls use it). */
-	--panel: var(--surface-2);
-	--panel2: var(--surface-3);
-	--fg: var(--text);
-	--dim: var(--text-2);
-	--up: var(--bull);
-	--down: var(--bear);
+	/* The accent that native controls (checkbox, range) take. */
 	--accent: var(--bull);
 
 	/* Tells the browser this is a dark page. One line, and it fixes the
@@ -409,6 +401,9 @@ label { cursor:pointer; }
 .stat .v, .card .v { font:500 var(--fs-17)/1.3 var(--mono); font-variant-numeric:tabular-nums;
         margin-top:2px; overflow-wrap:anywhere; }
 .stat.lg .v { font-size:var(--fs-24); }
+/* a message dropped into a stat grid spans it instead of taking one cell */
+.cards > .empty, .stats > .empty, .cards > .err-box, .stats > .err-box,
+.cards > .notice, .stats > .notice { grid-column:1 / -1; }
 .stat .v small, .card .v small { font-size:var(--fs-12); color:var(--text-2); font-weight:400; }
 .stat .c, .card .c { color:var(--text-3); font-size:var(--fs-12); margin-top:2px; }
 
