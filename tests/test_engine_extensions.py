@@ -236,7 +236,9 @@ def test_csv_columns_match_the_journal_exactly():
     db.init()
     with db.connect() as conn:
         cols = [r[1] for r in conn.execute("PRAGMA table_info(trades)")]
-    ignore = {"id", "initial_stop", "created_at"}
+    # `checks` is the pre-trade checklist's verdict — recorded at entry on a
+    # real trade, meaningless for a simulated one.
+    ignore = {"id", "initial_stop", "created_at", "checks"}
     assert set(B.JOURNAL_COLUMNS) == set(cols) - ignore
 
 

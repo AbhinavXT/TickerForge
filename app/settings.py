@@ -114,6 +114,23 @@ SETTINGS: tuple[Setting, ...] = (
             "Hard ceiling on one position. 100 = cash account, no margin. "
             "Raise it only if you actually trade on leverage.",
             minimum=1, maximum=500, step=5),
+
+    # ---- pre-trade checklist (warns, never blocks)
+    Setting("RESULTS_WARN_DAYS", "Warn: results within (days)", "number",
+            "Checklist",
+            "Flag an entry when the company reports within this many days. "
+            "A results gap goes straight through a stop.",
+            minimum=0, maximum=30, step=1),
+    Setting("MIN_RR", "Warn: reward:risk below", "number", "Checklist",
+            "Flag an entry whose target is closer than this many R. Only "
+            "checked when a target is given.",
+            minimum=0.5, maximum=10, step=0.1),
+    Setting("CORR_WARN", "Warn: correlation above", "number", "Checklist",
+            "Flag an entry whose 60-session daily returns correlate at least "
+            "this much with a position already open on the same side. Two "
+            "names moving together are one bet at twice the size.",
+            minimum=0.3, maximum=0.99, step=0.05),
+
     # ---- pushes from NSE data
     Setting("PREOPEN_GAP_ATR", "Pre-open gap (x ATR)", "number",
             "Notifications",

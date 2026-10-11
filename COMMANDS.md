@@ -722,6 +722,28 @@ tf journal stats --tag st_adx
 Omit `--qty` on `open` and it's sized from your risk model. **Tag
 consistently** — every later comparison joins on the tag.
 
+**Pre-trade checklist.** Every `open` (CLI, `/log`, the Journal page, and
+semi-auto proposals) runs a short set of checks and stores the warnings on
+the trade. It never blocks: the hard limits are the risk guard's job.
+
+| Check | Fires when |
+|---|---|
+| Results due soon | results are due within `RESULTS_WARN_DAYS` (5) |
+| Reward:risk below minimum | a `--target` is given and it's under `MIN_RR` (1.5) R |
+| Against the market regime | long while Nifty trends down or sits below its 200-DMA; short while it trends up |
+| High-volatility tape | Nifty is in its high-vol regime |
+| Correlated with an open position | 60-session return correlation ≥ `CORR_WARN` (0.7) with an open trade on the same side |
+| Insider selling / pledge invoked | promoters or directors net sold on market, or a pledge was invoked, in the last 90 days (longs only) |
+
+```bash
+tf journal open BEL --entry 405 --sl 398 --target 425   # target enables the R:R check
+tf journal checks                     # what each warning has cost, in R
+```
+
+`journal checks` compares closed trades that carried each warning with
+checked trades that came back clean. Trades logged before the checklist
+existed are left out of both sides.
+
 ### Portfolio
 
 ```bash
@@ -1103,7 +1125,7 @@ Sent to `NTFY_CMD_TOPIC`. The `remote` service must be running.
 | `/mf schemes` | — | Which fund portfolios you've imported |
 | `/mf overlap A \| B` | — | How much two funds are the same fund |
 | `/mf lookthrough` | — | True exposure: funds plus direct holdings |
-| `/journal` | `/j` `/trades` | Open positions and live R |
+| `/journal` | `/j` `/trades` | Open positions and live R. `/journal checks`: what each checklist warning has cost |
 | `/alerts` | — | What's armed |
 | `/exit SYM` | `/trail` `/stop` | Where the trailing stop sits, and R so far |
 | `/brief` | `/b` | The pre-market brief on demand |

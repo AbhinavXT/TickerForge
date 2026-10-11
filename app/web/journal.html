@@ -170,6 +170,14 @@
 				<table class="stmt" id="closedTbl"></table>
 			</div>
 
+			<h3 class="sect">Checklist review</h3>
+			<div class="sub" style="margin-bottom: var(--s2)">
+				Closed trades that carried each pre-trade warning, against
+				trades that were checked and came back clean. Read a row once
+				it has ~20 trades; before that it's noise.
+			</div>
+			<div id="checks"></div>
+
 			<h3 class="sect">Live vs backtest, by strategy</h3>
 			<div class="row">
 				<span class="sub"
@@ -216,6 +224,48 @@
 				renderStats(DATA.stats)
 				renderOpen(DATA.open)
 				renderClosed(DATA.closed)
+				loadChecks()
+			}
+
+			// Pre-trade checklist warnings stored on a trade (JSON, or null
+			// when the trade predates the checklist).
+			function warnMark(raw) {
+				let w = null
+				try {
+					w = raw ? JSON.parse(raw) : null
+				} catch (e) {}
+				if (!w || !w.length) return ""
+				const tip = w.map((x) => `${x.key.replace(/_/g, " ")}: ${x.detail}`).join("\n")
+				return ` <span class="tag" style="color:var(--warn)" title="${TF.esc(tip)}">⚠ ${w.length}</span>`
+			}
+
+			async function loadChecks() {
+				try {
+					const d = await api("/api/journal/checks")
+					const c = d.clean || {}
+					const ex = (s) => (s && s.expectancy_r != null ? sgn(s.expectancy_r) + "R" : "—")
+					const rows = (d.checks || []).filter((r) => r.flagged.trades)
+					if (!d.checked) {
+						$("#checks").innerHTML = `<div class="sub">No checked trades closed yet${d.unchecked ? ` (${d.unchecked} from before the checklist aren't counted)` : ""}.</div>`
+						return
+					}
+					$("#checks").innerHTML = `<div class="tbl-wrap"><table class="stmt"><thead><tr>
+      <th>Entry</th><th>Trades</th><th>Expectancy</th><th>Win%</th><th>vs clean</th></tr></thead><tbody>
+      <tr><td>Clean (no warnings)</td><td>${c.trades}</td><td class="r ${cls(c.expectancy_r)}">${ex(c)}</td>
+        <td>${c.win_rate_pct == null ? "—" : f(c.win_rate_pct, 1) + "%"}</td><td>—</td></tr>
+      ${rows
+			.map(
+				(r) => `<tr><td>⚠ ${TF.esc(r.label)}</td><td>${r.flagged.trades}</td>
+        <td class="r ${cls(r.flagged.expectancy_r)}">${ex(r.flagged)}</td>
+        <td>${r.flagged.win_rate_pct == null ? "—" : f(r.flagged.win_rate_pct, 1) + "%"}</td>
+        <td class="r ${cls(r.cost_r)}">${r.cost_r == null ? "—" : sgn(r.cost_r) + "R"}</td></tr>`,
+			)
+			.join("")}
+      </tbody></table></div>
+      ${d.unchecked ? `<div class="sub" style="margin-top:6px">${d.unchecked} closed trade(s) from before the checklist are left out of both sides.</div>` : ""}`
+				} catch (e) {
+					$("#checks").innerHTML = `<div class="sub">Checklist review unavailable: ${TF.esc(e.message)}</div>`
+				}
 			}
 
 			function renderGuard(g, s) {
@@ -289,7 +339,7 @@
 					rows
 						.map(
 							(r) => `<tr>
-      <td>${r.symbol}</td><td>${r.side}</td><td>${r.qty}</td>
+      <td>${r.symbol}${warnMark(r.checks)}</td><td>${r.side}</td><td>${r.qty}</td>
       <td>${f(r.entry)}</td>
       <td>${f(r.stop)}${
 			r.initial_stop != null && r.stop !== r.initial_stop
@@ -421,19 +471,58 @@
 							"Stop (defines 1R — leave blank and the trade can't be scored)",
 						) +
 						fld("nQty", "Quantity") +
-						fld("nTag", "Tag (strategy key, e.g. st_adx)", "text"),
+						`<div class="fld"><label>Side</label><select class="sel" id="nSide">
+     <option value="long">long</option><option value="short">short</option></select></div>` +
+						fld("nTarget", "Target (optional — enables the reward:risk check)") +
+						fld("nTag", "Tag (strategy key, e.g. st_adx)", "text") +
+						`<div id="nChecks" class="sub" style="margin-top:8px" aria-live="polite"></div>`,
 					async () => {
 						const q = new URLSearchParams({
 							symbol: $("#nSym").value.trim().toUpperCase(),
 							entry: $("#nEntry").value,
 							qty: $("#nQty").value,
+							side: $("#nSide").value,
 						})
 						if ($("#nStop").value) q.set("stop", $("#nStop").value)
+						if ($("#nTarget").value) q.set("target", $("#nTarget").value)
 						if ($("#nTag").value)
 							q.set("tag", $("#nTag").value.trim())
-						await api("/api/journal?" + q, { method: "POST" })
+						const t = await api("/api/journal?" + q, { method: "POST" })
+						if (t.warnings && t.warnings.length)
+							TF.toast(`Logged with ${t.warnings.length} warning(s) — recorded on the trade`)
 					},
 				)
+			// Checklist preview while the form is filled in. Warns, never
+			// blocks — the warnings are stored with the trade either way.
+			let _pc = null
+			document.addEventListener("input", (e) => {
+				if (!e.target.closest || !e.target.closest("#dlg") || !$("#nChecks")) return
+				clearTimeout(_pc)
+				_pc = setTimeout(precheck, 500)
+			})
+			document.addEventListener("change", (e) => {
+				if (e.target && e.target.id === "nSide") precheck()
+			})
+			async function precheck() {
+				const sym = ($("#nSym").value || "").trim().toUpperCase()
+				const entry = $("#nEntry").value
+				if (!sym || !entry) {
+					$("#nChecks").textContent = ""
+					return
+				}
+				const q = new URLSearchParams({ symbol: sym, entry, side: $("#nSide").value })
+				if ($("#nStop").value) q.set("stop", $("#nStop").value)
+				if ($("#nTarget").value) q.set("target", $("#nTarget").value)
+				$("#nChecks").textContent = "checking…"
+				try {
+					const d = await api("/api/journal/precheck?" + q)
+					$("#nChecks").innerHTML = d.warnings.length
+						? d.warnings.map((w) => `<div style="color:var(--warn)">⚠ <b>${TF.esc(w.label)}</b> — ${TF.esc(w.detail)}</div>`).join("")
+						: '<span style="color:var(--bull)">✓ checklist clean</span>'
+				} catch (e) {
+					$("#nChecks").textContent = ""
+				}
+			}
 
 			window.askClose = (id) =>
 				openDialog(

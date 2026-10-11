@@ -1427,15 +1427,35 @@ def api_journal_open(symbol: str, entry: float, qty: int,
                      stop: float | None = None, side: str = "long",
                      target: float | None = None, tag: str | None = None,
                      notes: str | None = None):
+    from . import checklist
     inst = instruments.lookup(symbol)
+    sym = inst["tradingsymbol"] if inst else symbol.upper()
+    warnings = checklist.run(sym, entry, stop, side, target)
     try:
         tid = journal.open_trade(
-            inst["tradingsymbol"] if inst else symbol.upper(),
-            entry=entry, qty=qty, stop=stop, side=side, target=target,
-            tag=tag, notes=notes, source="web")
+            sym, entry=entry, qty=qty, stop=stop, side=side, target=target,
+            tag=tag, notes=notes, source="web",
+            checks=checklist.encode(warnings))
     except journal.JournalError as e:
         raise HTTPException(400, str(e))
-    return journal.get(tid)
+    return {**journal.get(tid), "warnings": warnings}
+
+
+@app.get("/api/journal/precheck")
+def api_journal_precheck(symbol: str, entry: float, stop: float | None = None,
+                         side: str = "long", target: float | None = None):
+    """The checklist without logging anything — for the form, before submit."""
+    from . import checklist
+    inst = instruments.lookup(symbol)
+    sym = inst["tradingsymbol"] if inst else symbol.upper()
+    return {"symbol": sym,
+            "warnings": checklist.run(sym, entry, stop, side, target)}
+
+
+@app.get("/api/journal/checks")
+def api_journal_checks(since: str | None = None):
+    from . import checklist
+    return checklist.report(since=since)
 
 
 @app.post("/api/journal/{trade_id}/close")

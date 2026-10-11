@@ -16,6 +16,7 @@ from app import regime
 from app import delivery
 from app import insider
 from app import preopen
+from app import checklist
 
 
 @pytest.fixture(autouse=True)
@@ -203,6 +204,19 @@ def test_empty_market_feed_falls_back_to_followed_symbols(monkeypatch):
     assert not r["fallback"] and len(asked) == n + 1   # hourly, not every poll
 
 
+def test_net_and_checklist_insider_warning():
+    insider.poll_once(_Feed([]), followed={})        # seed
+    with mock.patch.object(insider.notify, "send"):
+        insider.poll_once(_Feed([rec(tdpTransactionType="Sell",
+                                     acqMode="Market Sale",
+                                     intimDt=date.today().strftime("%d-%b-%Y"))]),
+                          followed={})
+    n = insider.net("BEL", days=90)
+    assert n["value"] < 0 and n["sold"]
+    assert "net sold" in checklist.check_insider("BEL", "long")
+    assert checklist.check_insider("BEL", "short") is None
+
+
 # ------------------------------------------------------------------ preopen
 PRE = {"data": [
     {"metadata": {"symbol": "BEL", "iep": 380.0, "previousClose": 400.0},
@@ -300,3 +314,64 @@ def test_split_and_verdict():
     assert "switching it off in choppy" in v
 
 
+# ---------------------------------------------------------------- checklist
+def test_rr_check():
+    assert checklist.check_rr(100, 95, 105, "long").startswith("reward:risk 1.00")
+    assert checklist.check_rr(100, 95, 110, "long") is None
+    assert checklist.check_rr(100, 105, 90, "short") is None
+    assert checklist.check_rr(100, 95, None, "long") is None
+
+
+def test_regime_check():
+    assert checklist.check_regime("long", {"label": "trend-down"})[0]
+    assert checklist.check_regime("long", {"label": "choppy",
+                                           "above_200": False})[0]
+    assert checklist.check_regime("long", {"label": "trend-up",
+                                           "above_200": True}) == (None, None)
+    assert checklist.check_regime("short", {"label": "trend-up"})[0]
+    assert checklist.check_regime("long", {"label": "high-vol"})[1]
+
+
+def test_correlation_maths():
+    a = {f"d{i}": math.sin(i) for i in range(40)}
+    assert checklist.correlation(a, a) == pytest.approx(1.0)
+    neg = {k: -v for k, v in a.items()}
+    assert checklist.correlation(a, neg) == pytest.approx(-1.0)
+    assert checklist.correlation(a, {"d1": 1.0}) is None   # too little overlap
+
+
+def test_run_never_raises_and_collects(monkeypatch):
+    monkeypatch.setattr(checklist, "check_results",
+                        lambda *a: (_ for _ in ()).throw(RuntimeError("down")))
+    monkeypatch.setattr(checklist, "check_correlated", lambda *a: "moves with X (0.90)")
+    monkeypatch.setattr(checklist, "check_insider", lambda *a: None)
+    w = checklist.run("BEL", 100, 95, "long", 102, opens=[],
+                      reg={"label": "trend-down"})
+    keys = [x["key"] for x in w]
+    assert keys == ["low_rr", "against_regime", "correlated"]
+
+
+def test_report_compares_flagged_with_clean():
+    def trade(r, checks):
+        tid = journal.open_trade("BEL", entry=100, qty=1, stop=99,
+                                 checks=None if checks is None else json.dumps(checks))
+        journal.close_trade(tid, exit_price=100 + r, charges=0)
+
+    for _ in range(3):
+        trade(2, [])
+        trade(-1, [{"key": "results_soon", "detail": "x"}])
+    trade(5, None)                                   # pre-checklist: ignored
+    rep = checklist.report()
+    assert rep["checked"] == 6 and rep["unchecked"] == 1
+    assert rep["clean"]["expectancy_r"] == pytest.approx(2.0, abs=0.05)
+    row = next(r for r in rep["checks"] if r["key"] == "results_soon")
+    assert row["flagged"]["trades"] == 3
+    assert row["cost_r"] == pytest.approx(-3.0, abs=0.1)
+    assert "Results due soon" in checklist.report_text(rep)
+
+
+def test_open_trade_stores_checks():
+    tid = journal.open_trade("BEL", entry=100, qty=1, stop=99,
+                             checks=checklist.encode([{"key": "low_rr",
+                                                       "label": "", "detail": "d"}]))
+    assert checklist.decode(journal.get(tid)["checks"])[0]["key"] == "low_rr"

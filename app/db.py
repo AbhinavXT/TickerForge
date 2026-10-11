@@ -394,6 +394,9 @@ def init() -> None:
         _ensure_column(conn, "trades", "initial_stop", "REAL")
         conn.execute("UPDATE trades SET initial_stop = stop "
                      "WHERE initial_stop IS NULL AND stop IS NOT NULL")
+        # pre-trade checklist warnings, JSON list of check keys (checklist.py)
+        _ensure_column(conn, "trades", "checks", "TEXT")
+        _ensure_column(conn, "order_proposals", "checks", "TEXT")
 
 
 def set_meta(key: str, value: str) -> None:

@@ -67,13 +67,17 @@ def _row_to_dict(r) -> dict:
 def open_trade(symbol: str, entry: float, qty: int, stop: float | None = None,
                side: str = "long", target: float | None = None,
                tag: str | None = None, notes: str | None = None,
-               source: str = "manual", entry_time: str | None = None) -> int:
+               source: str = "manual", entry_time: str | None = None,
+               checks: str | None = None) -> int:
     """Record a position you've taken. Returns the trade id.
 
     `stop` is optional but strongly wanted: without it there is no 1R, so the
     trade can never be scored in R and it drops out of every statistic that
     matters. The journal accepts it anyway — recording an undisciplined trade
     is more useful than refusing to record it — but `close_trade` will say so.
+
+    `checks` is the pre-trade checklist's verdict, already encoded
+    (checklist.encode). NULL means the checklist never ran on this trade.
     """
     symbol = symbol.upper()
     side = side.lower()
@@ -101,9 +105,10 @@ def open_trade(symbol: str, entry: float, qty: int, stop: float | None = None,
     with db.connect() as conn:
         cur = conn.execute(
             "INSERT INTO trades (symbol, side, qty, entry, stop, initial_stop, "
-            "target, entry_time, tag, notes, source) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "target, entry_time, tag, notes, source, checks) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (symbol, side, qty, entry, stop, stop, target,
-             entry_time or _now(), tag, notes, source))
+             entry_time or _now(), tag, notes, source, checks))
         return cur.lastrowid
 
 

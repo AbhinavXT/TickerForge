@@ -87,6 +87,7 @@ HELP = (
     "/log buy SYM 405 sl=398 tag=st_adx   record the trade\n"
     "/close ID 419 reason=target   ·  /amend ID sl=411   trail the stop\n"
     "/journal [SYM]  open positions + today's R · /journal stats  by tag\n"
+    "/journal checks  what each pre-trade checklist warning has cost you\n"
     "/portfolio     Kite holdings + valuation, signals, stop distance\n"
     "/batch STRATEGY  run it across the watchlist — breadth, not just the best\n"
     "/heatmap SYM STRATEGY fast=5:30:5 slow=30:80:10   peak or plateau?\n"
@@ -1083,16 +1084,21 @@ def cmd_log(tokens: list[str]) -> str:
         if not qty:
             return f"Need qty= (no ACCOUNT_SIZE set, or no stop given).\n{usage}"
 
+    from . import checklist
+    target = _num(kv.get("target") or kv.get("tp"))
+    warnings = checklist.run(inst["tradingsymbol"], entry, stop, side, target)
     try:
         tid = journal.open_trade(
             inst["tradingsymbol"], entry=entry, qty=qty, stop=stop, side=side,
-            target=_num(kv.get("target") or kv.get("tp")),
-            tag=kv.get("tag"), notes=kv.get("note") or kv.get("notes"))
+            target=target,
+            tag=kv.get("tag"), notes=kv.get("note") or kv.get("notes"),
+            checks=checklist.encode(warnings))
     except journal.JournalError as e:
         return f"Not logged: {e}"
 
     t = journal.get(tid)
     out = [f"Logged {journal.format_trade(t)}"]
+    out += checklist.as_lines(warnings)
     if sized_note:
         out.append(sized_note)
     if stop is None:
@@ -1319,6 +1325,10 @@ def cmd_journal(arg: str) -> str:
     """/journal [SYM|tag|stats] — open positions, today's R, and expectancy."""
     arg = (arg or "").strip()
     lines = []
+
+    if arg.lower() in ("checks", "checklist", "review"):
+        from . import checklist
+        return checklist.report_text()
 
     if arg.lower() in ("stats", "tags", "tag"):
         groups = journal.by_tag()

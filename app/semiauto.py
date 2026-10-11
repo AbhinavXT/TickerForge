@@ -44,7 +44,7 @@ from __future__ import annotations
 import secrets
 from datetime import datetime, timedelta
 
-from . import config, db, journal, notify, risk
+from . import checklist, config, db, journal, notify, risk
 
 TOKEN_TTL_MIN = 15
 TOKEN_BYTES = 8                  # ~13 chars of base32; typable, not guessable
@@ -148,21 +148,27 @@ def propose(symbol: str, qty: int, price: float, stop: float,
     problems = check(symbol, qty, price, stop, now)
     token = secrets.token_hex(TOKEN_BYTES)
     status = "blocked" if problems else "pending"
+    # Warnings, not blocks — shown on the approval push so the decision is
+    # made with them in view, and carried onto the journal row at approval.
+    warnings = [] if problems else checklist.run(
+        symbol, price, stop, "long" if side == "buy" else "short", target)
 
     with db.connect() as conn:
         conn.execute(
             "INSERT INTO order_proposals (token, symbol, side, qty, ref_price,"
-            " stop, target, tag, reason, status, created_at, expires_at, note)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " stop, target, tag, reason, status, created_at, expires_at, note,"
+            " checks)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             [token, symbol, side, qty, price, stop, target, tag, reason,
              status, now.isoformat(timespec="seconds"),
              (now + timedelta(minutes=TOKEN_TTL_MIN)).isoformat(
                  timespec="seconds"),
-             "; ".join(problems) or None])
+             "; ".join(problems) or None,
+             None if problems else checklist.encode(warnings)])
 
     out = {"token": token, "symbol": symbol, "qty": qty, "price": price,
            "stop": stop, "status": status, "problems": problems,
-           "expires_in_min": TOKEN_TTL_MIN}
+           "warnings": warnings, "expires_in_min": TOKEN_TTL_MIN}
 
     if problems:
         # A blocked proposal is still worth telling you about: silence would
@@ -186,9 +192,11 @@ def _risk_line(qty: int, price: float, stop: float) -> str:
 
 
 def _push_proposal(p: dict, tag: str) -> None:
+    warn = "".join(f"{w}\n" for w in checklist.as_lines(p.get("warnings") or []))
     body = (f"{p['symbol']} — buy {p['qty']} @ ~{p['price']:.2f}\n"
             f"stop {p['stop']:.2f} · {tag}\n"
-            f"{_risk_line(p['qty'], p['price'], p['stop'])}\n\n"
+            f"{_risk_line(p['qty'], p['price'], p['stop'])}\n"
+            f"{warn}\n"
             f"Approve within {TOKEN_TTL_MIN} min:\n"
             f"  /approve {p['token']} pin=YOUR_PIN\n"
             f"  /reject {p['token']}")
@@ -314,7 +322,7 @@ def approve(token: str, broker=None, now: datetime | None = None) -> dict:
 
     trade_id = journal.open_trade(
         p["symbol"], entry=p["ref_price"], qty=p["qty"], stop=p["stop"],
-        tag=p["tag"], source="semiauto",
+        tag=p["tag"], source="semiauto", checks=p.get("checks"),
         notes=f"order {order_id}" + (f"; gtt {gtt_id}" if gtt_id else ""))
 
     _finish(token, "placed", order_id=str(order_id),

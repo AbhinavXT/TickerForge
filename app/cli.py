@@ -350,6 +350,7 @@ def main() -> None:
     jo.add_argument("--qty", type=int, help="omitted → sized from your risk %%")
     jo.add_argument("--side", default="long", choices=["long", "short"])
     jo.add_argument("--tag", help="strategy key, e.g. st_adx")
+    jo.add_argument("--target", type=float, help="for the reward:risk check")
     jo.add_argument("--note")
     jv = jsub.add_parser("compare",
                          help="Live vs backtested, same tag, same symbols")
@@ -369,6 +370,8 @@ def main() -> None:
     ja.add_argument("--tag")
     js = jsub.add_parser("stats", help="Expectancy overall and by tag")
     js.add_argument("--tag")
+    jsub.add_parser("checks",
+                    help="What each pre-trade checklist warning has cost you")
 
     ip = sub.add_parser("intraday", help="Live levels + alert watcher")
     isub = ip.add_subparsers(dest="icmd", required=True)
@@ -1188,14 +1191,20 @@ def main() -> None:
                 qty = risk.size(args.entry, args.sl, account,
                                 float(config.get("RISK_PCT", 1))) ["qty"]
                 print(f"sized {qty} from {config.get('RISK_PCT', 1)}% risk")
+            from . import checklist
+            warnings = checklist.run(args.symbol.upper(), args.entry, args.sl,
+                                     args.side, args.target)
             try:
                 tid = journal.open_trade(args.symbol.upper(), entry=args.entry,
                                          qty=qty, stop=args.sl, side=args.side,
                                          tag=args.tag, notes=args.note,
-                                         source="cli")
+                                         target=args.target, source="cli",
+                                         checks=checklist.encode(warnings))
             except journal.JournalError as e:
                 print(f"Not logged: {e}"); return
             print(journal.format_trade(journal.get(tid)))
+            for w in checklist.as_lines(warnings):
+                print("  " + w)
             if args.sl is None:
                 print("  ! no stop — this trade can't be scored in R")
 
@@ -1230,6 +1239,10 @@ def main() -> None:
             if "stop" in fields and t.get("initial_stop") is not None:
                 print(f"  (R still measured against the entry stop "
                       f"{t['initial_stop']:g})")
+
+        elif args.jcmd == "checks":
+            from . import checklist
+            print(checklist.report_text())
 
         elif args.jcmd == "stats":
             print(journal.format_stats(journal.stats(tag=args.tag), label="All: "))

@@ -1,3 +1,59 @@
+# TickerForge — delivery, insiders, pre-open gaps, a checklist, regimes
+
+Five additions, four of them fed from NSE rather than Kite.
+
+## Delivery volume
+
+`app/delivery.py` reads the evening bhavcopy (`sec_bhavdata_full_*.csv`, EQ
+series only) into a `delivery` table. Query fields `deliv_pct`,
+`avg_deliv_pct` and `deliv_ratio`; scan condition `delivery_spike`; a
+`Deliv N×` chip on the Board. On the Board it's context only and doesn't
+feed the score, because it's the last completed session's number on an
+intraday screen. **The spike ratio is measured on quantity**, against the
+prior 20 sessions excluding today, so a quiet day at 80% delivery of almost
+nothing doesn't count as accumulation. The scanner refuses to match when
+the delivery file is for a different session than the last candle.
+
+## Insider trades
+
+`app/insider.py` stores SEBI PIT disclosures (promoter, director and KMP
+buys, sells, pledges, releases and invocations). Every disclosure on a name
+you follow pushes. Market-wide, only open-market buys ≥ `INSIDER_MIN_VALUE`
+and pledge invocations push, batched. Shown on Corporate Actions, in the
+brief, and via `/insider`. Field names were checked against a live
+response. The market-wide query returned no rows when this was written, so
+when it's empty the poller asks per symbol for the names you follow, at
+most hourly.
+
+## Pre-open gaps
+
+`app/preopen.py` reads the 09:08 auction prices and pushes once per weekday:
+open trades opening through their stop (max priority), and followed names
+gapping ≥ `PREOPEN_GAP_ATR` daily ATRs. Silent when nothing qualifies.
+
+## Pre-trade checklist
+
+`app/checklist.py` runs on `/log`, the Journal form (live, before submit),
+`journal open`, and semi-auto proposals. It checks for results due soon, low
+R:R, trading against the regime, a high-vol tape, correlation with an open
+position, and insider selling. **It warns and never blocks.** Warnings are
+stored as JSON in `trades.checks`, where NULL means "never checked" and `[]`
+means "checked and clean". The difference matters to `journal checks`,
+which compares each warning's expectancy against clean entries and leaves
+pre-checklist trades out of both sides.
+
+## Regime-split backtests
+
+`app/regime.py` labels each Nifty day high-vol, trend-up, trend-down or
+choppy, using the same alignment as `regime_gate`, so there's no
+lookahead. Single runs and batches (pooled across symbols) report trade
+stats per regime, plus a verdict when the edge flips sign between them.
+Percentile ranks use mid-rank for ties. With `<=`, a perfectly steady
+volatility ranked at 100% of its own history and read as extreme; a test
+caught it.
+
+---
+
 # TickerForge — query engine: industry P/E, and comparing names
 
     pe < industry_pe * 0.8 and roe > 15
