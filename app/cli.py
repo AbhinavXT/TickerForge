@@ -16,6 +16,11 @@ from . import db, kite_auth, instruments, watchlist, notify, watcher
 
 
 
+def _preopen_job(client) -> str | None:
+    from . import preopen
+    return "pre-open gaps checked" if preopen.maybe_send(client=client) else None
+
+
 def _delivery_job(client) -> str | None:
     from . import delivery
     return delivery.maybe_sync(client=client)
@@ -179,6 +184,7 @@ def main() -> None:
     insh.add_argument("symbol")
     insh.add_argument("--days", type=int, default=180)
 
+    sub.add_parser("preopen", help="Pre-open auction gaps on your names (09:00–09:15)")
 
     ep = sub.add_parser("events", help="Corporate events watcher (NSE)")
     esub = ep.add_subparsers(dest="ecmd", required=True)
@@ -748,6 +754,10 @@ def main() -> None:
         else:
             print(insider.as_text(args.symbol, days=args.days))
 
+    elif args.cmd == "preopen":
+        from . import preopen
+        print(preopen.as_text(preopen.check()))
+
     elif args.cmd == "events":
         import time as _time
         from . import events
@@ -824,6 +834,7 @@ def main() -> None:
                 for label, job in (
                         ("delivery", _delivery_job),
                         ("insider", _insider_job),
+                        ("pre-open", _preopen_job),
                 ):
                     try:
                         msg = job(client)

@@ -115,6 +115,11 @@ SETTINGS: tuple[Setting, ...] = (
             "Raise it only if you actually trade on leverage.",
             minimum=1, maximum=500, step=5),
     # ---- pushes from NSE data
+    Setting("PREOPEN_GAP_ATR", "Pre-open gap (x ATR)", "number",
+            "Notifications",
+            "The 09:08 push lists names you follow gapping by at least this "
+            "many daily ATRs. Positions opening through their stop are "
+            "always listed.", minimum=0.25, maximum=5, step=0.25),
     Setting("INSIDER_MIN_VALUE", "Insider buy floor (₹)", "number",
             "Notifications",
             "Market-wide, only open-market promoter/director buys at least "

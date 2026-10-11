@@ -15,6 +15,7 @@ from app import config, db, journal, query, scanner
 from app import regime
 from app import delivery
 from app import insider
+from app import preopen
 
 
 @pytest.fixture(autouse=True)
@@ -200,6 +201,57 @@ def test_empty_market_feed_falls_back_to_followed_symbols(monkeypatch):
     n = len(asked)
     r = insider.poll_once(Feed(), followed={"BEL": {"watchlist"}})
     assert not r["fallback"] and len(asked) == n + 1   # hourly, not every poll
+
+
+# ------------------------------------------------------------------ preopen
+PRE = {"data": [
+    {"metadata": {"symbol": "BEL", "iep": 380.0, "previousClose": 400.0},
+     "detail": {"preOpenMarket": {"totalBuyQuantity": 10, "totalSellQuantity": 90}}},
+    {"metadata": {"symbol": "TCS", "lastPrice": 3510.0, "previousClose": 3500.0},
+     "detail": {"preOpenMarket": {}}},
+    {"metadata": {"symbol": "BAD"}},
+]}
+
+
+def test_preopen_parse():
+    p = preopen.parse(PRE)
+    assert set(p) == {"BEL", "TCS"}
+    assert p["BEL"]["gap_pct"] == -5.0 and p["BEL"]["sell_qty"] == 90
+
+
+def test_preopen_flags_gap_through_stop_and_big_gaps():
+    prices = preopen.parse(PRE)
+    followed = {"BEL": {"position"}, "TCS": {"watchlist"}, "INFY": {"holding"}}
+    positions = [{"id": 7, "symbol": "BEL", "side": "long", "entry": 405.0,
+                  "stop": 390.0, "initial_stop": 390.0}]
+    res = preopen.assess(prices, followed, positions,
+                         atrs={"BEL": 8.0, "TCS": 40.0}, gap_atr=1.0)
+    assert [r["symbol"] for r in res["through_stop"]] == ["BEL"]
+    assert res["through_stop"][0]["r_at_open"] == pytest.approx(-25 / 15, abs=0.01)
+    assert [r["symbol"] for r in res["gaps"]] == ["BEL"]      # -2.5 ATR; TCS 0.25
+    assert res["missing"] == ["INFY"]
+    text = preopen.as_text(res)
+    assert "THROUGH YOUR STOP" in text and "#7" in text
+
+
+def test_preopen_short_through_stop():
+    prices = {"X": {"iep": 110.0, "prev_close": 100.0, "gap_pct": 10.0}}
+    res = preopen.assess(prices, {"X": {"position"}},
+                         [{"id": 1, "symbol": "X", "side": "short",
+                           "entry": 100.0, "stop": 105.0}], {"X": 2.0})
+    assert res["through_stop"]
+
+
+def test_preopen_sends_once_per_day_in_window(monkeypatch):
+    calls = []
+    monkeypatch.setattr(preopen, "check", lambda client=None: calls.append(1) or
+                        {"through_stop": [], "gaps": []})
+    mon = datetime(2026, 10, 12, 9, 9)
+    assert not preopen.maybe_send(datetime(2026, 10, 12, 9, 5))
+    assert preopen.maybe_send(mon)
+    assert not preopen.maybe_send(mon + timedelta(minutes=1))
+    assert not preopen.maybe_send(datetime(2026, 10, 11, 9, 9))   # Sunday
+    assert calls == [1]
 
 
 # ------------------------------------------------------------------- regime

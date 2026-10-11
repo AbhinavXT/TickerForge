@@ -859,6 +859,17 @@ def api_delivery(symbol: str):
     return delivery.stats(symbol) or {}
 
 
+@app.get("/api/preopen")
+def api_preopen():
+    from . import preopen
+    try:
+        return preopen.check()
+    except SystemExit as e:
+        raise HTTPException(401, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"pre-open data unavailable: {e}")
+
+
 # -------------------------------------------------- market-wide calendar (all stocks)
 @app.get("/api/calendar")
 def api_calendar():

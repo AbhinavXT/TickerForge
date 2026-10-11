@@ -987,6 +987,23 @@ tf brief --skip news,gaps             # omit sections
 The brief includes an **INSIDERS** section listing promoter and director
 trades and pledges on your names over the last three days.
 
+### Pre-open gaps
+
+```bash
+tf preopen                            # 09:00–09:15 on trading days
+```
+
+At 09:08 NSE's pre-open auction fixes each stock's opening price. The events
+service pushes once per weekday at 09:08 with:
+
+* **open trades opening through their stop**, at max priority. A stop-market
+  order fills at the open, not at the stop price, so this is the last moment
+  to decide what to do about it.
+* **names you follow gapping by at least `PREOPEN_GAP_ATR`** (1) daily ATRs,
+  tagged W (watchlist), P (open trade) or H (holding).
+
+If nothing crosses the threshold, it stays silent.
+
 ---
 
 ## 7. Configuration
@@ -1068,6 +1085,7 @@ Sent to `NTFY_CMD_TOPIC`. The `remote` service must be running.
 | `/board` | — | F&O Board: breadth, leading/lagging sector, top 5 bullish and bearish order-block setups, flagged `REV` (reversal build-up) and `trap ▲/▼` (liquidity sweep). `/board nf` pushes the same board as one structured message for the NewsForge app instead of text |
 | `/deliv [SYM]` | `/delivery` | Last session's delivery % against its 20-session average. Bare: delivery spikes among the names you follow |
 | `/insider [SYM]` | `/insiders` | Promoter/director trades and pledges for one name (fetched from NSE). Bare: the last 7 days across your names |
+| `/preopen` | `/gaps` | Pre-open auction gaps on your names, and any open trade opening through its stop. 09:00–09:15 only |
 | `/ob SYM` | — | One stock's order block, R/S and liquidity, any liquidity trap or reversal build-up, why it ranks, and the retest `/alert` to send |
 | `/ind SYM` | `/indicators` `/ta` | Indicator bundle |
 | `/conf SYM` | `/confluence` `/mtf` | Multi-timeframe agreement score |

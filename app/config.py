@@ -89,6 +89,7 @@ OVERRIDABLE = frozenset({
     "PAPER_MAX_POSITIONS", "PAPER_TRAIL_MULT", "PAPER_TRAIL_PERIOD",
     "PAPER_REGIME_GATE",
     "INSIDER_MIN_VALUE",
+    "PREOPEN_GAP_ATR",
 })
 
 # Built-in defaults for keys that have no module constant above, so `get`
@@ -114,6 +115,7 @@ DEFAULTS = {"COST_BPS": "10", "BACKUP_KEEP_DAYS": "14",
             # ₹1 Cr. Market-wide insider buys below this are noise; on
             # names you follow every disclosure pushes regardless.
             "INSIDER_MIN_VALUE": "10000000",
+            "PREOPEN_GAP_ATR": "1",
             }
 
 

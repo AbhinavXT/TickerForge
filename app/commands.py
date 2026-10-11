@@ -109,6 +109,7 @@ HELP = (
     "/results [SYM|all|latest]  quarter numbers, the awaited date, or market feed\n"
     "/deliv [SYM]     delivery % vs its average; bare = spikes on your names\n"
     "/insider [SYM]   promoter/director trades & pledges (bare = your names, 7d)\n"
+    "/preopen         09:08 auction gaps on your names, and any through a stop\n"
     "/valuation SYM   ·  /fundamentals SYM  ·  /news SYM  ·  /dividends SYM\n"
     "/candles SYM [day|5minute|minute] [count]   price history for the\n"
     "                NewsForge chart (sent as data, not a picture)\n"
@@ -651,6 +652,16 @@ def cmd_insider(sym: str) -> str:
         return "No promoter/director trades or pledges on your names this week."
     return "Insiders · last 7 days\n" + "\n".join(
         "  " + insider.line(r) for r in rows[:15])
+
+
+def cmd_preopen(_arg: str) -> str:
+    """/preopen — pre-open auction gaps on the names you follow."""
+    from . import preopen
+    try:
+        return preopen.as_text(preopen.check())
+    except Exception as e:                               # noqa: BLE001
+        return (f"Pre-open data unavailable: {e}\n"
+                f"(NSE publishes it 09:00–09:15 on trading days.)")
 
 
 def cmd_ob(sym: str) -> str:
@@ -1628,6 +1639,7 @@ HANDLERS = {
     "board": cmd_board, "ob": cmd_ob,
     "deliv": cmd_delivery, "delivery": cmd_delivery,
     "insider": cmd_insider, "insiders": cmd_insider,
+    "preopen": cmd_preopen, "gaps": cmd_preopen,
     "chart": cmd_chart,
     "ind": cmd_indicators, "indicators": cmd_indicators, "ta": cmd_indicators,
     "conf": cmd_confluence, "confluence": cmd_confluence, "mtf": cmd_confluence,
