@@ -4,284 +4,132 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>TickerForge · Latest Quarterly Results</title>
+		<meta name="theme-color" content="#0b0e13" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
 		<link rel="stylesheet" href="/app.css" />
+		<script src="/ui.js"></script>
 		<style>
-			/* results-specific — a screener-style card in the app's dark theme */
-			.rlayout {
-				display: flex;
-				gap: 20px;
-				align-items: flex-start;
-			}
-			.rside {
-				width: 210px;
-				flex: 0 0 210px;
-				position: sticky;
-				top: 64px;
-			}
-			.rside .grp {
-				margin-bottom: 20px;
-			}
-			.rside .grp h4 {
-				color: var(--dim);
-				font-size: 12px;
-				letter-spacing: 0.6px;
-				text-transform: uppercase;
-				margin-bottom: 8px;
-			}
-			.rside label {
-				display: flex;
-				align-items: center;
-				gap: 9px;
-				padding: 5px 0;
-				color: var(--fg);
-				cursor: pointer;
-				font-size: 14px;
-			}
-			.rside input[type="radio"] {
-				accent-color: var(--warn);
-				width: 15px;
-				height: 15px;
-			}
-			.rmain {
-				flex: 1;
-				min-width: 0;
-			}
+			.rlayout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: var(--s5); align-items: start; }
+			.rside { position: sticky; top: calc(var(--top-h) + var(--s4)); display: flex; flex-direction: column; gap: var(--s4); }
+			.rside .grp h4 { color: var(--text-3); font-size: var(--fs-11); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; margin-bottom: var(--s2); }
+			/* radio groups rendered as stacked options (desktop) / segmented rows (phone) */
+			.opts { display: flex; flex-direction: column; gap: 2px; }
+			.opts label { display: flex; align-items: center; gap: var(--s2); padding: 6px 10px; border-radius: var(--radius-sm); color: var(--text-2); font-size: var(--fs-13); min-height: 32px; }
+			.opts label:hover { background: var(--hover); color: var(--text); }
+			.opts input { position: absolute; opacity: 0; pointer-events: none; }
+			.opts label:has(input:checked) { background: var(--surface-3); color: var(--text); box-shadow: inset 2px 0 0 var(--bull); }
+			.opts label:has(input:focus-visible) { outline: 2px solid var(--bull); outline-offset: 1px; }
+			.viewseg { display: inline-flex; }
+			.viewseg label { padding: 4px 12px; min-height: 28px; border-radius: 4px; color: var(--text-2); font: 500 var(--fs-12)/1.2 var(--sans); display: flex; align-items: center; }
+			.viewseg input { position: absolute; opacity: 0; pointer-events: none; }
+			.viewseg label:has(input:checked) { background: var(--surface-1); color: var(--text); box-shadow: 0 0 0 1px var(--border-2); }
+			.viewseg label:has(input:focus-visible) { outline: 2px solid var(--bull); }
 
-			.rcard {
-				background: var(--panel);
-				border: 1px solid var(--border);
-				border-radius: 12px;
-				padding: 16px 18px;
-				margin-bottom: 16px;
-			}
-			.rhead {
-				display: flex;
-				align-items: baseline;
-				gap: 10px;
-				flex-wrap: wrap;
-			}
-			.rhead .nm {
-				font-size: 17px;
-				font-weight: 700;
-				color: var(--fg);
-			}
-			.rhead .nm a {
-				color: var(--fg);
-			}
-			.rhead .dt {
-				color: var(--dim);
-				font-size: 13px;
-				font-style: italic;
-			}
-			.rhead .sp {
-				flex: 1;
-			}
-			.rhead .cap {
-				color: var(--dim);
-				font-size: 14px;
-			}
-			.rhead .cap b {
-				color: var(--fg);
-				font-weight: 600;
-			}
-			.rhead .cap .pe {
-				margin-left: 18px;
-			}
-
-			table.rq {
-				border-collapse: collapse;
-				width: 100%;
-				margin-top: 12px;
-				font-variant-numeric: tabular-nums;
-				font-size: 14px;
-			}
-			table.rq th,
-			table.rq td {
-				padding: 11px 14px;
-				text-align: right;
-				border-bottom: 1px solid var(--border);
-				white-space: nowrap;
-			}
-			table.rq thead th {
-				color: var(--dim);
-				font-weight: 500;
-				font-size: 13px;
-				border-bottom: 1px solid var(--border);
-			}
-			table.rq tbody tr:last-child td {
-				border-bottom: 0;
-			}
-			table.rq td:first-child,
-			table.rq th:first-child {
-				text-align: left;
-				color: var(--fg);
-				font-weight: 600;
-			}
-			table.rq thead th:first-child {
-				color: var(--dim);
-				font-weight: 500;
-			}
-			.up {
-				color: var(--up);
-			}
-			.down {
-				color: var(--down);
-			}
-
-			.rfoot {
-				text-align: right;
-				margin-top: 10px;
-			}
-			.waiting {
-				color: var(--dim);
-				font-size: 14px;
-				padding: 8px 2px 2px;
-			}
-			.waiting .big {
-				color: var(--warn);
-				font-size: 15px;
-				font-weight: 600;
-			}
-			.miss {
-				color: var(--dim);
-				font-size: 14px;
-				padding: 6px 2px;
-			}
-			@media (max-width: 760px) {
-				.rside {
-					display: none;
-				}
+			.rcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: var(--s3); }
+			.rcard { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s3) var(--s4); min-width: 0; display: flex; flex-direction: column; gap: var(--s3); }
+			.rhead { display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap; }
+			.rhead .nm { font-size: var(--fs-14); font-weight: 600; min-width: 0; }
+			.rhead .nm a { color: var(--text); }
+			.rhead .sym { font-family: var(--mono); color: var(--text-3); font-size: var(--fs-12); }
+			.rhead .sp { flex: 1; }
+			.rmetrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
+			.rm { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--s2) var(--s3); min-width: 0; }
+			.rm .k { font-size: var(--fs-11); color: var(--text-3); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+			.rm .v { font: 500 var(--fs-17)/1.3 var(--mono); font-variant-numeric: tabular-nums; }
+			.rm .d { display: flex; flex-direction: column; gap: 1px; font-size: var(--fs-12); margin-top: 2px; }
+			.rm .d .lab { color: var(--text-3); font-family: var(--sans); font-size: var(--fs-11); margin-right: 4px; }
+			.rm .was { color: var(--text-3); font: var(--fs-11)/1.4 var(--mono); margin-top: 4px; }
+			.rfoot { display: flex; gap: var(--s3); font-size: var(--fs-12); margin-top: auto; }
+			.waiting { color: var(--text-2); font-size: var(--fs-13); }
+			.waiting .big { color: var(--warn); font-weight: 600; }
+			.miss { color: var(--text-2); font-size: var(--fs-13); }
+			@media (max-width: 1099px) { .rlayout { grid-template-columns: minmax(0, 1fr); } .rside { position: static; flex-direction: row; flex-wrap: wrap; } .rside .grp { flex: 1 1 200px; } }
+			@media (max-width: 759px) {
+				.rcards { grid-template-columns: minmax(0, 1fr); }
+				.rside { flex-direction: column; gap: var(--s3); }
+				.rside .grp { flex: none; }
+				#sidenote { display: none; }
+				.opts { flex-direction: row; overflow-x: auto; scrollbar-width: none; gap: 4px; }
+				.opts label { flex: none; min-height: 44px; border: 1px solid var(--border); }
+				.opts label:has(input:checked) { box-shadow: none; border-color: var(--bull); }
+				.rmetrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+				.rm { padding: var(--s2); }
+				.rm .v { font-size: var(--fs-14); }
 			}
 		</style>
 	</head>
 	<body>
-		<div id="nav">
+		<div id="nav" data-page="results">
 			<span class="brand">TickerForge</span>
+			<a class="tab" href="/board">Board</a>
 			<a class="tab" href="/">Chart</a>
 			<a class="tab" href="/desk">Desk</a>
-			<a class="tab" href="/portfolio">Portfolio</a>
 			<a class="tab" href="/scanner">Scanner</a>
 			<a class="tab" href="/screen">Screen</a>
 			<a class="tab" href="/query">Query</a>
 			<a class="tab" href="/fundamentals">Fundamentals</a>
 			<a class="tab on" href="/results">Results</a>
 			<a class="tab" href="/valuation">Valuation</a>
-			<a class="tab" href="/backtest">Backtest</a>
-			<a class="tab" href="/journal">Journal</a>
 			<a class="tab" href="/metrics">Metrics</a>
-			<a class="tab" href="/paper">Paper</a>
 			<a class="tab" href="/news">News</a>
 			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/backtest">Backtest</a>
 			<a class="tab" href="/settings">Settings</a>
 			<span class="sp"></span>
 			<span class="status" id="status"></span>
 		</div>
+		<script>TF.shell()</script>
 
 		<div class="wrap">
-			<div class="row">
-				<h2 class="page">Latest Quarterly Results</h2>
+			<div class="page-head">
+				<div>
+					<h2 class="page">Latest quarterly results</h2>
+					<div class="sub"><span id="qtag"></span></div>
+				</div>
 				<div class="spacer"></div>
-				<span class="sub" id="qtag"></span>
-				<input
-					class="search"
-					id="filter"
-					placeholder="Search company…"
-					autocomplete="off"
-					style="min-width: 200px"
-				/>
+				<div class="seg viewseg" role="radiogroup" aria-label="View">
+					<label><input type="radio" name="mode" value="mine" checked /> My companies</label>
+					<label><input type="radio" name="mode" value="market" /> Whole market</label>
+				</div>
+				<input class="search" id="filter" placeholder="Search company…" autocomplete="off" aria-label="Search company" style="min-width: 200px" />
 			</div>
 
-			<div class="rlayout" style="margin-top: 14px">
+			<div class="rlayout">
 				<aside class="rside">
-					<div class="grp">
-						<h4>View</h4>
-						<label
-							><input
-								type="radio"
-								name="mode"
-								value="mine"
-								checked
-							/>
-							My Companies (cards)</label
-						>
-						<label
-							><input type="radio" name="mode" value="market" />
-							Latest — whole market (list)</label
-						>
-					</div>
 					<div class="grp" id="scopeGrp">
-						<h4>By companies</h4>
-						<label
-							><input
-								type="radio"
-								name="scope"
-								value="watch"
-								checked
-							/>
-							My Companies</label
-						>
-						<label
-							><input type="radio" name="scope" value="stored" />
-							All Companies</label
-						>
+						<h4>Companies</h4>
+						<div class="opts" role="radiogroup" aria-label="Companies">
+							<label><input type="radio" name="scope" value="watch" checked /> My companies</label>
+							<label><input type="radio" name="scope" value="stored" /> All stored</label>
+						</div>
 					</div>
 					<div class="grp">
-						<h4>By sorting</h4>
-						<label
-							><input
-								type="radio"
-								name="sort"
-								value="latest"
-								checked
-							/>
-							Latest</label
-						>
-						<label
-							><input type="radio" name="sort" value="sales" />
-							Sales YoY %</label
-						>
-						<label class="opsort"
-							><input type="radio" name="sort" value="op" />
-							Operating Profit YoY %</label
-						>
-						<label
-							><input type="radio" name="sort" value="np" /> Net
-							Profit YoY %</label
-						>
+						<h4>Sort by</h4>
+						<div class="opts" role="radiogroup" aria-label="Sort by">
+							<label><input type="radio" name="sort" value="latest" checked /> Latest</label>
+							<label><input type="radio" name="sort" value="sales" /> Sales YoY %</label>
+							<label class="opsort"><input type="radio" name="sort" value="op" /> Operating profit YoY %</label>
+							<label><input type="radio" name="sort" value="np" /> Net profit YoY %</label>
+						</div>
 					</div>
 					<div class="grp" id="capGrp" style="display: none">
-						<h4>By market cap</h4>
-						<label
-							><input
-								type="radio"
-								name="cap"
-								value="All"
-								checked
-							/>
-							All</label
-						>
-						<label
-							><input type="radio" name="cap" value="Large" />
-							Large (&gt;₹20k Cr)</label
-						>
-						<label
-							><input type="radio" name="cap" value="Mid" /> Mid
-							(₹5k–20k Cr)</label
-						>
-						<label
-							><input type="radio" name="cap" value="Small" />
-							Small (₹500–5k Cr)</label
-						>
-						<label
-							><input type="radio" name="cap" value="Micro" />
-							Micro / Nano</label
-						>
+						<h4>Market cap</h4>
+						<div class="opts" role="radiogroup" aria-label="Market cap">
+							<label><input type="radio" name="cap" value="All" checked /> All</label>
+							<label><input type="radio" name="cap" value="Large" /> Large (&gt;₹20k Cr)</label>
+							<label><input type="radio" name="cap" value="Mid" /> Mid (₹5k–20k Cr)</label>
+							<label><input type="radio" name="cap" value="Small" /> Small (₹500–5k Cr)</label>
+							<label><input type="radio" name="cap" value="Micro" /> Micro / Nano</label>
+						</div>
 					</div>
 					<div class="grp">
-						<button class="btn" id="reloadAll" style="width: 100%">
-							↻ Reload
-						</button>
-						<div class="sub" style="margin-top: 8px" id="sidenote">
+						<button type="button" class="btn" id="reloadAll" style="width: 100%">Reload</button>
+						<div class="caption" style="margin-top: var(--s2)" id="sidenote">
 							Numbers come from your stored screener.in data.
 							Refresh a card to re-check if results are out.
 						</div>
@@ -289,57 +137,12 @@
 				</aside>
 
 				<main class="rmain">
-					<div id="body"><div class="loading">Loading…</div></div>
+					<div id="body"></div>
 				</main>
 			</div>
 		</div>
 
-		<style>
-			.rtable {
-				width: 100%;
-				border-collapse: collapse;
-				font-size: 13px;
-			}
-			.rtable th,
-			.rtable td {
-				padding: 7px 10px;
-				text-align: right;
-				white-space: nowrap;
-				border-bottom: 1px solid var(--border);
-			}
-			.rtable th {
-				color: var(--dim);
-				font-weight: 600;
-				cursor: pointer;
-				position: sticky;
-				top: 0;
-				background: var(--bg);
-			}
-			.rtable td.nm,
-			.rtable th.nm {
-				text-align: left;
-			}
-			.rtable td.nm a {
-				color: var(--fg);
-				text-decoration: none;
-			}
-			.rtable td.nm a:hover {
-				color: var(--accent);
-			}
-			.rtable tr:hover td {
-				background: var(--panel2);
-			}
-			.rtable .cap {
-				color: var(--dim);
-				font-size: 11px;
-			}
-			.up {
-				color: var(--up);
-			}
-			.down {
-				color: var(--down);
-			}
-		</style>
+
 
 		<script>
 			"use strict"
@@ -377,84 +180,68 @@
 				return `<td class="${cls}">${p >= 0 ? "" : ""}${p.toFixed(2)}%</td>`
 			}
 
+			// Sales / Operating profit / Net profit as metric tiles: current
+			// quarter in ₹ Cr, YoY and QoQ as ▲/▼ deltas, the comparison
+			// quarters underneath.
 			function releasedCard(c) {
 				const q = c.quarter,
 					pq = c.prev_quarter,
 					yq = c.yoy_quarter
-				const rows = c.rows
+				const tiles = c.rows
 					.map(
-						(r) => `
-    <tr>
-      <td>${esc(r.label)}</td>
-      ${pct(r.yoy_growth)}
-      ${pct(r.qoq_growth)}
-      <td>${grp(r.cur)}</td>
-      <td>${grp(r.prev)}</td>
-      <td>${grp(r.yoy)}</td>
-    </tr>`,
+						(r) => `<div class="rm">
+      <div class="k" title="${esc(r.label)}">${esc(r.label)}</div>
+      <div class="v">${grp(r.cur)}</div>
+      <div class="d"><span><span class="lab">YoY</span>${TF.delta(r.yoy_growth, 1)}</span>
+        <span><span class="lab">QoQ</span>${TF.delta(r.qoq_growth, 1)}</span></div>
+      <div class="was" title="${esc(pq)} · ${esc(yq)}">${grp(r.prev)} · ${grp(r.yoy)}</div>
+    </div>`,
 					)
 					.join("")
-				const cap = c.mcap ? `M Cap: <b>${esc(c.mcap)}</b>` : ""
-				const pe = c.pe
-					? `<span class="pe">PE: <b>${esc(c.pe)}</b></span>`
-					: ""
-				const dt = c.date
-					? `<span class="dt">• ${esc(c.date)}</span>`
-					: ""
-				const stale = c.stale
-					? ` <span class="stale">· stale</span>`
-					: ""
-				return `<div class="rcard" data-sym="${c.symbol}">
+				const cap = c.mcap ? `<span class="chip mono">M Cap ${esc(c.mcap)}</span>` : ""
+				const pe = c.pe ? `<span class="chip mono">P/E ${esc(c.pe)}</span>` : ""
+				const dt = c.date ? `<span class="chip mono">${esc(c.date)}</span>` : ""
+				const stale = c.stale ? `<span class="chip warn">stale</span>` : ""
+				return `<article class="rcard" data-sym="${esc(c.symbol)}">
     <div class="rhead">
-      <span class="nm"><a href="/fundamentals?symbol=${c.symbol}">${esc(c.name)}</a> ↗</span>
-      ${dt}${stale}
-      <span class="sp"></span>
-      <span class="cap">${cap} ${pe}</span>
+      <span class="nm"><a href="/fundamentals?symbol=${encodeURIComponent(c.symbol)}">${esc(c.name)}</a></span>
+      <span class="sym">${esc(c.symbol)}</span>
+      <span class="sp"></span>${dt}${stale}
     </div>
-    <table class="rq">
-      <thead><tr>
-        <th>(In Cr.)</th><th>YoY Growth</th><th>QoQ Growth</th>
-        <th>${esc(q)}</th><th>${esc(pq)}</th><th>${esc(yq)}</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
+    <div class="row" style="gap:6px"><span class="chip bull">${esc(q)}</span><span class="caption">vs ${esc(pq)} · ${esc(yq)} (₹ Cr)</span><span class="spacer"></span>${cap}${pe}</div>
+    <div class="rmetrics">${tiles}</div>
     <div class="rfoot">
-      <a href="/fundamentals?symbol=${c.symbol}">View Detailed Financials</a>
-      &nbsp;·&nbsp; <a href="#" class="refresh">Refresh</a>
+      <a href="/fundamentals?symbol=${encodeURIComponent(c.symbol)}">Detailed financials</a>
+      <a href="#" class="refresh">Refresh</a>
     </div>
-  </div>`
+  </article>`
 			}
 
 			function waitingCard(c) {
-				const cap = c.mcap ? `M Cap: <b>${esc(c.mcap)}</b>` : ""
-				const pe = c.pe
-					? `<span class="pe">PE: <b>${esc(c.pe)}</b></span>`
-					: ""
+				const cap = c.mcap ? `<span class="chip mono">M Cap ${esc(c.mcap)}</span>` : ""
+				const pe = c.pe ? `<span class="chip mono">P/E ${esc(c.pe)}</span>` : ""
 				if (c.missing) {
-					return `<div class="rcard" data-sym="${c.symbol}">
-      <div class="rhead">
-        <span class="nm">${esc(c.name)}</span>
-        <span class="sp"></span>
-      </div>
+					return `<article class="rcard" data-sym="${esc(c.symbol)}">
+      <div class="rhead"><span class="nm">${esc(c.name)}</span><span class="sym">${esc(c.symbol)}</span></div>
       <div class="miss">No fundamentals stored yet.
         <a href="#" class="refresh">Fetch from screener.in</a></div>
-    </div>`
+    </article>`
 				}
 				const when = c.date
-					? `<span class="big">${esc(c.date)}</span>`
+					? `<span class="big mono">${esc(c.date)}</span>`
 					: `<span class="big">date not announced yet</span>`
 				const last = c.last_reported
-					? ` &nbsp;·&nbsp; last reported ${esc(c.last_reported)}`
+					? `<div class="caption">last reported ${esc(c.last_reported)}</div>`
 					: ""
-				return `<div class="rcard" data-sym="${c.symbol}">
+				return `<article class="rcard" data-sym="${esc(c.symbol)}">
     <div class="rhead">
-      <span class="nm"><a href="/fundamentals?symbol=${c.symbol}">${esc(c.name)}</a> ↗</span>
-      <span class="sp"></span>
-      <span class="cap">${cap} ${pe}</span>
+      <span class="nm"><a href="/fundamentals?symbol=${encodeURIComponent(c.symbol)}">${esc(c.name)}</a></span>
+      <span class="sym">${esc(c.symbol)}</span>
+      <span class="sp"></span>${cap}${pe}
     </div>
-    <div class="waiting">${esc(c.quarter)} results not released — ${when}${last}
-      &nbsp;·&nbsp; <a href="#" class="refresh">Refresh</a></div>
-  </div>`
+    <div class="waiting">${esc(c.quarter)} results not released — ${when}</div>${last}
+    <div class="rfoot"><a href="#" class="refresh">Refresh</a></div>
+  </article>`
 			}
 
 			function render(cards) {
@@ -466,15 +253,15 @@
 								c.symbol.toLowerCase().includes(f) ||
 								(c.name || "").toLowerCase().includes(f),
 						)
-				$("#qtag").textContent = QUARTER ? `Quarter: ${QUARTER}` : ""
+				$("#qtag").innerHTML = QUARTER ? `Quarter <span class="mono">${esc(QUARTER)}</span> · Sales, operating and net profit vs last quarter and a year ago` : ""
 				if (!shown.length) {
-					$("#body").innerHTML =
-						`<div class="empty">No companies.</div>`
+					$("#body").innerHTML = TF.empty("No companies", f ? "Nothing matches the search." : "Add stocks to your watchlist, or switch to All stored.", "results")
 					return
 				}
-				$("#body").innerHTML = shown
-					.map((c) => (c.released ? releasedCard(c) : waitingCard(c)))
-					.join("")
+				$("#body").innerHTML =
+					`<div class="rcards">` +
+					shown.map((c) => (c.released ? releasedCard(c) : waitingCard(c))).join("") +
+					`</div>`
 				bindRefreshers()
 			}
 
@@ -483,7 +270,7 @@
 					(a) =>
 						(a.onclick = async (ev) => {
 							ev.preventDefault()
-							const sym = ev.target.closest(".rcard").dataset.sym
+							const sym = a.closest(".rcard").dataset.sym
 							a.textContent = "refreshing…"
 							try {
 								await fetch(
@@ -508,19 +295,20 @@
 			async function load() {
 				if (modeVal() === "market") return loadMarket()
 				status("loading…")
-				$("#body").innerHTML = `<div class="loading">Loading…</div>`
+				$("#body").innerHTML = `<div class="rcards">${`<div class="rcard">${TF.skeleton(1, "lg")}${TF.skeleton(4)}</div>`.repeat(4)}</div>`
 				try {
 					const r = await fetch(
 						`/api/results?scope=${scopeVal()}&sort=${sortVal()}`,
 					)
 					const d = await r.json()
+					if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`)
 					ALL = d.cards || []
 					QUARTER = d.quarter || ""
 					render(ALL)
 					status(`${ALL.length} companies`)
 				} catch (e) {
-					$("#body").innerHTML =
-						`<div class="notice">Could not load results: ${esc(e.message)}</div>`
+					$("#body").innerHTML = ""
+					$("#body").appendChild(TF.errorBox(`Could not load results: ${e.message}`, load))
 					status("")
 				}
 			}
@@ -556,13 +344,13 @@
 
 			async function loadMarket(refresh) {
 				status("loading market…")
-				$("#body").innerHTML =
-					`<div class="loading">${refresh ? "Re-scraping screener…" : "Loading…"}</div>`
+				$("#body").innerHTML = `<div class="card">${refresh ? '<div class="caption">Re-scraping screener…</div>' : ""}${TF.skeleton(10)}</div>`
 				try {
 					const r = await fetch(
 						`/api/results/latest?sort=${marketSort()}&bucket=${capVal()}&refresh=${refresh ? 1 : 0}`,
 					)
 					const d = await r.json()
+					if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`)
 					MARKET = d.rows || []
 					renderMarket(d)
 					status(
@@ -572,17 +360,13 @@
 								: ""),
 					)
 				} catch (e) {
-					$("#body").innerHTML =
-						`<div class="notice">Could not load market feed: ${esc(e.message)}</div>`
+					$("#body").innerHTML = ""
+					$("#body").appendChild(TF.errorBox(`Could not load market feed: ${e.message}`, () => loadMarket()))
 					status("")
 				}
 			}
 
-			function mpct(v) {
-				if (v === null || v === undefined) return ""
-				const c = v >= 0 ? "up" : "down"
-				return `<span class="${c}">${v >= 0 ? "+" : ""}${v.toFixed(1)}%</span>`
-			}
+			const mpct = (v) => (v === null || v === undefined ? "" : TF.delta(v, 1))
 			function mnum(v) {
 				return v === null || v === undefined
 					? "—"
@@ -601,31 +385,32 @@
 							(r.symbol || "").toLowerCase().includes(q),
 					)
 				if (!rows.length) {
-					$("#body").innerHTML =
-						`<div class="empty">No companies match.</div>`
+					$("#body").innerHTML = q
+						? TF.empty("No companies match", "", "search")
+						: TF.empty("The market feed is empty", "Reload re-scrapes screener.in's latest results.", "results")
 					return
 				}
 				if (d && d.error)
 					status("screener fetch failed — showing cached")
 				const head = `<tr>
-    <th class="nm">Company</th><th>CMP</th><th>P/E</th><th>M Cap ₹Cr</th>
-    <th>NP Qtr ₹Cr</th><th>NP YoY</th><th>Sales Qtr ₹Cr</th><th>Sales YoY</th><th>ROCE</th></tr>`
+    <th>Company</th><th class="num">CMP</th><th class="num">P/E</th><th class="num">M Cap ₹Cr</th>
+    <th class="num">NP Qtr ₹Cr</th><th class="num">NP YoY</th><th class="num">Sales Qtr ₹Cr</th><th class="num">Sales YoY</th><th class="num">ROCE</th></tr>`
 				const body = rows
 					.map((r) => {
 						const link = /^[0-9]+$/.test(r.symbol || "")
 							? `https://www.screener.in/company/${r.symbol}/`
 							: `/fundamentals?symbol=${r.symbol}`
 						return `<tr>
-      <td class="nm"><a href="${link}">${esc(r.name || r.symbol || "?")}</a>
-        <span class="cap"> ${r.bucket || ""}</span></td>
-      <td>${mnum(r.cmp)}</td><td>${mnum(r.pe)}</td><td>${mnum(r.mcap)}</td>
-      <td>${mnum(r.np_qtr)}</td><td>${mpct(r.np_yoy)}</td>
-      <td>${mnum(r.sales_qtr)}</td><td>${mpct(r.sales_yoy)}</td>
-      <td>${mnum(r.roce)}</td></tr>`
+      <td><a href="${link}" style="color:var(--text)">${esc(r.name || r.symbol || "?")}</a>
+        ${r.bucket ? `<span class="chip" style="margin-left:6px">${esc(r.bucket)}</span>` : ""}</td>
+      <td class="num">${mnum(r.cmp)}</td><td class="num">${mnum(r.pe)}</td><td class="num">${mnum(r.mcap)}</td>
+      <td class="num">${mnum(r.np_qtr)}</td><td class="num">${mpct(r.np_yoy)}</td>
+      <td class="num">${mnum(r.sales_qtr)}</td><td class="num">${mpct(r.sales_yoy)}</td>
+      <td class="num">${mnum(r.roce)}</td></tr>`
 					})
 					.join("")
 				$("#body").innerHTML =
-					`<table class="rtable"><thead>${head}</thead><tbody>${body}</tbody></table>`
+					`<div class="tbl-wrap" style="max-height:calc(100vh - 180px)"><table class="tbl"><thead>${head}</thead><tbody>${body}</tbody></table></div>`
 			}
 
 			document

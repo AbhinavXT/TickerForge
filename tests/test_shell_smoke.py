@@ -50,7 +50,7 @@ def test_page_runs_without_script_errors(desktop, page):
 # ------------------------------------------------------------------ the shell
 # Pages on the shared shell. Grows one page per migration commit; once every
 # page is on it this becomes PAGES minus the chart (which has its own toolbar).
-SHELL_PAGES = {"board.html", "news.html", "actions.html", "fundamentals.html"}
+SHELL_PAGES = {"board.html", "news.html", "actions.html", "fundamentals.html", "results.html"}
 ROUTE = {"index.html": "/"}
 
 
