@@ -597,4 +597,7 @@ details.collapsible > .body { padding:0 var(--s4) var(--s4); }
 	       font-size:16px; min-height:44px; }
 	input.search { min-width:0; width:100%; }
 	.tbl-wrap { border-radius:var(--radius-sm); }
+	/* page headers stack: title, then each control at full width */
+	.page-head > .spacer { display:none; }
+	.page-head > div:not(.seg), .page-head > input { flex:1 1 100% !important; max-width:none !important; }
 }
