@@ -1189,6 +1189,181 @@
 				return o
 			}
 
+			// --- order blocks & liquidity. A port of app/board.py's pure maths so
+			//     the chart marks the same zones the Board ranks, on any timeframe;
+			//     tests/test_chart_js.py runs both on the same candles and compares.
+			function obSwings(c, L = 2, R = 2) {
+				const highs = [],
+					lows = []
+				for (let i = L; i < c.length - R; i++) {
+					let hi = true,
+						lo = true
+					for (let j = i - L; j < i; j++) {
+						if (c[i].high < c[j].high) hi = false
+						if (c[i].low > c[j].low) lo = false
+					}
+					for (let j = i + 1; j <= i + R; j++) {
+						if (!(c[i].high > c[j].high)) hi = false
+						if (!(c[i].low < c[j].low)) lo = false
+					}
+					if (hi) highs.push(i)
+					if (lo) lows.push(i)
+				}
+				return { highs, lows }
+			}
+			function obScan(c, opt) {
+				opt = opt || {}
+				const K = opt.k ?? 1.5,
+					R = 2,
+					LOOK = 10,
+					EQ_TOL = 0.15
+				const atr = opt.atr || _atr(c, 14)
+				const { highs, lows } = obSwings(c, 2, R)
+				const bull = (x) => x.close > x.open,
+					bear = (x) => x.close < x.open
+				// displacement: body > K×ATR closing beyond the last swing confirmed before it
+				const disps = []
+				for (let i = 0; i < c.length; i++) {
+					const a = atr[i]
+					if (!a) continue
+					const body = Math.abs(c[i].close - c[i].open)
+					if (body <= K * a) continue
+					const dir = bull(c[i]) ? "bull" : bear(c[i]) ? "bear" : null
+					if (!dir) continue
+					const piv = (dir === "bull" ? highs : lows).filter((j) => j + R < i)
+					if (!piv.length) continue
+					const lvl = dir === "bull" ? c[piv[piv.length - 1]].high : c[piv[piv.length - 1]].low
+					if (dir === "bull" ? c[i].close > lvl : c[i].close < lvl)
+						disps.push({ i, dir, atr_mult: body / a, time: c[i].time })
+				}
+				// order block: last opposite-colour candle before it; live until traded through
+				const obs = []
+				for (const d of disps) {
+					const want = d.dir === "bull" ? bear : bull
+					for (let j = d.i - 1; j > Math.max(-1, d.i - 1 - LOOK); j--) {
+						if (!want(c[j])) continue
+						const ob = { i: j, dir: d.dir, top: c[j].high, bottom: c[j].low, time: c[j].time, disp_i: d.i }
+						let k = d.i + 1
+						for (; k < c.length; k++)
+							if (d.dir === "bull" ? c[k].low < ob.bottom : c[k].high > ob.top) break
+						ob.live = k >= c.length
+						ob.end = ob.live ? c.length - 1 : k
+						obs.push(ob)
+						break
+					}
+				}
+				// resting liquidity: equal highs/lows within EQ_TOL×ATR, plus PDH/PDL
+				const atrNow = [...atr].reverse().find((a) => a) || null
+				const levels = []
+				if (atrNow) {
+					const tol = EQ_TOL * atrNow
+					for (const [idx, kind, key] of [
+						[highs, "eqh", "high"],
+						[lows, "eql", "low"],
+					]) {
+						const pairs = idx.map((i) => [c[i][key], i]).sort((a, b) => a[0] - b[0] || a[1] - b[1])
+						const groups = []
+						for (const p of pairs) {
+							const g = groups[groups.length - 1]
+							if (g && p[0] - g[g.length - 1][0] <= tol) g.push(p)
+							else groups.push([p])
+						}
+						for (const g of groups)
+							if (g.length >= 2) {
+								const vals = g.map((p) => p[0])
+								levels.push({
+									price: kind === "eqh" ? Math.max(...vals) : Math.min(...vals),
+									kind,
+									touches: g.length,
+									formed: Math.max(...g.map((p) => p[1])) + R,
+								})
+							}
+					}
+				}
+				let start = 0
+				if (c.length) {
+					const day = Math.floor(c[c.length - 1].time / 86400)
+					start = c.length - 1
+					while (start > 0 && Math.floor(c[start - 1].time / 86400) === day) start--
+				}
+				if (opt.pdh != null) levels.push({ price: opt.pdh, kind: "pdh", touches: 1, formed: start })
+				if (opt.pdl != null) levels.push({ price: opt.pdl, kind: "pdl", touches: 1, formed: start })
+				levels.sort((a, b) => a.price - b.price)
+				// traps: the first bar after a level formed that runs it and closes back;
+				// a close beyond it first means it broke instead, and the liquidity is spent
+				const traps = []
+				for (const lv of levels) {
+					const above = lv.kind === "eqh" || lv.kind === "pdh"
+					lv.spent = null
+					for (let i = Math.max(lv.formed, 0); i < c.length; i++) {
+						const x = c[i]
+						if (!(above ? x.high > lv.price : x.low < lv.price)) continue
+						lv.spent = i
+						if (above ? x.close < lv.price : x.close > lv.price)
+							traps.push({ i, time: x.time, price: lv.price, kind: lv.kind, dir: above ? "bear" : "bull" })
+						break
+					}
+				}
+				traps.sort((a, b) => b.i - a.i)
+				return { disps, obs, levels, traps }
+			}
+			// PDH/PDL from the bars themselves, for intraday timeframes only: the
+			// previous session in view. Daily bars have no "previous day" inside one bar.
+			function obPrevDay(c) {
+				const day = (x) => Math.floor(x.time / 86400)
+				// intraday only: some day must hold more than one bar
+				if (!c.some((x, k) => k > 0 && day(x) === day(c[k - 1]))) return {}
+				let j = c.length - 1
+				const last = day(c[j])
+				while (j >= 0 && day(c[j]) === last) j--
+				if (j < 0) return {}
+				const prev = day(c[j])
+				let pdh = -Infinity,
+					pdl = Infinity
+				for (; j >= 0 && day(c[j]) === prev; j--) {
+					pdh = Math.max(pdh, c[j].high)
+					pdl = Math.min(pdl, c[j].low)
+				}
+				return { pdh, pdl }
+			}
+			function I_obliq(c, p) {
+				const scan = obScan(c, { k: p.k, ...obPrevDay(c) })
+				const last = c.length ? c[c.length - 1].time : null
+				const overlays = []
+				const span = (from, v) => {
+					const out = []
+					for (let i = from; i < c.length; i++) out.push({ time: c[i].time, value: v })
+					return out
+				}
+				// the newest `count` live zones per side, each drawn as its top and bottom
+				for (const [dir, col, tag] of [
+					["bull", PAL.up, "▲ OB"],
+					["bear", PAL.down, "▼ OB"],
+				]) {
+					const live = scan.obs.filter((o) => o.dir === dir && o.live).slice(-(p.count || 2)).reverse()
+					live.forEach((o, n) => {
+						const nm = tag + (n ? ` ${n + 1}` : "")
+						overlays.push({ name: nm + " top", color: col, width: 2, data: span(o.i, o.top) })
+						overlays.push({ name: nm + " bot", color: col, width: 2, data: span(o.i, o.bottom) })
+					})
+				}
+				// liquidity still resting (not yet run): the nearest `levels` each side
+				const ltp = c.length ? c[c.length - 1].close : null
+				if (ltp != null && last != null) {
+					const resting = scan.levels.filter((l) => l.spent == null && l.formed < c.length)
+					const up = resting.filter((l) => l.price >= ltp).slice(0, p.levels ?? 2)
+					const dn = resting.filter((l) => l.price < ltp).slice(-(p.levels ?? 2))
+					for (const l of [...up, ...dn])
+						overlays.push({
+							name: `${l.kind.toUpperCase()}${l.touches > 1 ? " ×" + l.touches : ""}`,
+							color: PAL.dim,
+							dashed: true,
+							data: span(Math.min(l.formed, c.length - 1), l.price),
+						})
+				}
+				return { overlays }
+			}
+
 			function I_ma(kind) {
 				return (c, p) => {
 					const cl = _cl(c)
@@ -1795,6 +1970,12 @@
 					cat: "overlay",
 					p: { step: 0.02, max: 0.2 },
 					fn: I_psar,
+				},
+				obliq: {
+					name: "Order Blocks & Liquidity",
+					cat: "overlay",
+					p: { k: 1.5, count: 2, levels: 2 },
+					fn: I_obliq,
 				},
 				hl52: {
 					name: "52-week High/Low",
@@ -3006,6 +3187,17 @@
 							dir: f.dir,
 							text: f.dir === "up" ? "ST↑" : "ST↓",
 							color: f.dir === "up" ? PAL.up : PAL.down,
+						})),
+				},
+				liq_trap: {
+					label: "Liquidity trap (sweep)",
+					color: PAL.warn,
+					fn: (c) =>
+						obScan(c, obPrevDay(c)).traps.map((t) => ({
+							time: t.time,
+							dir: t.dir === "bull" ? "up" : "down",
+							text: "trap " + t.kind.toUpperCase(),
+							color: t.dir === "bull" ? PAL.up : PAL.down,
 						})),
 				},
 				rsi_ob: {

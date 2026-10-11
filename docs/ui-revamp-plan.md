@@ -319,10 +319,10 @@ review found 10 issues in that diff, which I'll report separately.
 
 ### Tests
 
-Baseline 68 failed / 1132 passed → now 5 failed / 1295 passed. The 5 are pre-existing
+Baseline 68 failed / 1132 passed → now 4 failed / 1312 passed. The 4 are pre-existing
 and untouched: `test_query` ×2 (indicators missing from `indicators.py`),
-`test_entrypoints` (`/bars`, `/candles` undocumented), `test_commands` (`ACCOUNT_SIZE`
-leaks from the local `.env`), `test_paper_autopilot` (watcher lacks `maybe_evening_queue`).
+`test_commands` (`ACCOUNT_SIZE` leaks from the local `.env`), `test_paper_autopilot`
+(watcher lacks `maybe_evening_queue`). `/bars` and `/candles` are now documented.
 
 ### Follow-ups
 
@@ -337,3 +337,21 @@ leaks from the local `.env`), `test_paper_autopilot` (watcher lacks `maybe_eveni
   Fundamentals.
 - ~~Compatibility aliases~~ **Done:** every page now uses the real tokens, and the
   aliases are gone from `app.css` (only `--accent`, which native controls use, remains).
+
+## 9. Order-block features after launch
+
+Matched against order-block.com's feature list; rankings, liquidity score, X-Ray, zones
+and the last-session board were already here. Added:
+
+- **Liquidity traps** (`board.liquidity_traps`): the first bar after an EQH/EQL/PDH/PDL
+  formed that runs it and closes back inside. A close beyond it first is a break, and the
+  level is spent. Above a high it points ▼, below a low ▲.
+- **Reversal build-up** (`board.reversal_setup`): price within `REVERSAL_NEAR_ATR` of its
+  live OB, backed by OI on that side (`OI_SUPPORT ≥ REVERSAL_OI_MIN`) or a sweep the same
+  way within `TRAP_RECENT` bars. Neither changes the score; both are badges on the list,
+  notes in the zone drawer (traps also as chart markers) and suffixes in `/board`, `/ob`.
+- **Chart page**: indicator *Order Blocks & Liquidity* (the newest live zones per side as
+  top/bottom lines, the nearest resting liquidity dashed) and event *Liquidity trap*. It is
+  a JS port of the same maths (`obScan`), PDH/PDL taken from the previous session in view
+  on intraday timeframes; `tests/test_chart_js.py` runs both on the same candles and
+  requires identical displacements, zones, levels and traps.

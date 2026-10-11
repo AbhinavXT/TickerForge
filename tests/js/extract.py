@@ -54,6 +54,12 @@ BLOCKS = [
     "const DRAW_HANDLE_PX = 5",
     block("function _rsiSeries(closes, period)"),
     block("function _crossEvents("),
+    block("function _atr(c, p)"),
+    block("function _pts(c, arr)"),
+    block("function obSwings(c, L = 2, R = 2)"),
+    block("function obScan(c, opt)"),
+    block("function obPrevDay(c)"),
+    block("function I_obliq(c, p)"),
     block("const EVENTS = {"),
 ]
 
