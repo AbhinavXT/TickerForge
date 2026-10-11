@@ -267,7 +267,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app import server  # noqa: E402
 
-client = TestClient(server.app)
+# The host guard only answers loopback; TestClient defaults to "testserver".
+client = TestClient(server.app, base_url="http://127.0.0.1:5000")
 
 
 def test_metrics_route():

@@ -1,0 +1,8 @@
+{
+  "name": "tickerforge-js-tests",
+  "private": true,
+  "description": "Test-only dependencies for the page smoke tests. Never served.",
+  "devDependencies": {
+    "jsdom": "^25.0.0"
+  }
+}

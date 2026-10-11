@@ -3,3 +3,4 @@ data/
 __pycache__/
 *.pyc
 .venv/
+tests/js/node_modules/
