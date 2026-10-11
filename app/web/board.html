@@ -10,6 +10,93 @@
 		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
 		<link rel="stylesheet" href="/app.css" />
 		<script src="/ui.js"></script>
+		<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+		<style>
+			/* ---- header: breadth + NIFTY + sectors ---- */
+			.bhead { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap: var(--s3); }
+			.breadth .bar { display: flex; gap: 2px; height: 10px; margin: var(--s2) 0 6px; }
+			.breadth .bar i { display: block; border-radius: 3px; min-width: 2px; }
+			.breadth .bar .b { background: var(--bull); }
+			.breadth .bar .c { background: var(--neutral); }
+			.breadth .bar .r { background: var(--bear); }
+			.breadth .keys { display: flex; gap: var(--s4); flex-wrap: wrap; font-size: var(--fs-12); color: var(--text-2); }
+			.breadth .keys b { font-family: var(--mono); font-weight: 500; color: var(--text); }
+			.breadth .keys i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+
+			/* ---- body: ranked list + market x-ray ---- */
+			.bgrid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--s3); margin-top: var(--s3); align-items: start; }
+			.listhead, .brow { display: grid; grid-template-columns: 28px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(96px, 1.2fr); gap: var(--s3); align-items: center; }
+			.listhead { color: var(--text-3); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 var(--s3) var(--s2); border-bottom: 1px solid var(--border); }
+			.listhead .r, .brow .r { text-align: right; }
+			.brow { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border); color: var(--text); font: inherit; text-align: left; padding: 9px var(--s3); cursor: pointer; min-height: 48px; }
+			.brow:hover { background: var(--hover); }
+			.brow:last-child { border-bottom: 0; }
+			.brow .rk { font: var(--fs-12)/1 var(--mono); color: var(--text-3); }
+			.brow .sym { font: 500 var(--fs-14)/1.2 var(--mono); }
+			.brow .oi { margin-top: 3px; }
+			.brow .dist { font: var(--fs-12)/1.3 var(--mono); color: var(--text-2); }
+			.brow .dist small { display: block; color: var(--text-3); font-size: var(--fs-11); }
+			.brow .score .n { font-size: var(--fs-13); }
+			.oichip.long_buildup, .oichip.short_covering { color: var(--bull); background: var(--bull-bg); border-color: transparent; }
+			.oichip.short_buildup, .oichip.long_unwinding { color: var(--bear); background: var(--bear-bg); border-color: transparent; }
+
+			/* x-ray */
+			.xray { position: relative; }
+			.xray svg { display: block; width: 100%; height: auto; overflow: visible; }
+			.xray .grid line { stroke: var(--border); stroke-width: 1; }
+			.xray .axis text, .xray .lbl { fill: var(--text-3); font: 10px var(--mono); }
+			.xray .zero { stroke: var(--border-2); }
+			.xray .pt { stroke: var(--surface-2); stroke-width: 2; cursor: pointer; }
+			.xray .pt.bull { fill: var(--bull); }
+			.xray .pt.bear { fill: var(--bear); }
+			.xray .pt.choppy { fill: var(--neutral); }
+			.xray .pt:hover, .xray .pt:focus { stroke: var(--text); outline: none; }
+			.xray .tag { fill: var(--text-2); font: 10px var(--mono); pointer-events: none; }
+			.tip { position: absolute; pointer-events: none; z-index: 5; background: var(--surface-3); border: 1px solid var(--border-2); border-radius: var(--radius-sm); padding: 6px 9px; font-size: var(--fs-12); box-shadow: var(--shadow); white-space: nowrap; display: none; }
+			.tip b { font-family: var(--mono); }
+			.legend { display: flex; gap: var(--s4); font-size: var(--fs-12); color: var(--text-2); margin-top: var(--s2); flex-wrap: wrap; }
+			.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+			.flow { display: flex; flex-direction: column; gap: 4px; }
+			.flowrow { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr) 72px; gap: var(--s2); align-items: center; font-size: var(--fs-12); }
+			.flowrow .nm { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+			.flowrow .nm small { color: var(--text-3); font-family: var(--mono); }
+			.flowrow .track { position: relative; height: 12px; }
+			.flowrow .track::before { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--border-2); }
+			.flowrow .track i { position: absolute; top: 1px; bottom: 1px; border-radius: 3px; }
+			.flowrow .v { text-align: right; font-size: var(--fs-12); }
+			.xtabs { display: none; margin-top: var(--s3); }
+
+			/* ---- zone view ---- */
+			.zone .zchart { position: relative; height: 320px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface-1); }
+			.zone .zchart .host { position: absolute; inset: 0; }
+			.zone .band { position: absolute; pointer-events: none; z-index: 2; border-top: 1px solid; border-bottom: 1px solid; }
+			.zone .band.bull { background: color-mix(in srgb, var(--bull) 16%, transparent); border-color: color-mix(in srgb, var(--bull) 60%, transparent); }
+			.zone .band.bear { background: color-mix(in srgb, var(--bear) 16%, transparent); border-color: color-mix(in srgb, var(--bear) 60%, transparent); }
+			.zone .band span { position: absolute; left: 6px; top: 2px; font: var(--fs-11)/1 var(--mono); color: var(--text-2); }
+			.zone h3 { font-size: var(--fs-13); margin: var(--s5) 0 var(--s2); }
+			.why { display: flex; flex-direction: column; gap: var(--s2); }
+			.whyrow { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.2fr) 40px; gap: var(--s3); align-items: center; font-size: var(--fs-13); }
+			.whyrow .lab { color: var(--text-2); }
+			.whyrow .val { font-family: var(--mono); text-align: right; }
+			.whyrow .w { font: var(--fs-11)/1 var(--mono); color: var(--text-3); text-align: right; }
+
+			@media (max-width: 1099px) {
+				.bhead { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+				.bhead .breadth { grid-column: 1 / -1; }
+				.bgrid { grid-template-columns: minmax(0, 1fr); }
+			}
+			@media (max-width: 759px) {
+				.bhead { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+				.bhead .nifty { grid-column: 1 / -1; }
+				.xtabs { display: flex; }
+				.bgrid[data-view="ranked"] #xraycard, .bgrid[data-view="xray"] #rankcard { display: none; }
+				.listhead, .brow { grid-template-columns: 22px minmax(0, 1.5fr) minmax(0, 1fr) minmax(84px, 1fr); }
+				.listhead .dcol, .brow .dist { display: none; }
+				.zone .zchart { height: 260px; }
+				.whyrow { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); }
+				.whyrow .w { display: none; }
+			}
+		</style>
 	</head>
 	<body>
 		<div id="nav" data-page="board">
@@ -35,15 +122,442 @@
 			<span class="status" id="status"></span>
 		</div>
 		<script>TF.shell()</script>
-		<div class="wrap">
-			<div id="body"></div>
+
+		<div class="wrap wide">
+			<div class="page-head">
+				<div>
+					<h2 class="page">F&amp;O Board</h2>
+					<div class="sub">Order-block setups across the NSE F&amp;O universe, ranked · <span id="stamp"></span></div>
+				</div>
+				<div class="spacer"></div>
+				<button type="button" class="btn" id="reload"></button>
+			</div>
+			<div id="note"></div>
+
+			<section class="bhead" id="head" aria-label="Market summary">
+				<div class="card breadth">
+					<div class="k">Breadth</div>
+					<div class="bar" id="breadthbar" role="img"></div>
+					<div class="keys" id="breadthkeys"></div>
+				</div>
+				<div class="stat nifty"><div class="k">NIFTY 50</div><div class="v" id="nifty">—</div><div class="c" id="niftyc"></div></div>
+				<div class="stat"><div class="k">Leading sector</div><div class="v" style="font-family: var(--sans); font-size: var(--fs-14)" id="lead">—</div><div class="c" id="leadc"></div></div>
+				<div class="stat"><div class="k">Lagging sector</div><div class="v" style="font-family: var(--sans); font-size: var(--fs-14)" id="lag">—</div><div class="c" id="lagc"></div></div>
+			</section>
+
+			<div class="seg xtabs" id="xtabs" aria-label="View">
+				<button type="button" data-v="ranked" class="on" aria-pressed="true">Ranked</button>
+				<button type="button" data-v="xray" aria-pressed="false">Market X-Ray</button>
+			</div>
+
+			<div class="bgrid" id="bgrid" data-view="ranked">
+				<section class="card" id="rankcard" style="padding: var(--s3) 0 0">
+					<div class="card-h" style="padding: 0 var(--s3)">
+						<div class="seg bullbear" id="side" aria-label="Side">
+							<button type="button" data-v="bull" class="on" aria-pressed="true">▲ Bullish</button>
+							<button type="button" data-v="bear" aria-pressed="false">▼ Bearish</button>
+						</div>
+						<span class="sp"></span>
+						<span class="caption">top 20 · tap a row for the zone</span>
+					</div>
+					<div class="listhead"><span>#</span><span>Stock · OI read</span><span class="r dcol">To OB</span><span class="r">Chg</span><span>Score</span></div>
+					<div id="list"></div>
+				</section>
+
+				<section class="card" id="xraycard">
+					<div class="card-h"><h3>Market X-Ray</h3><span class="sp"></span><span class="caption">x: % change · y: score</span></div>
+					<div class="xray" id="xray"></div>
+					<div class="legend">
+						<span><i style="background: var(--bull)"></i>Bullish</span>
+						<span><i style="background: var(--bear)"></i>Bearish</span>
+						<span><i style="background: var(--neutral)"></i>Choppy (ADX &lt; 18)</span>
+					</div>
+					<h3 class="section">Sector flow</h3>
+					<div class="flow" id="flow"></div>
+				</section>
+			</div>
 		</div>
+
 		<script>
-			document.getElementById("body").innerHTML = TF.empty(
-				"The Board is on its way",
-				"The F&O scanner lands in a later step of the UI revamp.",
-				"board",
-			)
+			"use strict"
+			const $ = (s) => document.querySelector(s)
+			const esc = TF.esc
+			const status = (m) => {
+				$("#status").textContent = m || ""
+			}
+			let BOARD = null,
+				SIDE = "bull",
+				timer = null,
+				zone = null
+			const OI_LABEL = {
+				long_buildup: "long buildup",
+				short_buildup: "short buildup",
+				short_covering: "short covering",
+				long_unwinding: "long unwinding",
+			}
+			const oiChip = (r) =>
+				r ? `<span class="chip oichip ${r}">${OI_LABEL[r] || esc(r)}</span>` : `<span class="chip">OI n/a</span>`
+			const scoreCell = (n, side) =>
+				`<div class="score"><span class="n">${n}</span><span class="scorebar ${side === "bear" ? "bear" : side === "choppy" ? "neutral" : ""}"><i style="width:${Math.max(0, Math.min(100, n))}%"></i></span></div>`
+			$("#reload").innerHTML = TF.icon("refresh") + "Refresh"
+
+			// --------------------------------------------------------------- load
+			async function load() {
+				status("loading…")
+				if (!BOARD) $("#list").innerHTML = `<div style="padding:var(--s3)">${TF.skeleton(8)}</div>`
+				try {
+					const r = await fetch("/api/board")
+					const d = await r.json().catch(() => ({}))
+					if (r.status === 401) return needLogin(d.detail)
+					if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`)
+					BOARD = d
+					render()
+					status("")
+				} catch (e) {
+					status("error")
+					$("#note").innerHTML = ""
+					$("#note").appendChild(TF.errorBox(`Couldn't build the board: ${e.message}`, load))
+				}
+				clearTimeout(timer)
+				if (BOARD && BOARD.live) timer = setTimeout(load, 60000)
+			}
+
+			async function needLogin(msg) {
+				status("")
+				let url = ""
+				try {
+					url = (await (await fetch("/api/session")).json()).login_url || ""
+				} catch (e) {}
+				$("#list").innerHTML = TF.empty("The Board needs a Kite session", "It ranks live quotes and futures OI.", "board")
+				if (url) $("#list").insertAdjacentHTML("beforeend", `<div style="text-align:center;padding-bottom:var(--s5)"><a class="btn primary" href="${esc(url)}">Log in to Kite</a></div>`)
+				$("#xray").innerHTML = TF.empty("No data yet", "", "chart")
+			}
+
+			function render() {
+				const d = BOARD
+				TF.stamp($("#stamp"), Date.parse(d.built_at), d.stale ? "last session · built " : "updated ")
+				$("#note").innerHTML = d.note
+					? `<div class="notice">${esc(d.note)}</div>`
+					: d.stale
+						? `<div class="notice">Market closed — showing the last session's board (built <span class="mono">${esc(d.built_at.slice(0, 16).replace("T", " "))}</span> IST).</div>`
+						: ""
+				renderBreadth(d.breadth || {})
+				const sec = (el, s) => {
+					$(el).textContent = s ? s.sector : "—"
+					$(el + "c").innerHTML = s ? `${TF.delta(s.chg_pct)} <span class="faint">· ${s.n} stocks</span>` : ""
+				}
+				sec("#lead", d.leading)
+				sec("#lag", d.lagging)
+				renderList()
+				renderXray()
+				renderFlow()
+			}
+
+			function renderBreadth(b) {
+				const tot = (b.bull || 0) + (b.choppy || 0) + (b.bear || 0) || 1
+				const seg = (cls, n) => (n ? `<i class="${cls}" style="flex:${n}" title="${n}"></i>` : "")
+				$("#breadthbar").innerHTML = seg("b", b.bull) + seg("c", b.choppy) + seg("r", b.bear)
+				$("#breadthbar").setAttribute("aria-label", `${b.bull || 0} bullish, ${b.choppy || 0} choppy, ${b.bear || 0} bearish`)
+				const k = (cls, lab, n) => `<span><i style="background:var(${cls})"></i>${lab} <b>${n || 0}</b> <span class="faint mono">${Math.round(((n || 0) / tot) * 100)}%</span></span>`
+				$("#breadthkeys").innerHTML = k("--bull", "▲ Bullish", b.bull) + k("--neutral", "Choppy", b.choppy) + k("--bear", "▼ Bearish", b.bear)
+			}
+
+			async function loadMarket() {
+				try {
+					const m = await (await fetch("/api/board/market")).json()
+					if (m.nifty && m.nifty.last != null) {
+						$("#nifty").textContent = TF.num(m.nifty.last, 2)
+						$("#niftyc").innerHTML = TF.delta(m.nifty.chg_pct)
+					} else {
+						$("#nifty").textContent = "—"
+						$("#niftyc").textContent = m.open ? "market open" : "market closed"
+					}
+				} catch (e) {}
+			}
+
+			function renderList() {
+				const rows = (BOARD && BOARD[SIDE]) || []
+				if (!rows.length) {
+					$("#list").innerHTML = TF.empty(
+						`No ${SIDE === "bull" ? "bullish" : "bearish"} setups right now`,
+						"Stocks with ADX under 18 are choppy and aren't ranked.",
+						"board",
+					)
+					return
+				}
+				$("#list").innerHTML = rows
+					.map(
+						(r) => `<button type="button" class="brow" data-sym="${esc(r.symbol)}" aria-label="${esc(r.symbol)}, rank ${r.rank}, score ${r.score}">
+      <span class="rk">${r.rank}</span>
+      <span><div class="sym">${esc(r.symbol)}</div><div class="oi">${oiChip(r.oi_read)}</div></span>
+      <span class="dist r">${r.ob_dist_pct == null ? "no live OB" : r.ob_dist_pct === 0 ? "in zone" : TF.signed(r.ob_dist_pct, 2, "%")}<small>${r.ob_dist_atr == null ? "" : r.ob_dist_atr + " ATR"}</small></span>
+      <span class="r">${TF.delta(r.chg_pct)}</span>
+      ${scoreCell(r.score, SIDE)}
+    </button>`,
+					)
+					.join("")
+			}
+			$("#list").addEventListener("click", (e) => {
+				const b = e.target.closest(".brow")
+				if (b) openZone(b.dataset.sym)
+			})
+			TF.seg($("#side"), (v) => {
+				SIDE = v
+				renderList()
+			})
+			TF.seg($("#xtabs"), (v) => {
+				$("#bgrid").dataset.view = v
+				if (v === "xray" && BOARD) renderXray()
+			})
+			let rz
+			window.addEventListener("resize", () => {
+				clearTimeout(rz)
+				rz = setTimeout(() => BOARD && renderXray(), 150)
+			})
+
+			// ---------------------------------------------------------- x-ray
+			// Scatter: x = % change, y = score. Choppy stocks score 0 and sit
+			// on the floor in grey; the top three of each side are labelled.
+			function renderXray() {
+				const rows = (BOARD.rows || []).filter((r) => r.chg_pct != null)
+				if (!rows.length) {
+					$("#xray").innerHTML = TF.empty("Nothing to plot yet", "", "chart")
+					return
+				}
+				// size the plot to its box so text stays 10px on a phone
+				const W = Math.max(300, Math.round($("#xray").clientWidth || 600)),
+					H = Math.round(Math.min(340, Math.max(240, W * 0.55))),
+					L = 34, R = 12, T = 12, B = 26
+				const m = Math.max(2, ...rows.map((r) => Math.abs(r.chg_pct))) * 1.08
+				const x = (v) => L + ((v + m) / (2 * m)) * (W - L - R)
+				const y = (v) => T + (1 - v / 100) * (H - T - B)
+				const ticks = [-m, -m / 2, 0, m / 2, m].map((v) => Math.round(v * 10) / 10)
+				const lab = new Set([...(BOARD.bull || []).slice(0, 3), ...(BOARD.bear || []).slice(0, 3)].map((r) => r.symbol))
+				let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Scatter of every stock: percent change against score">`
+				svg += `<g class="grid">${[0, 25, 50, 75, 100].map((v) => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/>`).join("")}</g>`
+				svg += `<line class="zero" x1="${x(0)}" x2="${x(0)}" y1="${T}" y2="${H - B}"/>`
+				svg += `<g class="axis">${[0, 50, 100].map((v) => `<text x="${L - 6}" y="${y(v) + 3}" text-anchor="end">${v}</text>`).join("")}`
+				svg += ticks.map((v) => `<text x="${x(v)}" y="${H - 8}" text-anchor="middle">${v > 0 ? "+" : ""}${v}%</text>`).join("") + `</g>`
+				// choppy first so the ranked dots draw on top
+				const order = [...rows].sort((a, b) => (a.side === "choppy") - (b.side === "choppy")).reverse()
+				svg += order
+					.map(
+						(r) =>
+							`<circle class="pt ${r.side}" tabindex="0" r="${lab.has(r.symbol) ? 5.5 : 4}" cx="${x(r.chg_pct).toFixed(1)}" cy="${y(r.score).toFixed(1)}" data-sym="${esc(r.symbol)}" aria-label="${esc(r.symbol)} ${TF.signed(r.chg_pct, 2, "%")}, score ${r.score}"/>`,
+					)
+					.join("")
+				// direct labels for the top three per side, nudged apart vertically
+				// when two would overlap
+				const placed = []
+				svg += rows
+					.filter((r) => lab.has(r.symbol))
+					.sort((a, b) => b.score - a.score)
+					.map((r) => {
+						const left = r.chg_pct < 0
+						const lx = x(r.chg_pct) + (left ? -8 : 8)
+						let ly = y(r.score) + 3
+						const wd = r.symbol.length * 6.2
+						const x0 = left ? lx - wd : lx
+						while (placed.some((p) => Math.abs(p.y - ly) < 11 && x0 < p.x1 && x0 + wd > p.x0)) ly += 11
+						placed.push({ x0, x1: x0 + wd, y: ly })
+						return `<text class="tag" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${left ? "end" : "start"}">${esc(r.symbol)}</text>`
+					})
+					.join("")
+				svg += `</svg><div class="tip" id="tip"></div>`
+				$("#xray").innerHTML = svg
+				const byS = new Map(rows.map((r) => [r.symbol, r]))
+				const tip = $("#tip")
+				const show = (el) => {
+					const r = byS.get(el.dataset.sym)
+					if (!r) return
+					tip.innerHTML = `<b>${esc(r.symbol)}</b> ${TF.delta(r.chg_pct)} · score <b>${r.score}</b><br><span class="faint">${r.side === "choppy" ? "choppy" : (r.side === "bull" ? "bullish" : "bearish") + " · " + (OI_LABEL[r.oi_read] || "OI n/a")}</span>`
+					const box = $("#xray").getBoundingClientRect(), b = el.getBoundingClientRect()
+					tip.style.display = "block"
+					const tx = Math.min(box.width - tip.offsetWidth - 4, Math.max(4, b.left - box.left + 10))
+					tip.style.left = tx + "px"
+					tip.style.top = Math.max(0, b.top - box.top - tip.offsetHeight - 8) + "px"
+				}
+				$("#xray").querySelectorAll(".pt").forEach((el) => {
+					el.addEventListener("mouseenter", () => show(el))
+					el.addEventListener("focus", () => show(el))
+					el.addEventListener("mouseleave", () => (tip.style.display = "none"))
+					el.addEventListener("blur", () => (tip.style.display = "none"))
+					el.addEventListener("click", () => openZone(el.dataset.sym))
+					el.addEventListener("keydown", (e) => e.key === "Enter" && openZone(el.dataset.sym))
+				})
+			}
+
+			// Diverging bar per sector, centred on 0.
+			function renderFlow() {
+				const s = BOARD.sectors || []
+				if (!s.length) {
+					$("#flow").innerHTML = '<div class="caption">No sector data — sectors come from stored fundamentals.</div>'
+					return
+				}
+				const m = Math.max(0.5, ...s.map((x) => Math.abs(x.chg_pct)))
+				$("#flow").innerHTML = s
+					.map((x) => {
+						const w = (Math.abs(x.chg_pct) / m) * 50
+						const pos = x.chg_pct >= 0
+						return `<div class="flowrow" title="${esc(x.sector)}: ${TF.signed(x.chg_pct, 2, "%")} average over ${x.n}">
+        <span class="nm">${esc(x.sector)} <small>${x.n}</small></span>
+        <span class="track"><i style="left:${pos ? 50 : 50 - w}%;width:${w}%;background:var(${pos ? "--bull" : "--bear"})"></i></span>
+        <span class="v">${TF.delta(x.chg_pct)}</span></div>`
+					})
+					.join("")
+			}
+
+			// ----------------------------------------------------------- zone
+			async function openZone(sym) {
+				if (zone) zone.close()
+				const ov = TF.overlay({
+					kind: "drawer",
+					title: sym,
+					actions: `<a class="btn sm" href="/?symbol=${encodeURIComponent(sym)}">${TF.icon("chart")}Chart</a>`,
+					body: `<div class="zone">${TF.skeleton(1, "block")}<div class="levels" style="margin-top:var(--s3)">${'<div class="level">' + TF.skeleton(2) + "</div>"}</div>${TF.skeleton(5)}</div>`,
+					onClose: () => {
+						if (zone && zone.raf) cancelAnimationFrame(zone.raf)
+						if (zone && zone.chart) zone.chart.remove()
+						zone = null
+					},
+				})
+				zone = { close: ov.close, el: ov }
+				const mine = zone
+				let d
+				try {
+					const r = await fetch(`/api/board/${encodeURIComponent(sym)}`)
+					d = await r.json()
+					if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`)
+				} catch (e) {
+					if (zone !== mine) return
+					ov.body.innerHTML = ""
+					ov.body.appendChild(TF.errorBox(`Couldn't load the zone: ${e.message}`, () => openZone(sym)))
+					return
+				}
+				if (zone !== mine) return
+				renderZone(ov, d)
+			}
+
+			function renderZone(ov, d) {
+				const sideTxt = d.side === "bull" ? "▲ Bullish" : d.side === "bear" ? "▼ Bearish" : "Choppy"
+				ov.panel.querySelector("header h2").innerHTML = `<span class="mono">${esc(d.symbol)}</span> <span class="chip ${d.side === "bull" ? "bull" : d.side === "bear" ? "bear" : ""}">${sideTxt}</span> <span class="caption">score <span class="mono">${d.score}</span></span>`
+				const ob = d.ob
+				const level = (cls, k, v, c = "") => `<div class="level ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="c">${c}</div></div>`
+				const dist = (v) => (v == null || d.ltp == null ? "" : TF.signed(((v - d.ltp) / d.ltp) * 100, 2, "%"))
+				const w = d.why || {}, parts = w.parts || {}, W = d.weights || {}
+				const row = (lab, val, k, extra = "") => `<div class="whyrow"><span class="lab">${lab}</span><span class="val">${val}${extra}</span><span class="scorebar ${d.side === "bear" ? "bear" : ""}"><i style="width:${Math.round((parts[k] || 0) * 100)}%"></i></span><span class="w">×${W[k] ?? "–"}</span></div>`
+				ov.body.innerHTML = `<div class="zone">
+    <div class="zchart" id="zchart"><div class="host" id="zhost"></div><div class="band" id="zband" hidden><span></span></div></div>
+    <div class="levels" style="margin-top:var(--s3)">
+      ${level("res", "Resistance", TF.num(d.resistance), dist(d.resistance))}
+      ${level("ltp", "LTP", TF.num(d.ltp), d.chg_pct == null ? "" : TF.signed(d.chg_pct, 2, "%"))}
+      ${level("sup", "Support", TF.num(d.support), dist(d.support))}
+      ${level(ob ? (ob.dir === "bull" ? "sup" : "bear") : "", "Order block", ob ? `${TF.num(ob.bottom)}–${TF.num(ob.top)}` : "none live", ob ? (ob.dir === "bull" ? "bullish zone" : "bearish zone") : "")}
+    </div>
+    <h3>Why it ranks</h3>
+    ${d.choppy ? '<div class="notice">ADX is under 18 — choppy. Order blocks in a range get run through both ways, so this stock scores 0.</div>' : ""}
+    <div class="why">
+      ${row("Displacement", w.move_atr == null ? "—" : `${w.move_atr}× ATR`, "move")}
+      ${row("OI change", w.oi_chg_pct == null ? "n/a" : TF.signed(w.oi_chg_pct, 2, "%"), "oi", w.oi_read ? ` <span class="caption">${OI_LABEL[w.oi_read] || ""}</span>` : "")}
+      ${row("Volume vs 20-bar avg", w.vol_ratio == null ? "—" : `${w.vol_ratio}×`, "volume")}
+      ${row("ADX", w.adx == null ? "—" : w.adx, "adx")}
+      ${row("Distance to OB", w.ob_dist_atr == null ? "—" : `${w.ob_dist_atr} ATR`, "proximity")}
+    </div>
+    <h3>Liquidity</h3>
+    <div class="row" style="gap:6px">${(d.liquidity || []).map((l) => `<span class="chip mono">${l.kind.toUpperCase()} ${TF.num(l.price)}${l.touches > 1 ? ` ×${l.touches}` : ""}</span>`).join("") || '<span class="caption">none found</span>'}</div>
+    <div class="row" style="margin-top:var(--s5)">
+      <button type="button" class="btn primary" id="zalert" ${d.alert_cond ? "" : "disabled"}>${TF.icon("bell")}Alert on OB retest</button>
+      <span class="caption mono">${d.alert_cond ? esc(d.alert_cond) : "no live order block to retest"}</span>
+    </div></div>`
+				const btn = ov.body.querySelector("#zalert")
+				btn.onclick = async () => {
+					btn.disabled = true
+					try {
+						const r = await fetch(`/api/alerts?symbol=${encodeURIComponent(d.symbol)}&cond=${encodeURIComponent(d.alert_cond)}`, { method: "POST" })
+						const e = await r.json().catch(() => ({}))
+						if (!r.ok) throw new Error(e.detail || `HTTP ${r.status}`)
+						TF.toast(`Alert armed: ${d.symbol} ${d.alert_cond}`)
+					} catch (e) {
+						TF.toast(`Couldn't arm the alert: ${e.message}`, "err")
+						btn.disabled = false
+					}
+				}
+				drawZoneChart(d)
+			}
+
+			function zoneTheme() {
+				const c = TF.colors()
+				return { up: c.bull, down: c.bear, res: c.violet, sup: c.bull, ltp: c.text, liq: c.text3 }
+			}
+			function drawZoneChart(d) {
+				if (!window.LightweightCharts || !d.candles || !d.candles.length) {
+					$("#zchart").innerHTML = TF.empty("No 5m candles stored yet", "They fill in during market hours.", "chart")
+					return
+				}
+				const ch = LightweightCharts.createChart($("#zhost"), {
+					...TF.chartTheme(),
+					timeScale: { ...TF.chartTheme().timeScale, timeVisible: true, secondsVisible: false },
+					autoSize: true,
+				})
+				const col = zoneTheme()
+				const s = ch.addCandlestickSeries({ upColor: col.up, downColor: col.down, wickUpColor: col.up, wickDownColor: col.down, borderVisible: false })
+				s.setData(d.candles)
+				const line = (price, color, title, style = 0) =>
+					price == null ? null : s.createPriceLine({ price, color, title, lineWidth: 1, lineStyle: style, axisLabelVisible: true })
+				const lines = []
+				const addLines = () => {
+					const c = zoneTheme()
+					lines.splice(0).forEach((l) => l && s.removePriceLine(l))
+					lines.push(line(d.resistance, c.res, "R"))
+					lines.push(line(d.support, c.sup, "S"))
+					lines.push(line(d.ltp, c.ltp, "LTP", 2))
+					for (const l of d.liquidity || []) lines.push(line(l.price, c.liq, l.kind.toUpperCase(), 1))
+				}
+				addLines()
+				const vis = Math.min(d.candles.length, 90)
+				ch.timeScale().setVisibleLogicalRange({ from: d.candles.length - vis, to: d.candles.length + 3 })
+				zone.chart = ch
+				// The order-block band: a positioned div kept in step with the
+				// chart every frame (lightweight-charts 4 has no shaded-band series).
+				const band = $("#zband")
+				if (d.ob) {
+					band.className = "band " + d.ob.dir
+					band.querySelector("span").textContent = `OB ${TF.num(d.ob.bottom)}–${TF.num(d.ob.top)}`
+					const tick = () => {
+						if (!zone || zone.chart !== ch) return
+						const y1 = s.priceToCoordinate(d.ob.top), y2 = s.priceToCoordinate(d.ob.bottom)
+						let x1 = ch.timeScale().timeToCoordinate(d.ob.time)
+						const w = $("#zhost").clientWidth - ch.priceScale("right").width()
+						if (x1 == null) x1 = ch.timeScale().getVisibleLogicalRange()?.from > 0 ? 0 : null
+						if (y1 != null && y2 != null && x1 != null) {
+							band.hidden = false
+							band.style.left = Math.max(0, x1) + "px"
+							band.style.width = Math.max(0, w - Math.max(0, x1)) + "px"
+							band.style.top = Math.min(y1, y2) + "px"
+							band.style.height = Math.max(2, Math.abs(y2 - y1)) + "px"
+						} else band.hidden = true
+						zone.raf = requestAnimationFrame(tick)
+					}
+					zone.raf = requestAnimationFrame(tick)
+				}
+				zone.retheme = () => {
+					const c = zoneTheme()
+					ch.applyOptions(TF.chartTheme())
+					s.applyOptions({ upColor: c.up, downColor: c.down, wickUpColor: c.up, wickDownColor: c.down })
+					addLines()
+				}
+			}
+			window.addEventListener("tf:theme", () => zone && zone.retheme && zone.retheme())
+
+			$("#reload").onclick = () => {
+				load()
+				loadMarket()
+			}
+			load()
+			loadMarket()
+			setInterval(loadMarket, 60000)
+			const q0 = new URLSearchParams(location.search).get("symbol")
+			if (q0) openZone(q0.toUpperCase())
 		</script>
 	</body>
 </html>
