@@ -356,8 +356,7 @@
 			}
 
 			async function load(refresh) {
-				$("#totals").innerHTML =
-					'<div class="empty">Loading from Kite…</div>'
+				$("#totals").innerHTML = `<div class="cards">${`<div class="stat">${TF.skeleton(2)}</div>`.repeat(4)}</div>`
 				try {
 					render(
 						await api(
@@ -365,13 +364,21 @@
 						),
 					)
 				} catch (e) {
-					$("#totals").innerHTML =
-						`<div class="empty">${e.message}` +
-						(/session|log in/i.test(e.message)
-							? " — run <code>python -m app.cli login</code>"
-							: "") +
-						"</div>"
 					$("#hold").innerHTML = ""
+					if (/session|log in/i.test(e.message)) {
+						let url = ""
+						try {
+							url = (await (await fetch("/api/session")).json()).login_url || ""
+						} catch (_) {}
+						$("#totals").innerHTML =
+							`<div style="grid-column:1/-1;width:100%">` +
+							TF.empty("Portfolio needs a Kite session", "Holdings and positions come straight from Kite.", "portfolio") +
+							(url ? `<div style="text-align:center"><a class="btn primary" href="${esc(url)}">Log in to Kite</a></div>` : "") +
+							`</div>`
+					} else {
+						$("#totals").innerHTML = ""
+						$("#totals").appendChild(TF.errorBox(`Couldn't load the portfolio: ${e.message}`, () => load(refresh)))
+					}
 				}
 			}
 
