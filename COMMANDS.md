@@ -1020,6 +1020,7 @@ Sent to `NTFY_CMD_TOPIC`. The `remote` service must be running.
 | `/conf SYM` | `/confluence` `/mtf` | Multi-timeframe agreement score |
 | `/signals` | `/sig` | Strategy stances |
 | `/chart SYM` | — | Chart image |
+| `/candles SYM [day\|5minute\|minute] [count]` | `/bars` | Price history as compact JSON messages for the phone chart (default `day`, 300 bars, max 2000); stops at the first rate-limit refusal |
 | `/valuation SYM` | `/val` | Fair value, MoS, verdict |
 | `/fundamentals SYM` | `/fund` | Stored ratios |
 | `/results SYM` | `/result` | Latest quarter |
