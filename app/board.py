@@ -579,6 +579,22 @@ def _row(u: dict, bars: list[dict], q: dict, fq: dict, prev_oi: float | None,
     }
 
 
+def _attach_delivery(rows: list[dict]) -> None:
+    """Last completed session's delivery against its own average. Context,
+    not a score input: it's yesterday's number on an intraday board, and
+    weighting it would let a stale fact move today's ranking."""
+    try:
+        from . import delivery
+        got = delivery.many([r["symbol"] for r in rows])
+    except Exception:                                    # noqa: BLE001
+        return
+    for r in rows:
+        s = got.get(r["symbol"])
+        r["deliv"] = None if not s else {
+            "day": s["day"], "pct": s["deliv_pct"], "ratio": s["deliv_ratio"],
+            "avg_pct": s["avg_deliv_pct"], "spike": s["spike"]}
+
+
 def _trap_brief(t: dict | None) -> dict | None:
     return None if not t else {k: t[k] for k in ("time", "price", "kind", "dir")}
 
@@ -606,6 +622,7 @@ def build(kite) -> dict:
         daily = candles.get(u["token"], "day", 10)
         rows.append(_row(u, bars, quotes.get(f"NSE:{u['symbol']}"),
                          quotes.get(f"NFO:{u['fut']}"), prev.get(u["fut_token"]), daily))
+    _attach_delivery(rows)
     sect = _sectors()
     flow = sector_flow(rows, sect)
     return {
@@ -714,7 +731,14 @@ def detail(kite, symbol: str) -> dict | None:
                 "ob_dist_pct": a.get("ob_dist_pct"), "parts": a.get("parts", {})},
         "alert_cond": retest_condition(ob),
         "weights": WEIGHTS,
+        "deliv": _deliv_one(sym),
     }
+
+
+def _deliv_one(sym: str) -> dict | None:
+    row = {"symbol": sym}
+    _attach_delivery([row])
+    return row.get("deliv")
 
 
 def market(kite_factory) -> dict:

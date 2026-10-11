@@ -55,6 +55,25 @@ class NSEClient:
                 # cookies stale / blocked — start a fresh session and retry once
                 self._session = self._new_session()
 
+    def get_text(self, url: str) -> str | None:
+        """A file off nsearchives (bhavcopies). None on 404 — a holiday has
+        no file, and that's an answer rather than an error."""
+        if self._session is None:
+            self._session = self._new_session()
+        for attempt in (1, 2):
+            try:
+                r = self._session.get(url, timeout=30)
+                if r.status_code == 404:
+                    return None
+                if r.status_code in (401, 403):
+                    raise ValueError(f"blocked (HTTP {r.status_code})")
+                r.raise_for_status()
+                return r.text
+            except (ValueError, requests.RequestException):
+                if attempt == 2:
+                    raise
+                self._session = self._new_session()
+
     def fetch_feed(self, kind: str):
         data = self.get_json(FEEDS[kind])
         # Feeds usually return a bare list; some wrap in {"data": [...]}.

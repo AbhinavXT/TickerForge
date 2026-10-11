@@ -222,6 +222,28 @@ tf results latest --limit 40 --sort np_yoy --scope large
 `fund diagnose` is the one to reach for when a valuation comes back empty —
 usually a slug mismatch.
 
+### Delivery volume and insider trades
+
+Both come from NSE rather than Kite, and both run on their own inside
+`events run` (so `tf up` covers them). The commands are for backfilling and
+looking things up.
+
+```bash
+tf delivery sync                      # fill missing sessions (last 45 days)
+tf delivery show BEL                  # last session's delivery % vs its average
+tf delivery spikes --ratio 2.5        # biggest delivery spikes on up days
+tf delivery spikes --all              # include down days
+
+```
+
+**Delivery** is read from the full bhavcopy NSE posts each evening,
+usually by 19:00. The events service starts asking at 18:30 and retries every
+30 minutes until the file arrives. Only EQ-series rows are stored, because
+trade-to-trade series are 100% delivery by rule. Run `delivery sync` once after
+upgrading: the 20-session average needs a month of files before
+`deliv_ratio` means anything.
+
+
 ---
 
 ## 4. Research
@@ -593,6 +615,7 @@ field list.
 
 ```bash
 tf scan 52w_high volume_surge --universe nifty200
+tf scan delivery_spike volume_surge --universe nifty200   # accumulation
 tf scan donchian_break --universe nifty200 --limit 40
 tf scan bb_squeeze --save squeeze-watch      # remember this scan
 tf scan --saved                              # list saved scans
@@ -1031,6 +1054,7 @@ Sent to `NTFY_CMD_TOPIC`. The `remote` service must be running.
 | `/price SYM` | `/quote` | Last price and day change |
 | `/levels SYM` | `/lvl` | VWAP, PDH/PDL, CPR, pivots, ORB |
 | `/board` | — | F&O Board: breadth, leading/lagging sector, top 5 bullish and bearish order-block setups, flagged `REV` (reversal build-up) and `trap ▲/▼` (liquidity sweep). `/board nf` pushes the same board as one structured message for the NewsForge app instead of text |
+| `/deliv [SYM]` | `/delivery` | Last session's delivery % against its 20-session average. Bare: delivery spikes among the names you follow |
 | `/ob SYM` | — | One stock's order block, R/S and liquidity, any liquidity trap or reversal build-up, why it ranks, and the retest `/alert` to send |
 | `/ind SYM` | `/indicators` `/ta` | Indicator bundle |
 | `/conf SYM` | `/confluence` `/mtf` | Multi-timeframe agreement score |
@@ -1133,6 +1157,7 @@ nested.
 | Growth | `sales_growth3` `sales_growth5` `profit_growth3` `profit_growth5` |
 | Multiples | `pe` `pb` `book_value` `div_yield` `earnings_yield` `market_cap` |
 | Yours | `rs` `mos_pct` `fair_value` `n_models` |
+| Delivery | `deliv_pct` `avg_deliv_pct` `deliv_ratio` (last completed session, from NSE's bhavcopy) |
 
 A company whose figure isn't stored **never matches** — `debt_equity < 0.5`
 won't surface a business whose debt you don't know, which would otherwise mean
@@ -1150,7 +1175,13 @@ never be true.
 ```
 52w_high      52w_low       above_sma     bb_squeeze    death_cross
 donchian_break  golden_cross  rsi_range   strategy_long volume_surge
+delivery_spike
 ```
+
+`delivery_spike` (mult 2, window 20, min_pct 0): delivery quantity at least
+`mult` × its own 20-session average, on an up day. It only matches when the
+stored delivery file is for the same session as the last closed candle, so a
+scan run before the evening file lands returns nothing for it.
 
 Combine two or more. A single condition is a list; two are a thesis.
 

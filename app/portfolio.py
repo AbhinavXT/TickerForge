@@ -82,6 +82,30 @@ def raw_positions(kite=None) -> list[dict]:
         raise PortfolioError(f"could not read positions: {e}") from e
 
 
+def followed(kite=None, holdings: bool = True) -> dict[str, set[str]]:
+    """Every name you have a stake or an interest in -> why.
+
+    {"TCS": {"watchlist", "position"}, ...}. Reasons are "watchlist",
+    "position" (an open journal trade) and "holding" (Kite demat). Holdings
+    are best-effort: without a Kite session the other two still answer, and
+    a push about a watchlist name shouldn't wait on the broker.
+    """
+    out: dict[str, set[str]] = {}
+    for w in watchlist.items():
+        out.setdefault(w["tradingsymbol"].upper(), set()).add("watchlist")
+    for t in journal.open_positions():
+        out.setdefault(t["symbol"].upper(), set()).add("position")
+    if holdings:
+        try:
+            for h in raw_holdings(kite):
+                sym = (h.get("tradingsymbol") or "").upper()
+                if sym and (_num(h.get("quantity")) + _num(h.get("t1_quantity"))) > 0:
+                    out.setdefault(sym, set()).add("holding")
+        except (PortfolioError, Exception):               # noqa: BLE001
+            pass
+    return out
+
+
 # ------------------------------------------------------------- annotation
 def _num(v, default=0.0) -> float:
     try:

@@ -473,6 +473,8 @@
 					.map(([k, v]) => {
 						if (k === "volume_surge")
 							return `<span class="chip">${v.times}× vol</span>`
+						if (k === "delivery_spike")
+							return `<span class="chip" title="${v.deliv_pct}% delivered vs ${v.avg_deliv_pct}% average">${v.times}× delivery</span>`
 						if (k === "52w_high")
 							return `<span class="chip">52wH +${v.above_pct}%</span>`
 						if (k === "52w_low")

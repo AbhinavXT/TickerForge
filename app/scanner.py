@@ -203,6 +203,34 @@ def c_strategy_long(c, p=None):
             "close": round(c[-1]["close"], 2)}
 
 
+def c_delivery_spike(c, p=None):
+    """Delivery qty at least N× its own average on an up day — accumulation.
+
+    Needs the symbol, not just candles: delivery isn't in Kite's bars. The
+    engine passes it as `_symbol`. The delivery session must be the same day
+    as the last closed candle, or a stale file would vouch for today's bar.
+    """
+    from . import delivery
+    p = p or {}
+    sym = p.get("_symbol")
+    if not sym or not c:
+        return None
+    s = delivery.stats(sym, window=int(p.get("window", delivery.WINDOW)))
+    if not s or not s["deliv_ratio"]:
+        return None
+    bar_day = datetime.fromtimestamp(c[-1]["time"]).strftime("%Y-%m-%d")
+    if s["day"] != bar_day:
+        return None
+    if s["deliv_ratio"] < float(p.get("mult", delivery.SPIKE_RATIO)):
+        return None
+    if float(p.get("min_pct", 0)) and (s["deliv_pct"] or 0) < float(p["min_pct"]):
+        return None
+    if len(c) > 1 and c[-1]["close"] <= c[-2]["close"]:
+        return None
+    return {"times": s["deliv_ratio"], "deliv_pct": s["deliv_pct"],
+            "avg_deliv_pct": s["avg_deliv_pct"], "day": s["day"]}
+
+
 CONDITIONS = {
     "52w_high": {"fn": c_52w_high, "label": "New 52-week high",
                  "params": {"window": 252}},
@@ -224,11 +252,16 @@ CONDITIONS = {
                   "params": {"period": 14, "low": 0, "high": 30}},
     "strategy_long": {"fn": c_strategy_long, "label": "Strategy flipped long",
                       "params": {"strategy": "donchian_breakout"}},
+    "delivery_spike": {"fn": c_delivery_spike,
+                       "label": "Delivery ≥ N× average on an up day",
+                       "params": {"mult": 2.0, "window": 20, "min_pct": 0},
+                       "needs_symbol": True},
 }
 
 
 # ------------------------------------------------------------------ engine
-def evaluate(c: list[dict], conditions: list) -> dict | None:
+def evaluate(c: list[dict], conditions: list,
+             symbol: str | None = None) -> dict | None:
     """Run conditions against one symbol's candles.
 
     Conditions are ANDed: a scan for "52-week high AND volume surge" should
@@ -245,6 +278,8 @@ def evaluate(c: list[dict], conditions: list) -> dict | None:
         spec = CONDITIONS.get(key)
         if not spec:
             raise ValueError(f"unknown condition '{key}'")
+        if spec.get("needs_symbol"):
+            params["_symbol"] = symbol
         hit = spec["fn"](c, params)
         if not hit:
             return None
@@ -258,7 +293,8 @@ def _rank_value(detail: dict) -> float:
     Prefers whatever the conditions actually measured — how far above the old
     high, how many times average volume — rather than an arbitrary score.
     """
-    for key, best in (("volume_surge", "times"),
+    for key, best in (("delivery_spike", "times"),
+                      ("volume_surge", "times"),
                       ("52w_high", "above_pct"),
                       ("donchian_break", "close"),
                       ("above_sma", "above_pct"),
@@ -323,7 +359,7 @@ def scan(conditions: list, name: str = universe.DEFAULT_UNIVERSE,
             skipped.append(m["tradingsymbol"])
             continue
         try:
-            detail = evaluate(c, conditions)
+            detail = evaluate(c, conditions, symbol=m["tradingsymbol"])
         except ValueError:
             raise
         except Exception as e:
@@ -391,6 +427,8 @@ def as_text(res: dict, limit: int = 12) -> str:
         for k, d in h["detail"].items():
             if k == "volume_surge":
                 bits.append(f"{d['times']}× vol")
+            elif k == "delivery_spike":
+                bits.append(f"{d['times']}× deliv ({d['deliv_pct']:.0f}%)")
             elif k == "52w_high":
                 bits.append(f"52wH +{d['above_pct']}%")
             elif k == "52w_low":

@@ -288,6 +288,20 @@ CREATE TABLE IF NOT EXISTS saved_scans (
     last_hits  INTEGER
 );
 
+-- Delivery volume from NSE's daily bhavcopy (app/delivery.py). EQ series
+-- only: BE/BZ trade-to-trade series are 100% delivery by rule, which would
+-- make every one of them look like accumulation.
+CREATE TABLE IF NOT EXISTS delivery (
+    symbol    TEXT NOT NULL,
+    day       TEXT NOT NULL,          -- YYYY-MM-DD, the trading session
+    close     REAL,
+    volume    INTEGER,
+    deliv_qty INTEGER,
+    deliv_pct REAL,
+    PRIMARY KEY (symbol, day)
+);
+CREATE INDEX IF NOT EXISTS idx_delivery_day ON delivery (day);
+
 CREATE TABLE IF NOT EXISTS signal_state (
     symbol     TEXT NOT NULL,
     strategy   TEXT NOT NULL,

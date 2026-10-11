@@ -1407,6 +1407,10 @@ FIELDS: dict[str, tuple[int, str]] = {
     "div_yield": (0, "dividend yield %"),
     "earnings_yield": (0, "inverse of P/E, as a % — comparable to a bond"),
     "market_cap": (0, "market cap in ₹ crore"),
+    # delivery — last completed session, from NSE's bhavcopy
+    "deliv_pct": (0, "% of the last session's volume taken into delivery"),
+    "avg_deliv_pct": (0, "average delivery % over the prior 20 sessions"),
+    "deliv_ratio": (0, "last session's delivery qty ÷ its 20-session average"),
 }
 
 # Everything the candles can't tell you. Loaded in one pass per run, and only
@@ -1419,6 +1423,8 @@ SCALAR_FIELDS = {
     "pe", "pb", "book_value", "div_yield", "earnings_yield", "market_cap",
     "industry_pe", "sector_pe",
 }
+DELIVERY_FIELDS = {"deliv_pct", "avg_deliv_pct", "deliv_ratio"}
+SCALAR_FIELDS |= DELIVERY_FIELDS
 SCALAR_FIELDS |= STRING_FIELDS
 
 # The statement shorthands are fundamentals too. Membership here is what makes
@@ -2001,6 +2007,8 @@ def _group_of(name: str) -> str:
         return "Classification"
     if name in STATEMENT_ALIASES:
         return "Statement shorthands"
+    if name in DELIVERY_FIELDS:
+        return "Delivery"
     if name in SCALAR_FIELDS:
         return "Fundamentals"
     return "Price & volume"
@@ -2077,6 +2085,14 @@ EXAMPLE_GROUPS = [
         ("earnings_yield > 8 and roe > 15", "cheap on earnings, and earns well"),
         ("roe > 20 and pe < 25 and rs > 60",
          "quality, not expensive, and already working"),
+    ]),
+    ('Delivery', [
+        ("deliv_ratio > 2 and change_pct(1) > 0 and volume > 1.5 * avg_volume(20)",
+         "accumulation — up, on volume, and the volume stayed"),
+        ("deliv_pct > 60 and deliv_pct > avg_deliv_pct + 15",
+         "an unusually high share held overnight"),
+        ("deliv_ratio > 3 and change_pct(1) < 0",
+         "heavy delivery on a down day — distribution, or a strong hand"),
     ]),
     ('History', [
         ("within(5, rsi(14) crosses_above 70)",
@@ -2595,6 +2611,16 @@ def _load_scalars(symbols: list[str], days: int) -> dict[str, dict]:
             if industry:
                 d["industry"] = industry
                 d["industry_pe"] = groups["industry"].get(industry)
+    except Exception:                                # noqa: BLE001
+        pass
+
+    try:
+        from . import delivery
+        for symbol, st in delivery.many(symbols).items():
+            d = out.setdefault(symbol, {})
+            for k in DELIVERY_FIELDS:
+                if st.get(k) is not None:
+                    d[k] = st[k]
     except Exception:                                # noqa: BLE001
         pass
 

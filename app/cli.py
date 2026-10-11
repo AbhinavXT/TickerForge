@@ -15,6 +15,13 @@ import argparse
 from . import db, kite_auth, instruments, watchlist, notify, watcher
 
 
+
+def _delivery_job(client) -> str | None:
+    from . import delivery
+    return delivery.maybe_sync(client=client)
+
+
+
 def main() -> None:
     db.init()
     p = argparse.ArgumentParser(prog="tickerforge")
@@ -146,6 +153,18 @@ def main() -> None:
     wsub.add_parser("list")
     wsub.add_parser("fetch-missing",
                     help="Fetch fundamentals+results for watchlist stocks missing them")
+
+    dp = sub.add_parser("delivery", help="NSE delivery volume (bhavcopy)")
+    dsub = dp.add_subparsers(dest="dcmd", required=True)
+    ds = dsub.add_parser("sync", help="Fetch missing sessions (default 45 days)")
+    ds.add_argument("--days", type=int, default=45)
+    dw = dsub.add_parser("show", help="One symbol's delivery vs its average")
+    dw.add_argument("symbol")
+    dk = dsub.add_parser("spikes", help="Latest session's delivery spikes")
+    dk.add_argument("--ratio", type=float, default=2.0)
+    dk.add_argument("--all", action="store_true",
+                    help="include down days (default: up days only)")
+
 
     ep = sub.add_parser("events", help="Corporate events watcher (NSE)")
     esub = ep.add_subparsers(dest="ecmd", required=True)
@@ -693,6 +712,21 @@ def main() -> None:
             for r in rows:
                 print(f"{r['tradingsymbol']:<16} {r['exchange']:<4} {r['name']}")
 
+    elif args.cmd == "delivery":
+        from . import delivery
+        if args.dcmd == "sync":
+            r = delivery.sync(days=args.days)
+            print(f"fetched {r['fetched']} session(s); latest {r['last_day']}")
+            for e in r["errors"]:
+                print(f"  ! {e}")
+        elif args.dcmd == "show":
+            print(delivery.as_text(args.symbol))
+        else:
+            for r in delivery.spikes(ratio=args.ratio, up_only=not args.all, limit=50):
+                chg = "" if r["change_pct"] is None else f"{r['change_pct']:+6.2f}%"
+                print(f"{r['symbol']:<14} {r['deliv_ratio']:>5.1f}×  "
+                      f"{r['deliv_pct']:>5.1f}% deliv  {chg}")
+
     elif args.cmd == "events":
         import time as _time
         from . import events
@@ -761,6 +795,20 @@ def main() -> None:
                         print(f"[{now}] pre-market brief sent")
                 except Exception as e:
                     print(f"brief error: {e}")
+
+                # 09:08 pre-open gaps, evening delivery file, insider
+                # disclosures. Each is self-scheduling and date/time-guarded,
+                # and each failure is its own: one NSE endpoint down mustn't
+                # take the others with it.
+                for label, job in (
+                        ("delivery", _delivery_job),
+                ):
+                    try:
+                        msg = job(client)
+                        if msg:
+                            print(f"[{_time.strftime('%H:%M:%S')}] {msg}")
+                    except (Exception, SystemExit) as e:
+                        print(f"{label} error: {e}")
                 _time.sleep(20)      # wake often; should_poll() gates real work
 
     elif args.cmd == "news":

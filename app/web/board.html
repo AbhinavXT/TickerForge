@@ -282,6 +282,7 @@
 				let out = ""
 				if (r.reversal) out += ` <span class="chip violet" title="Price is back at its order block and ${r.reversal.why.map((k) => (k === "oi" ? "OI" : "a liquidity sweep")).join(" and ")} backs the side">Reversal</span>`
 				if (r.trap) out += ` <span class="chip ${r.trap.dir}" title="Swept ${r.trap.kind.toUpperCase()} ${TF.num(r.trap.price)} and closed back">${r.trap.dir === "bull" ? "▲" : "▼"} Trap ${r.trap.kind.toUpperCase()}</span>`
+				if (r.deliv && r.deliv.spike) out += ` <span class="chip warn" title="${r.deliv.day}: ${r.deliv.pct}% delivered, ${r.deliv.ratio}× its 20-session average (last completed session)">Deliv ${r.deliv.ratio}×</span>`
 				return out
 			}
 			function renderList() {
@@ -473,6 +474,7 @@
       ${row("ADX", w.adx == null ? "—" : w.adx, "adx")}
       ${row("Distance to OB", w.ob_dist_atr == null ? "—" : `${w.ob_dist_atr} ATR`, "proximity")}
     </div>
+    ${d.deliv ? `<div class="caption" style="margin-top:var(--s2)">Delivery (${esc(d.deliv.day)}, last completed session): <span class="mono">${d.deliv.pct ?? "—"}%</span> vs <span class="mono">${d.deliv.avg_pct ?? "—"}%</span> average · <span class="mono">${d.deliv.ratio ?? "—"}×</span> average quantity${d.deliv.spike ? " — a delivery spike" : ""}. Context only — not part of the score.</div>` : ""}
     <h3>Liquidity</h3>
     <div class="row" style="gap:6px">${(d.liquidity || []).map((l) => `<span class="chip mono">${l.kind.toUpperCase()} ${TF.num(l.price)}${l.touches > 1 ? ` ×${l.touches}` : ""}</span>`).join("") || '<span class="caption">none found</span>'}</div>
     <h3>Liquidity traps</h3>

@@ -107,6 +107,7 @@ HELP = (
     "/signals [SYM]  fresh flips + current long/flat stance per strategy\n"
     "\nResearch (any stock — fetched on demand, watchlist or not):\n"
     "/results [SYM|all|latest]  quarter numbers, the awaited date, or market feed\n"
+    "/deliv [SYM]     delivery % vs its average; bare = spikes on your names\n"
     "/valuation SYM   ·  /fundamentals SYM  ·  /news SYM  ·  /dividends SYM\n"
     "/candles SYM [day|5minute|minute] [count]   price history for the\n"
     "                NewsForge chart (sent as data, not a picture)\n"
@@ -611,6 +612,28 @@ def cmd_board(arg: str = ""):
             return "Board payload could not be sent."
         return None
     return board.as_text(b, n=5)
+
+
+def cmd_delivery(sym: str) -> str:
+    """/deliv SYM — last session's delivery %; bare /deliv lists the spikes
+    among the names you follow."""
+    from . import delivery
+    sym = (sym or "").strip()
+    if sym:
+        inst = instruments.lookup(sym)
+        return delivery.as_text(inst["tradingsymbol"] if inst else sym)
+    from . import portfolio
+    rows = delivery.spikes(list(portfolio.followed()), up_only=False)
+    if not rows:
+        d = delivery.last_day()
+        return ("No delivery spikes among your names" + (f" on {d}." if d else
+                " — no delivery data yet. Run `python -m app.cli delivery sync`."))
+    out = [f"Delivery spikes · {rows[0]['day']} (≥{delivery.SPIKE_RATIO:g}× avg)"]
+    for r in rows[:12]:
+        chg = "" if r["change_pct"] is None else f" {r['change_pct']:+.1f}%"
+        out.append(f"  {r['symbol']:<12} {r['deliv_ratio']:.1f}× · "
+                   f"{r['deliv_pct']:.0f}% delivered{chg}")
+    return "\n".join(out)
 
 
 def cmd_ob(sym: str) -> str:
@@ -1586,6 +1609,7 @@ HANDLERS = {
     "price": cmd_price, "quote": cmd_price,
     "levels": cmd_levels, "lvl": cmd_levels,
     "board": cmd_board, "ob": cmd_ob,
+    "deliv": cmd_delivery, "delivery": cmd_delivery,
     "chart": cmd_chart,
     "ind": cmd_indicators, "indicators": cmd_indicators, "ta": cmd_indicators,
     "conf": cmd_confluence, "confluence": cmd_confluence, "mtf": cmd_confluence,

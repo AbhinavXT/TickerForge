@@ -823,6 +823,12 @@ def api_events_poll():
         raise HTTPException(502, f"NSE poll failed: {e}")
 
 
+@app.get("/api/delivery/{symbol}")
+def api_delivery(symbol: str):
+    from . import delivery
+    return delivery.stats(symbol) or {}
+
+
 # -------------------------------------------------- market-wide calendar (all stocks)
 @app.get("/api/calendar")
 def api_calendar():
