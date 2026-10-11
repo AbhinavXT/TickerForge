@@ -646,3 +646,61 @@ def market(kite_factory) -> dict:
     with _lock:
         _market_cache["data"], _market_cache["at"] = out["nifty"], time.time()
     return out
+
+
+# ============================================================ phone text
+OI_SHORT = {"long_buildup": "LB", "short_buildup": "SB",
+            "short_covering": "SC", "long_unwinding": "LU"}
+
+
+def _pct(v) -> str:
+    return "—" if v is None else f"{'▲' if v > 0 else '▼' if v < 0 else '■'}{v:+.2f}%"
+
+
+def as_text(b: dict, n: int = 5) -> str:
+    """/board: breadth plus the top n each side, one line per stock."""
+    br = b.get("breadth") or {}
+    head = (f"Board {'(last session) ' if b.get('stale') else ''}"
+            f"{(b.get('built_at') or '')[11:16]} IST\n"
+            f"▲{br.get('bull', 0)} bull · {br.get('choppy', 0)} choppy · "
+            f"▼{br.get('bear', 0)} bear")
+    if b.get("leading"):
+        head += f"\nlead {b['leading']['sector']} {_pct(b['leading']['chg_pct'])}"
+    if b.get("lagging") and b.get("lagging") is not b.get("leading"):
+        head += f" · lag {b['lagging']['sector']} {_pct(b['lagging']['chg_pct'])}"
+    lines = [head]
+    for side, title in (("bull", "BULLISH"), ("bear", "BEARISH")):
+        rows = (b.get(side) or [])[:n]
+        lines.append(f"\n{title}")
+        if not rows:
+            lines.append("  none")
+        for r in rows:
+            ob = ("in OB" if r.get("ob_dist_pct") == 0 else
+                  f"OB {r['ob_dist_pct']:+.1f}%" if r.get("ob_dist_pct") is not None else "no OB")
+            lines.append(f"{r.get('rank', '·')}. {r['symbol']} {r['score']} "
+                         f"{_pct(r.get('chg_pct'))} {OI_SHORT.get(r.get('oi_read'), '—')} {ob}")
+    if b.get("note"):
+        lines.append("\n" + b["note"])
+    return "\n".join(lines)
+
+
+def detail_text(d: dict) -> str:
+    """/ob SYM: the zone, its levels and why it ranks."""
+    side = {"bull": "▲ bullish", "bear": "▼ bearish"}.get(d.get("side"), "choppy")
+    f = lambda v: "—" if v is None else f"{v:,.2f}"
+    lines = [f"{d['symbol']} {f(d.get('ltp'))} {_pct(d.get('chg_pct'))} · {side} · score {d.get('score', 0)}"]
+    ob = d.get("ob")
+    lines.append(f"OB {f(ob['bottom'])}–{f(ob['top'])} ({ob['dir']})" if ob else "No live order block")
+    lines.append(f"R {f(d.get('resistance'))} · S {f(d.get('support'))}")
+    liq = d.get("liquidity") or []
+    if liq:
+        lines.append("liq " + " · ".join(f"{l['kind'].upper()} {f(l['price'])}" for l in liq[:4]))
+    w = d.get("why") or {}
+    lines.append(
+        f"disp {w.get('move_atr') or '—'}×ATR · OI {_pct(w.get('oi_chg_pct'))} "
+        f"{OI_SHORT.get(w.get('oi_read'), '')} · vol {w.get('vol_ratio') or '—'}× · ADX {w.get('adx') or '—'}")
+    if d.get("choppy"):
+        lines.append("ADX < 18: choppy — not ranked.")
+    if d.get("alert_cond"):
+        lines.append(f"retest alert: /alert {d['symbol']} {d['alert_cond']}")
+    return "\n".join(lines)

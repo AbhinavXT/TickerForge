@@ -363,3 +363,51 @@ def test_board_page_is_served():
     c = TestClient(server.app, base_url="http://127.0.0.1:5000")
     r = c.get("/board")
     assert r.status_code == 200 and 'data-page="board"' in r.text
+
+
+# ---------------------------------------------------------- phone commands
+def test_board_and_ob_are_phone_commands():
+    from app import commands
+    assert commands.HANDLERS["board"] is commands.cmd_board
+    assert commands.HANDLERS["ob"] is commands.cmd_ob
+    doc = (Path(__file__).resolve().parents[1] / "COMMANDS.md").read_text()
+    assert "`/board`" in doc and "`/ob SYM`" in doc
+
+
+def test_board_text_lists_top_five_each_side(monkeypatch):
+    from app import commands
+    rows = [{"symbol": f"B{i}", "rank": i + 1, "score": 90 - i, "chg_pct": 1.0,
+             "oi_read": "long_buildup", "ob_dist_pct": -0.5} for i in range(8)]
+    b = {"built_at": "2026-10-12T11:42:00+05:30", "bull": rows, "bear": [],
+         "breadth": {"bull": 8, "choppy": 3, "bear": 0},
+         "leading": {"sector": "Metals", "chg_pct": 1.2}, "lagging": {"sector": "IT", "chg_pct": -0.4}}
+    monkeypatch.setattr(board, "get", lambda kf: b)
+    monkeypatch.setattr(commands, "_kite_or_none", lambda: object())
+    out = commands.cmd_board("")
+    assert "▲8 bull · 3 choppy · ▼0 bear" in out
+    assert "B4" in out and "B5" not in out          # five per side
+    assert "BEARISH\n  none" in out
+    assert "lead Metals ▲+1.20%" in out
+
+
+def test_ob_text_without_a_session():
+    from app import commands
+    import app.commands as c
+    orig = c._kite_or_none
+    c._kite_or_none = lambda: None
+    try:
+        assert "No Kite session" in commands.cmd_ob("RELIANCE")
+        assert commands.cmd_ob("") == "Usage: /ob SYM"
+    finally:
+        c._kite_or_none = orig
+
+
+def test_detail_text_carries_the_retest_alert():
+    d = {"symbol": "RELIANCE", "ltp": 2950.0, "chg_pct": 1.4, "side": "bull", "score": 81,
+         "ob": {"top": 2931.5, "bottom": 2922.0, "dir": "bull"}, "resistance": 2968.0,
+         "support": 2940.0, "liquidity": [{"kind": "eqh", "price": 2975.0}],
+         "why": {"move_atr": 2.4, "oi_chg_pct": 4.1, "oi_read": "long_buildup",
+                 "vol_ratio": 2.2, "adx": 29.0}, "alert_cond": "< 2931.5"}
+    t = board.detail_text(d)
+    assert "OB 2,922.00–2,931.50 (bull)" in t
+    assert "retest alert: /alert RELIANCE < 2931.5" in t

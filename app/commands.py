@@ -591,6 +591,32 @@ def cmd_levels(sym: str) -> str:
     return intraday.as_text(lv)
 
 
+# ---------------------------------------------------------------- the Board
+def cmd_board(arg: str = "") -> str:
+    """Top 5 each side of the F&O order-block board."""
+    from . import board
+    kite = _kite_or_none()
+    try:
+        b = board.get(lambda: kite or kite_auth.get_kite())
+    except SystemExit:
+        return "No Kite session — log in first."
+    return board.as_text(b, n=5)
+
+
+def cmd_ob(sym: str) -> str:
+    """One stock's order-block zone, levels and score breakdown."""
+    if not sym:
+        return "Usage: /ob SYM"
+    from . import board
+    kite = _kite_or_none()
+    if not kite:
+        return "No Kite session — log in first."
+    d = board.detail(kite, sym)
+    if d is None:
+        return f"Unknown symbol {sym}."
+    return board.detail_text(d)
+
+
 def cmd_chart(sym: str):
     if not sym:
         return "Usage: /chart SYM"
@@ -1549,6 +1575,7 @@ HANDLERS = {
     "dividends": cmd_dividends, "dividend": cmd_dividends, "div": cmd_dividends,
     "price": cmd_price, "quote": cmd_price,
     "levels": cmd_levels, "lvl": cmd_levels,
+    "board": cmd_board, "ob": cmd_ob,
     "chart": cmd_chart,
     "ind": cmd_indicators, "indicators": cmd_indicators, "ta": cmd_indicators,
     "conf": cmd_confluence, "confluence": cmd_confluence, "mtf": cmd_confluence,

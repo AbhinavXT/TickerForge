@@ -1014,6 +1014,8 @@ Sent to `NTFY_CMD_TOPIC`. The `remote` service must be running.
 |---|---|---|
 | `/price SYM` | `/quote` | Last price and day change |
 | `/levels SYM` | `/lvl` | VWAP, PDH/PDL, CPR, pivots, ORB |
+| `/board` | — | F&O Board: breadth, leading/lagging sector, top 5 bullish and bearish order-block setups |
+| `/ob SYM` | — | One stock's order block, R/S and liquidity, why it ranks, and the retest `/alert` to send |
 | `/ind SYM` | `/indicators` `/ta` | Indicator bundle |
 | `/conf SYM` | `/confluence` `/mtf` | Multi-timeframe agreement score |
 | `/signals` | `/sig` | Strategy stances |
