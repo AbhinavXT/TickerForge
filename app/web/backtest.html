@@ -4,485 +4,167 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>TickerForge · Backtest</title>
+		<meta name="theme-color" content="#0b0e13" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
 		<link rel="stylesheet" href="/app.css" />
+		<script src="/ui.js"></script>
 		<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 		<style>
-			.ctrls {
-				display: flex;
-				gap: 12px;
-				flex-wrap: wrap;
-				align-items: flex-end;
-				background: var(--panel);
-				border: 1px solid var(--border);
-				border-radius: 10px;
-				padding: 12px 14px;
-				margin: 12px 0 8px;
-			}
-			.ctrls .fld {
-				display: flex;
-				flex-direction: column;
-				gap: 3px;
-			}
-			.ctrls label {
-				color: var(--dim);
-				font-size: 11px;
-			}
-			.ctrls input,
-			.ctrls select {
-				padding: 6px 8px;
-				background: var(--bg);
-				color: var(--fg);
-				border: 1px solid var(--border);
-				border-radius: 6px;
-				outline: none;
-				font-size: 13px;
-			}
-			.ctrls input {
-				width: 84px;
-			}
-			.ctrls input.sym {
-				width: 150px;
-			}
-			#params,
-			#riskflds {
-				display: flex;
-				gap: 10px;
-				flex-wrap: wrap;
-				align-items: flex-end;
-			}
-			.riskbar {
-				display: flex;
-				gap: 12px;
-				flex-wrap: wrap;
-				align-items: flex-end;
-				background: var(--panel);
-				border: 1px solid var(--border);
-				border-radius: 10px;
-				padding: 10px 14px;
-				margin: 0 0 8px;
-			}
-			.riskbar .cap {
-				color: var(--dim);
-				font-size: 11px;
-				align-self: center;
-				max-width: 340px;
-				line-height: 1.45;
-			}
-			.riskbar input {
-				width: 74px;
-			}
+			/* layout: controls on the left (a bottom sheet on phones), results right */
+			.btlayout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: var(--s5); align-items: start; }
+			.btctl { position: sticky; top: calc(var(--top-h) + var(--s4)); max-height: calc(100vh - var(--top-h) - var(--s8)); overflow-y: auto; display: flex; flex-direction: column; gap: var(--s3); }
+			.btctl .card { display: flex; flex-direction: column; gap: var(--s3); }
+			.btctl .eyebrow { margin-bottom: -4px; }
+			.btmain { min-width: 0; display: flex; flex-direction: column; gap: var(--s3); }
+			.ctrls, #riskflds, #params { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2) var(--s3); }
+			.ctrls .fld.wide, .ctrls #params { grid-column: 1 / -1; }
+			.fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+			.fld label { color: var(--text-3); font-size: var(--fs-12); }
+			.fld input, .fld select { width: 100%; min-width: 0; }
+			.ctrls label[title], .riskbar label[title] { cursor: help; text-decoration: underline dotted var(--border-2); text-underline-offset: 3px; }
+			.btbtns { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
+			.riskbar .cap { color: var(--text-3); font-size: var(--fs-12); line-height: 1.5; }
+			#btsheetbtn, .btscrim { display: none; }
+
 			/* explainer */
-			.about {
-				background: var(--panel);
-				border: 1px solid var(--border);
-				border-radius: 10px;
-				padding: 14px 16px;
-				margin: 0 0 12px;
-				font-size: 13px;
-				line-height: 1.55;
-			}
-			.about h3 {
-				margin: 0 0 2px;
-				font-size: 14.5px;
-			}
-			.about .cat {
-				display: inline-block;
-				font-size: 10.5px;
-				letter-spacing: 0.4px;
-				text-transform: uppercase;
-				color: var(--accent, #4184e4);
-				border: 1px solid var(--border);
-				border-radius: 20px;
-				padding: 2px 9px;
-				margin-left: 8px;
-				vertical-align: 2px;
-			}
-			.about .sum {
-				color: var(--fg);
-				margin: 6px 0 10px;
-			}
-			.about .grid {
-				display: grid;
-				grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-				gap: 8px 22px;
-			}
-			.about .it b {
-				color: var(--dim);
-				font-weight: 500;
-				font-size: 11px;
-				text-transform: uppercase;
-				letter-spacing: 0.4px;
-				display: block;
-				margin-bottom: 2px;
-			}
-			.about .it.w b {
-				color: #26a69a;
-			}
-			.about .it.f b {
-				color: #ef5350;
-			}
-			.about .tip {
-				border-top: 1px dashed var(--border);
-				margin-top: 10px;
-				padding-top: 8px;
-				color: var(--dim);
-			}
-			.about .tip b {
-				color: var(--fg);
-				font-weight: 600;
-			}
-			details.eng {
-				margin: 0 0 12px;
-			}
-			details.eng summary {
-				cursor: pointer;
-				color: var(--dim);
-				font-size: 12.5px;
-				user-select: none;
-			}
-			details.eng .body {
-				background: var(--panel);
-				border: 1px solid var(--border);
-				border-radius: 10px;
-				padding: 12px 16px;
-				margin-top: 8px;
-				font-size: 12.5px;
-				line-height: 1.6;
-				color: var(--fg);
-			}
-			details.eng .body b {
-				color: var(--accent, #4184e4);
-				font-weight: 600;
-			}
-			details.eng .body p {
-				margin: 0 0 8px;
-			}
-			details.eng .body p:last-child {
-				margin: 0;
-			}
-			/* stats */
-			.statgrid {
-				display: grid;
-				grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-				gap: 10px;
-				margin: 12px 0;
-			}
-			.stat {
-				background: var(--panel);
-				border: 1px solid var(--border);
-				border-radius: 9px;
-				padding: 10px 12px;
-			}
-			.stat .k {
-				color: var(--dim);
-				font-size: 11px;
-			}
-			.stat .v {
-				font-size: 17px;
-				font-weight: 600;
-				font-variant-numeric: tabular-nums;
-				margin-top: 3px;
-			}
-			.stat .bh {
-				color: var(--dim);
-				font-size: 11px;
-				margin-top: 2px;
-			}
-			.pos {
-				color: var(--up);
-			}
-			.neg {
-				color: var(--down);
-			}
-			#price,
-			#equity,
-			#dd {
-				width: 100%;
-				border: 1px solid var(--border);
-				border-radius: 10px;
-				margin-top: 10px;
-			}
-			#price {
-				height: 280px;
-			}
-			#equity {
-				height: 190px;
-			}
-			#dd {
-				height: 120px;
-			}
-			.clabel {
-				color: var(--dim);
-				font-size: 12px;
-				margin-top: 12px;
-			}
-			table.trades {
-				width: 100%;
-				border-collapse: collapse;
-				font-size: 12.5px;
-				font-variant-numeric: tabular-nums;
-				margin-top: 8px;
-			}
-			table.trades th,
-			table.trades td {
-				padding: 6px 9px;
-				border-bottom: 1px solid var(--border);
-				text-align: right;
-			}
-			table.trades th {
-				color: var(--dim);
-				font-weight: 500;
-			}
-			table.trades td:first-child,
-			table.trades th:first-child,
-			table.trades td.rsn,
-			table.trades th.rsn {
-				text-align: left;
-			}
-			td.rsn {
-				color: var(--dim);
-			}
-			.ctrls label[title],
-			.riskbar label[title] {
-				cursor: help;
-				border-bottom: 1px dotted var(--border);
-			}
-			.sigpanel {
-				background: var(--panel);
-				border: 1px solid var(--border);
-				border-radius: 10px;
-				padding: 12px 14px;
-				margin: 0 0 12px;
-			}
-			.sigpanel .hd {
-				display: flex;
-				align-items: center;
-				gap: 10px;
-			}
-			.sigpanel .hd h3 {
-				margin: 0;
-				font-size: 14px;
-			}
-			.sigpanel .hd .sub {
-				flex: 1;
-			}
-			.sigflip {
-				margin: 8px 0 2px;
-				font-size: 13px;
-			}
-			.sigflip .up {
-				color: #26a69a;
-			}
-			.sigflip .dn {
-				color: #ef5350;
-			}
-			table.sigmat {
-				border-collapse: collapse;
-				font-size: 12px;
-				margin-top: 8px;
-				font-variant-numeric: tabular-nums;
-			}
-			table.sigmat th,
-			table.sigmat td {
-				padding: 4px 9px;
-				border-bottom: 1px solid var(--border);
-				text-align: center;
-			}
-			table.sigmat th {
-				color: var(--dim);
-				font-weight: 500;
-			}
-			table.sigmat td:first-child,
-			table.sigmat th:first-child {
-				text-align: left;
-			}
-			.dot {
-				display: inline-block;
-				width: 9px;
-				height: 9px;
-				border-radius: 50%;
-			}
-			.dot.on {
-				background: #26a69a;
-			}
-			.dot.off {
-				background: #30363d;
-			}
+			.about { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s4); font-size: var(--fs-13); line-height: 1.55; }
+			.about h3 { font-size: var(--fs-14); display: inline; }
+			.about .cat { display: inline-block; font-size: var(--fs-11); letter-spacing: 0.06em; text-transform: uppercase; color: var(--bull); background: var(--bull-bg); border-radius: var(--radius-sm); padding: 0 7px; margin-left: var(--s2); vertical-align: 1px; }
+			.about .sum { color: var(--text); margin: var(--s2) 0 var(--s3); }
+			.about .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--s2) var(--s5); }
+			.about .it { color: var(--text-2); }
+			.about .it b { color: var(--text-3); font-weight: 500; font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+			.about .it.w b { color: var(--bull); }
+			.about .it.f b { color: var(--bear); }
+			.about .tip { border-top: 1px dashed var(--border); margin-top: var(--s3); padding-top: var(--s2); color: var(--text-2); }
+			.about .tip b { color: var(--text); font-weight: 600; }
 
-			/* batch panel */
-			.bverdict {
-				border: 1px solid var(--border);
-				border-left: 3px solid var(--accent);
-				border-radius: 9px;
-				padding: 11px 14px;
-				margin: 14px 0;
-				background: var(--panel);
-			}
-			.bverdict.broad {
-				border-left-color: var(--up);
-			}
-			.bverdict.narrow {
-				border-left-color: var(--warn);
-			}
-			.bverdict.coin-flip {
-				border-left-color: var(--warn);
-			}
-			.bverdict.negative {
-				border-left-color: var(--down);
-			}
-			.bverdict .read {
-				font-weight: 600;
-				text-transform: uppercase;
-				font-size: 12px;
-				letter-spacing: 0.6px;
-			}
-			.bverdict .detail {
-				margin-top: 3px;
-			}
-			.bverdict .note {
-				color: var(--warn);
-				font-size: 12.5px;
-				margin-top: 6px;
-			}
-			.bcaveat {
-				color: var(--dim);
-				font-size: 12.5px;
-				line-height: 1.55;
-				border-left: 2px solid var(--border);
-				padding-left: 10px;
-				margin-top: 8px;
-			}
-			table.stmt tbody tr.clickable {
-				cursor: pointer;
-			}
-			.pos {
-				color: var(--up);
-			}
-			.neg {
-				color: var(--down);
-			}
+			/* collapsibles (engine notes, field guide, sweeps) */
+			details.collapsible { margin: 0; }
+			details.collapsible > .body p { color: var(--text-2); font-size: var(--fs-13); line-height: 1.6; margin-bottom: var(--s3); }
+			details.collapsible > .body p:last-child { margin-bottom: 0; }
+			details.collapsible > .body b { color: var(--text); }
+			details.sweep > :not(summary) { margin-left: var(--s4); margin-right: var(--s4); }
+			details.sweep > :last-child { margin-bottom: var(--s4); }
+			details.sweep .row { align-items: flex-end; }
 
-			details.sweep {
-				margin: 16px 0;
-				border: 1px solid var(--border);
-				border-radius: 10px;
-				padding: 10px 14px;
-				background: var(--panel);
-			}
-			details.sweep > summary {
-				cursor: pointer;
-				font-size: 14px;
-			}
-			details.sweep .row {
-				flex-wrap: wrap;
-				gap: 10px;
-				margin-top: 10px;
-			}
-			.hmwrap {
-				overflow-x: auto;
-				margin: 12px 0;
-			}
-			table.hm {
-				border-collapse: collapse;
-				font-variant-numeric: tabular-nums;
-				font-size: 12.5px;
-			}
-			table.hm caption {
-				caption-side: top;
-				text-align: left;
-				color: var(--dim);
-				padding-bottom: 6px;
-				font-size: 12.5px;
-			}
-			table.hm th {
-				color: var(--dim);
-				font-weight: 500;
-				padding: 3px 8px;
-				font-size: 12px;
-			}
-			table.hm td.hmc {
-				padding: 6px 10px;
-				text-align: right;
-				cursor: pointer;
-				border: 1px solid rgba(255, 255, 255, 0.04);
-				min-width: 52px;
-			}
-			table.hm td.hmc:hover {
-				outline: 1px solid var(--accent);
-			}
-			table.hm td.hmc.best {
-				outline: 2px solid var(--fg);
-				font-weight: 600;
-			}
-			table.hm td.hmc.thin {
-				opacity: 0.45;
-			}
-			.mcbars {
-				display: flex;
-				align-items: flex-end;
-				gap: 1px;
-				height: 110px;
-				margin: 8px 0 2px;
-				padding: 0 2px;
-				background: var(--panel);
-				border: 1px solid var(--border);
-				border-radius: 8px;
-			}
-			.mcbars i {
-				flex: 1;
-				min-height: 1px;
-				border-radius: 2px 2px 0 0;
-				opacity: 0.85;
-			}
-			.mcbars i:hover {
-				opacity: 1;
-			}
-			.mcaxis {
-				display: flex;
-				justify-content: space-between;
-				color: var(--dim);
-				font-size: 11px;
-				font-variant-numeric: tabular-nums;
-			}
-			.verdict {
-				margin: 14px 0 4px;
-				line-height: 1.6;
+			/* stats + charts */
+			.statgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s2); }
+			.stat .v.pos { color: var(--bull); }
+			.stat .v.neg { color: var(--bear); }
+			.stat .bh { color: var(--text-3); font: var(--fs-11)/1.4 var(--mono); margin-top: 2px; }
+			.panes { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+			.panes .clabel { padding: var(--s2) var(--s3) 0; margin: 0; }
+			#price, #equity, #dd { width: 100%; }
+			#price { height: 300px; }
+			#equity { height: 190px; border-top: 1px solid var(--border); }
+			#dd { height: 120px; border-top: 1px solid var(--border); }
+			.clabel { color: var(--text-3); font-size: var(--fs-12); margin-top: var(--s3); display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+			.clabel .key { display: inline-flex; align-items: center; gap: 4px; }
+			.clabel .key i { width: 12px; height: 2px; border-radius: 1px; display: inline-block; }
+			.pos { color: var(--bull); }
+			.neg { color: var(--bear); }
+			table.trades { width: 100%; border-collapse: collapse; font: var(--fs-12)/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+			table.trades th, table.trades td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+			table.trades th { color: var(--text-3); font: 500 var(--fs-12)/1.4 var(--sans); position: sticky; top: 0; background: var(--surface-2); }
+			table.trades td:first-child, table.trades th:first-child, table.trades td.rsn, table.trades th.rsn { text-align: left; }
+			table.trades td.rsn { font-family: var(--sans); color: var(--text-2); }
+
+			/* watchlist signals */
+			.sigpanel { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s3) var(--s4); }
+			.sigpanel .hd { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+			.sigpanel .hd h3 { font-size: var(--fs-14); }
+			.sigpanel .hd .sub { flex: 1 1 260px; font-size: var(--fs-12); }
+			.sigflip { margin: var(--s2) 0 2px; font-size: var(--fs-13); }
+			.sigflip .up { color: var(--bull); }
+			.sigflip .dn { color: var(--bear); }
+			table.sigmat { border-collapse: collapse; font: var(--fs-12)/1.4 var(--mono); margin-top: var(--s2); }
+			table.sigmat th, table.sigmat td { padding: 4px 10px; border-bottom: 1px solid var(--border); text-align: center; }
+			table.sigmat th { color: var(--text-3); font: 500 var(--fs-11)/1.4 var(--sans); }
+			table.sigmat td:first-child, table.sigmat th:first-child { text-align: left; }
+			.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+			.dot.on { background: var(--bull); }
+			.dot.off { background: transparent; box-shadow: inset 0 0 0 1.5px var(--border-2); }
+
+			/* batch verdict */
+			.bverdict { border: 1px solid var(--border); border-left: 3px solid var(--bull); border-radius: var(--radius-sm); padding: var(--s3) var(--s4); margin: var(--s3) 0; background: var(--surface-2); }
+			.bverdict.broad { border-left-color: var(--bull); }
+			.bverdict.narrow, .bverdict.coin-flip { border-left-color: var(--warn); }
+			.bverdict.negative { border-left-color: var(--bear); }
+			.bverdict .read { font-weight: 600; text-transform: uppercase; font-size: var(--fs-12); letter-spacing: 0.06em; }
+			.bverdict .detail { margin-top: 3px; color: var(--text-2); }
+			.bverdict .note { color: var(--warn); font-size: var(--fs-12); margin-top: 6px; }
+			.bcaveat { color: var(--text-3); font-size: var(--fs-12); line-height: 1.55; border-left: 2px solid var(--border-2); padding-left: var(--s3); margin-top: var(--s2); }
+			table.stmt tbody tr.clickable { cursor: pointer; }
+
+			/* parameter-sweep heatmap */
+			.hmwrap { overflow-x: auto; margin: var(--s3) 0; }
+			table.hm { border-collapse: separate; border-spacing: 2px; font: var(--fs-12)/1.3 var(--mono); font-variant-numeric: tabular-nums; }
+			table.hm caption { caption-side: top; text-align: left; color: var(--text-3); padding-bottom: 6px; font: var(--fs-12)/1.4 var(--sans); }
+			table.hm th { color: var(--text-3); font-weight: 400; padding: 3px 8px; }
+			table.hm td.hmc { padding: 6px 10px; text-align: right; cursor: pointer; border-radius: 3px; min-width: 52px; color: var(--text); }
+			table.hm td.hmc:hover { outline: 1px solid var(--bull); }
+			table.hm td.hmc.best { outline: 2px solid var(--text); font-weight: 600; }
+			table.hm td.hmc.thin { opacity: 0.45; }
+
+			/* monte carlo */
+			.mcbars { display: flex; align-items: flex-end; gap: 1px; height: 110px; margin: var(--s2) 0 2px; padding: 0 2px; background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+			.mcbars i { flex: 1; min-height: 1px; border-radius: 2px 2px 0 0; opacity: 0.8; }
+			.mcbars i:hover { opacity: 1; }
+			.mcaxis { display: flex; justify-content: space-between; color: var(--text-3); font: var(--fs-11)/1.4 var(--mono); }
+			.verdict { margin: var(--s3) 0 4px; line-height: 1.6; }
+
+			@media (max-width: 1099px) { .btlayout { grid-template-columns: 260px minmax(0, 1fr); } }
+			/* phones: the controls become a bottom sheet behind a sticky button */
+			@media (max-width: 759px) {
+				.btlayout { grid-template-columns: minmax(0, 1fr); }
+				#btsheetbtn { display: flex; position: sticky; top: calc(var(--top-h) + env(safe-area-inset-top) + var(--s2)); z-index: 20; width: 100%; }
+				.btctl { position: fixed; inset: auto 0 0 0; top: auto; max-height: 86vh; z-index: 46; background: var(--surface-2); border-top: 1px solid var(--border-2); border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: var(--s3) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom)); transform: translateY(105%); transition: transform 0.2s ease; }
+				.btctl.open { transform: none; }
+				.btctl .card { background: none; border: 0; padding: 0; }
+				.btscrim.open { display: block; position: fixed; inset: 0; z-index: 45; background: var(--scrim); }
+				#price { height: 240px; }
 			}
 		</style>
 	</head>
 	<body>
-		<div id="nav">
+		<div id="nav" data-page="backtest">
 			<span class="brand">TickerForge</span>
+			<a class="tab" href="/board">Board</a>
 			<a class="tab" href="/">Chart</a>
 			<a class="tab" href="/desk">Desk</a>
-			<a class="tab" href="/portfolio">Portfolio</a>
 			<a class="tab" href="/scanner">Scanner</a>
 			<a class="tab" href="/screen">Screen</a>
 			<a class="tab" href="/query">Query</a>
 			<a class="tab" href="/fundamentals">Fundamentals</a>
 			<a class="tab" href="/results">Results</a>
 			<a class="tab" href="/valuation">Valuation</a>
-			<a class="tab on" href="/backtest">Backtest</a>
-			<a class="tab" href="/journal">Journal</a>
 			<a class="tab" href="/metrics">Metrics</a>
-			<a class="tab" href="/paper">Paper</a>
 			<a class="tab" href="/news">News</a>
 			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab" href="/paper">Paper</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab on" href="/backtest">Backtest</a>
 			<a class="tab" href="/settings">Settings</a>
 			<span class="sp"></span>
 			<span class="status" id="status"></span>
 		</div>
-		<div class="wrap">
-			<div class="row">
-				<h2 class="page">Strategy backtester</h2>
-				<span class="sub"
-					>Long/flat · end-of-bar execution · no look-ahead · intrabar
-					risk exits · vs buy &amp; hold</span
-				>
+		<script>TF.shell()</script>
+		<div class="wrap wide">
+			<div class="page-head">
+				<div>
+					<h2 class="page">Strategy backtester</h2>
+					<div class="sub">Long/flat · end-of-bar execution · no look-ahead · intrabar risk exits · vs buy &amp; hold</div>
+				</div>
 			</div>
-
+			<div class="btlayout">
+			<aside class="btctl" id="btctl" aria-label="Backtest controls">
+				<div class="card"><div class="eyebrow">Strategy</div>
 			<div class="ctrls">
-				<div class="fld">
+				<div class="fld wide">
 					<label
 						title="Any NSE/BSE symbol from the instrument index. Type 2+ characters to search."
 						>Symbol</label
@@ -497,7 +179,7 @@
 						<div class="sres" id="sres"></div>
 					</div>
 				</div>
-				<div class="fld">
+				<div class="fld wide">
 					<label
 						title="The entry/exit rule under test. The panel below explains the selected one; parameters appear to the right."
 						>Strategy</label
@@ -522,17 +204,11 @@
 					><input id="cost" type="number" value="10" />
 				</div>
 				<div id="params"></div>
-				<button class="btn primary" id="run">Run backtest</button>
-				<button
-					class="btn"
-					id="runBatch"
-					title="Run this strategy across every watchlist symbol"
-				>
-					Across watchlist
-				</button>
 			</div>
 
-			<div class="riskbar">
+				<div class="btbtns"><button type="button" class="btn primary" id="run">Run backtest</button><button type="button" class="btn" id="runBatch" title="Run this strategy across every watchlist symbol">Across watchlist</button></div>
+				</div>
+			<div class="riskbar card"><div class="eyebrow">Risk exits</div>
 				<div id="riskflds">
 					<div class="fld">
 						<label
@@ -588,6 +264,10 @@
 				>
 			</div>
 
+			</aside>
+			<div class="btscrim" id="btscrim"></div>
+			<main class="btmain">
+				<button type="button" class="btn" id="btsheetbtn" aria-controls="btctl" aria-expanded="false">Strategy &amp; risk controls</button>
 			<div class="sigpanel">
 				<div class="hd">
 					<h3>Watchlist signals</h3>
@@ -605,7 +285,213 @@
 
 			<div class="about" id="about"></div>
 
-			<details class="eng">
+
+
+			<div class="sub" id="meta"></div>
+			<div
+				class="row"
+				id="btActions"
+				style="display: none; margin: 6px 0"
+			>
+				<button
+					class="btn ghost"
+					id="showOnChart"
+					title="Open the main chart with these entries and exits marked"
+				>
+					Show on chart
+				</button>
+			</div>
+			<div id="batchOut"></div>
+			<div id="out"></div>
+			<details class="collapsible sweep">
+				<summary>
+					Walk-forward — does it survive data the optimiser never saw?
+				</summary>
+				<div
+					class="row"
+					style="flex-wrap: wrap; gap: 10px; margin-top: 10px"
+				>
+					<div class="fld">
+						<label title="Bars the optimiser sees"
+							>In-sample bars</label
+						>
+						<input
+							class="search"
+							id="wfIS"
+							type="number"
+							value="250"
+							style="width: 100px"
+						/>
+					</div>
+					<div class="fld">
+						<label title="Bars it is then tested on, unchanged"
+							>Out-of-sample</label
+						>
+						<input
+							class="search"
+							id="wfOOS"
+							type="number"
+							value="60"
+							style="width: 100px"
+						/>
+					</div>
+					<div class="fld">
+						<label
+							title="rolling drops old regimes; anchored keeps all history"
+							>Mode</label
+						>
+						<select class="sel" id="wfMode">
+							<option value="rolling">rolling</option>
+							<option value="anchored">anchored</option>
+						</select>
+					</div>
+					<div class="fld">
+						<label>Metric</label>
+						<select class="sel" id="wfM">
+							<option value="sharpe">Sharpe</option>
+							<option value="profit_factor">Profit factor</option>
+							<option value="expectancy_pct">Expectancy</option>
+							<option value="total_return_pct">
+								Total return
+							</option>
+						</select>
+					</div>
+					<div class="fld">
+						<label>History (days)</label>
+						<input
+							class="search"
+							id="wfDays"
+							type="number"
+							value="1460"
+							style="width: 110px"
+						/>
+					</div>
+					<button class="btn" id="wfRun">Walk forward</button>
+				</div>
+				<div
+					class="row"
+					style="flex-wrap: wrap; gap: 10px"
+					id="wfGrid"
+				></div>
+				<div id="wfOut"></div>
+			</details>
+
+			<details class="collapsible sweep">
+				<summary>
+					Parameter sweep — is the good result a plateau or a spike?
+				</summary>
+				<div class="row" id="hmCtl"></div>
+				<div id="hmOut"></div>
+			</details>
+			<details class="collapsible sweep" id="enginePanel">
+				<summary>
+					Engine — size positions, gate by regime, export the trades
+				</summary>
+				<div
+					class="row"
+					style="flex-wrap: wrap; gap: 10px; margin-top: 10px"
+				>
+					<div class="fld">
+						<label
+							title="Off = every trade is the whole account, which is what a plain backtest assumes"
+							>Position sizing</label
+						>
+						<select class="sel" id="szMode">
+							<option value="">off — all-in each trade</option>
+							<option value="fixed_fractional">
+								fixed fractional (needs a stop)
+							</option>
+							<option value="atr_risk">
+								ATR risk (derives its own stop)
+							</option>
+						</select>
+					</div>
+					<div class="fld">
+						<label>Risk per trade %</label>
+						<input
+							class="search"
+							id="szRisk"
+							type="number"
+							value="1"
+							min="0.05"
+							max="10"
+							step="0.05"
+							style="width: 100px"
+						/>
+					</div>
+					<div class="fld">
+						<label>Max position %</label>
+						<input
+							class="search"
+							id="szCap"
+							type="number"
+							value="100"
+							min="10"
+							max="500"
+							step="10"
+							style="width: 100px"
+						/>
+					</div>
+					<div class="fld">
+						<label
+							title="Only hold while Nifty is above its own 200-DMA"
+							>Regime filter</label
+						>
+						<select class="sel" id="szRegime">
+							<option value="">off</option>
+							<option value="1">Nifty &gt; 200-DMA only</option>
+						</select>
+					</div>
+					<button
+						class="btn ghost"
+						id="dlCsv"
+						title="Trade list in the journal's columns, for a like-for-like comparison"
+					>
+						Export CSV
+					</button>
+				</div>
+				<div class="sub" id="engineNote" style="margin-top: 10px"></div>
+			</details>
+			<details class="collapsible sweep" id="mcPanel">
+				<summary>
+					Monte Carlo — how bad could that drawdown have been?
+				</summary>
+				<div
+					class="row"
+					style="flex-wrap: wrap; gap: 10px; margin-top: 10px"
+				>
+					<div class="fld">
+						<label
+							title="shuffle reorders your trades; bootstrap resamples them with replacement"
+							>Mode</label
+						>
+						<select class="sel" id="mcMode">
+							<option value="shuffle">
+								shuffle — same trades, new order
+							</option>
+							<option value="bootstrap">
+								bootstrap — resample with replacement
+							</option>
+						</select>
+					</div>
+					<div class="fld">
+						<label>Simulations</label>
+						<input
+							class="search"
+							id="mcSims"
+							type="number"
+							value="1000"
+							min="100"
+							max="20000"
+							step="100"
+							style="width: 110px"
+						/>
+					</div>
+					<button class="btn" id="mcRun">Simulate</button>
+				</div>
+				<div id="mcOut"></div>
+			</details>
+			<details class="collapsible eng">
 				<summary>
 					How the engine works — execution model, costs &amp; metric
 					definitions
@@ -680,8 +566,7 @@
 					</p>
 				</div>
 			</details>
-
-			<details class="eng">
+			<details class="collapsible eng">
 				<summary>
 					Field guide — every control explained thoroughly
 				</summary>
@@ -842,211 +727,8 @@
 					</p>
 				</div>
 			</details>
-
-			<div class="sub" id="meta"></div>
-			<div
-				class="row"
-				id="btActions"
-				style="display: none; margin: 6px 0"
-			>
-				<button
-					class="btn ghost"
-					id="showOnChart"
-					title="Open the main chart with these entries and exits marked"
-				>
-					Show on chart
-				</button>
+			</main>
 			</div>
-			<details class="sweep">
-				<summary>
-					Walk-forward — does it survive data the optimiser never saw?
-				</summary>
-				<div
-					class="row"
-					style="flex-wrap: wrap; gap: 10px; margin-top: 10px"
-				>
-					<div class="fld">
-						<label title="Bars the optimiser sees"
-							>In-sample bars</label
-						>
-						<input
-							class="search"
-							id="wfIS"
-							type="number"
-							value="250"
-							style="width: 100px"
-						/>
-					</div>
-					<div class="fld">
-						<label title="Bars it is then tested on, unchanged"
-							>Out-of-sample</label
-						>
-						<input
-							class="search"
-							id="wfOOS"
-							type="number"
-							value="60"
-							style="width: 100px"
-						/>
-					</div>
-					<div class="fld">
-						<label
-							title="rolling drops old regimes; anchored keeps all history"
-							>Mode</label
-						>
-						<select class="sel" id="wfMode">
-							<option value="rolling">rolling</option>
-							<option value="anchored">anchored</option>
-						</select>
-					</div>
-					<div class="fld">
-						<label>Metric</label>
-						<select class="sel" id="wfM">
-							<option value="sharpe">Sharpe</option>
-							<option value="profit_factor">Profit factor</option>
-							<option value="expectancy_pct">Expectancy</option>
-							<option value="total_return_pct">
-								Total return
-							</option>
-						</select>
-					</div>
-					<div class="fld">
-						<label>History (days)</label>
-						<input
-							class="search"
-							id="wfDays"
-							type="number"
-							value="1460"
-							style="width: 110px"
-						/>
-					</div>
-					<button class="btn" id="wfRun">Walk forward</button>
-				</div>
-				<div
-					class="row"
-					style="flex-wrap: wrap; gap: 10px"
-					id="wfGrid"
-				></div>
-				<div id="wfOut"></div>
-			</details>
-
-			<details class="sweep">
-				<summary>
-					Parameter sweep — is the good result a plateau or a spike?
-				</summary>
-				<div class="row" id="hmCtl"></div>
-				<div id="hmOut"></div>
-			</details>
-			<details class="sweep" id="enginePanel">
-				<summary>
-					Engine — size positions, gate by regime, export the trades
-				</summary>
-				<div
-					class="row"
-					style="flex-wrap: wrap; gap: 10px; margin-top: 10px"
-				>
-					<div class="fld">
-						<label
-							title="Off = every trade is the whole account, which is what a plain backtest assumes"
-							>Position sizing</label
-						>
-						<select class="sel" id="szMode">
-							<option value="">off — all-in each trade</option>
-							<option value="fixed_fractional">
-								fixed fractional (needs a stop)
-							</option>
-							<option value="atr_risk">
-								ATR risk (derives its own stop)
-							</option>
-						</select>
-					</div>
-					<div class="fld">
-						<label>Risk per trade %</label>
-						<input
-							class="search"
-							id="szRisk"
-							type="number"
-							value="1"
-							min="0.05"
-							max="10"
-							step="0.05"
-							style="width: 100px"
-						/>
-					</div>
-					<div class="fld">
-						<label>Max position %</label>
-						<input
-							class="search"
-							id="szCap"
-							type="number"
-							value="100"
-							min="10"
-							max="500"
-							step="10"
-							style="width: 100px"
-						/>
-					</div>
-					<div class="fld">
-						<label
-							title="Only hold while Nifty is above its own 200-DMA"
-							>Regime filter</label
-						>
-						<select class="sel" id="szRegime">
-							<option value="">off</option>
-							<option value="1">Nifty &gt; 200-DMA only</option>
-						</select>
-					</div>
-					<button
-						class="btn ghost"
-						id="dlCsv"
-						title="Trade list in the journal's columns, for a like-for-like comparison"
-					>
-						Export CSV
-					</button>
-				</div>
-				<div class="sub" id="engineNote" style="margin-top: 10px"></div>
-			</details>
-			<details class="sweep" id="mcPanel">
-				<summary>
-					Monte Carlo — how bad could that drawdown have been?
-				</summary>
-				<div
-					class="row"
-					style="flex-wrap: wrap; gap: 10px; margin-top: 10px"
-				>
-					<div class="fld">
-						<label
-							title="shuffle reorders your trades; bootstrap resamples them with replacement"
-							>Mode</label
-						>
-						<select class="sel" id="mcMode">
-							<option value="shuffle">
-								shuffle — same trades, new order
-							</option>
-							<option value="bootstrap">
-								bootstrap — resample with replacement
-							</option>
-						</select>
-					</div>
-					<div class="fld">
-						<label>Simulations</label>
-						<input
-							class="search"
-							id="mcSims"
-							type="number"
-							value="1000"
-							min="100"
-							max="20000"
-							step="100"
-							style="width: 110px"
-						/>
-					</div>
-					<button class="btn" id="mcRun">Simulate</button>
-				</div>
-				<div id="mcOut"></div>
-			</details>
-			<div id="batchOut"></div>
-			<div id="out"></div>
 		</div>
 
 		<script>
@@ -1486,12 +1168,11 @@
 					if (diverging) {
 						const m = Math.max(Math.abs(lo), Math.abs(hi)) || 1
 						const t = Math.min(1, Math.abs(x) / m)
-						return x >= 0
-							? `rgba(38,166,154,${0.1 + t * 0.75})`
-							: `rgba(239,83,80,${0.1 + t * 0.75})`
+						const pc = Math.round(10 + t * 60)
+						return `color-mix(in srgb, var(${x >= 0 ? "--bull" : "--bear"}) ${pc}%, transparent)`
 					}
 					const t = (x - lo) / span
-					return `rgba(65,132,228,${0.08 + t * 0.8})`
+					return `color-mix(in srgb, var(--bull) ${Math.round(6 + t * 62)}%, transparent)`
 				}
 
 				const best = a.best_at || {}
@@ -1748,18 +1429,13 @@
 				}
 			}
 
+			// Colour + ▲/▼ only for signed figures (returns, deltas). Plain
+			// percentages like win rate or exposure aren't a direction.
 			function statCard(k, v, bh) {
-				const cls =
-					typeof v === "string" &&
-					v.includes("%") &&
-					parseFloat(v) < 0
-						? "neg"
-						: typeof v === "string" &&
-							  v.includes("%") &&
-							  parseFloat(v) > 0
-							? "pos"
-							: ""
-				return `<div class="stat"><div class="k">${k}</div><div class="v ${cls}">${v}</div>${bh != null ? `<div class="bh">B&H ${bh}</div>` : ""}</div>`
+				const sv = typeof v === "string" ? v.trim() : ""
+				const cls = /^\+/.test(sv) && sv.includes("%") ? "pos" : /^[-−]/.test(sv) && sv.includes("%") ? "neg" : ""
+				const arrow = cls === "pos" ? "▲ " : cls === "neg" ? "▼ " : ""
+				return `<div class="stat"><div class="k">${k}</div><div class="v ${cls}">${arrow}${v}</div>${bh != null ? `<div class="bh">B&amp;H ${bh}</div>` : ""}</div>`
 			}
 
 			let LAST = null
@@ -1821,9 +1497,11 @@
     ${statCard("Avg loss", pct(s.avg_loss_pct))}
     ${statCard("Avg bars held", f(s.avg_bars_held, 1))}
   </div>
+  <div class="panes">
   <div class="clabel">Price with entries ▲ / exits ▼</div><div id="price"></div>
-  <div class="clabel">Equity curve — <span style="color:#4184e4">strategy</span> vs <span style="color:#8b949e">buy &amp; hold</span> (₹${f(d.capital, 0)} start)</div><div id="equity"></div>
-  <div class="clabel">Drawdown — % below the equity peak</div><div id="dd"></div>`
+  <div class="clabel">Equity curve <span class="key"><i style="background:var(--bull)"></i>strategy</span> <span class="key"><i style="background:var(--text-3)"></i>buy &amp; hold</span> <span class="mono">₹${f(d.capital, 0)}</span> start</div><div id="equity"></div>
+  <div class="clabel">Drawdown — % below the equity peak</div><div id="dd"></div>
+  </div>`
 
 				if (d.trades.length) {
 					html += `<div class="clabel">Trades (${d.trades.length})</div>
@@ -1838,8 +1516,8 @@
         <td>${new Date(t.exit_time * 1000).toLocaleDateString("en-IN")}</td><td>${f(t.exit)}</td>
         <td class="rsn">${t.open ? "open" : t.reason || "signal"}</td>
         <td>${t.bars}</td>
-        <td class="${t.return_pct >= 0 ? "pos" : "neg"}">${(t.return_pct > 0 ? "+" : "") + f(t.return_pct, 2)}%</td>
-        <td class="${t.net_pct >= 0 ? "pos" : "neg"}">${(t.net_pct > 0 ? "+" : "") + f(t.net_pct, 2)}%</td>
+        <td>${TF.delta(t.return_pct, 2)}</td>
+        <td>${TF.delta(t.net_pct, 2)}</td>
       </tr>`,
 			)
 			.join("")}</tbody></table></div>`
@@ -1848,23 +1526,31 @@
 				drawCharts(d)
 			}
 
+			// Three synced panes (price, equity, drawdown), themed from the CSS
+			// tokens and re-themed live when the theme toggles.
+			let PANES = null
+			function paneColors() {
+				const c = TF.colors()
+				return {
+					price: { color: c.text2 },
+					strat: { color: c.bull },
+					hold: { color: c.text3 },
+					dd: { lineColor: c.bear, topColor: TF.alpha(c.bear, 0.05), bottomColor: TF.alpha(c.bear, 0.3) },
+					buy: c.bull,
+					sell: c.bear,
+				}
+			}
 			function drawCharts(d) {
+				if (PANES) PANES.charts.forEach((ch) => { try { ch.remove() } catch (e) {} })
+				const col = paneColors()
 				const base = {
-					layout: {
-						background: { color: "#0e1116" },
-						textColor: "#8b949e",
-					},
-					grid: {
-						vertLines: { color: "#161b22" },
-						horzLines: { color: "#161b22" },
-					},
-					timeScale: { timeVisible: false, borderColor: "#2d333b" },
-					rightPriceScale: { borderColor: "#2d333b" },
+					...TF.chartTheme(),
 					autoSize: true,
 				}
+				base.timeScale = { ...base.timeScale, timeVisible: false }
 				const pc = LightweightCharts.createChart($("#price"), base)
 				const line = pc.addLineSeries({
-					color: "#c9d4e0",
+					...col.price,
 					lineWidth: 1,
 					priceLineVisible: false,
 					lastValueVisible: false,
@@ -1874,24 +1560,27 @@
 					},
 				})
 				line.setData(d.price)
-				const mk = d.markers.map((m) => ({
-					time: m.time,
-					position: m.type === "buy" ? "belowBar" : "aboveBar",
-					color: m.type === "buy" ? "#26a69a" : "#ef5350",
-					shape: m.type === "buy" ? "arrowUp" : "arrowDown",
-					text: m.type === "buy" ? "B" : "S",
-				}))
-				line.setMarkers(mk.sort((a, b) => a.time - b.time))
+				const markers = () =>
+					d.markers
+						.map((m) => ({
+							time: m.time,
+							position: m.type === "buy" ? "belowBar" : "aboveBar",
+							color: m.type === "buy" ? paneColors().buy : paneColors().sell,
+							shape: m.type === "buy" ? "arrowUp" : "arrowDown",
+							text: m.type === "buy" ? "B" : "S",
+						}))
+						.sort((a, b) => a.time - b.time)
+				line.setMarkers(markers())
 
 				const ec = LightweightCharts.createChart($("#equity"), base)
 				const strat = ec.addLineSeries({
-					color: "#4184e4",
+					...col.strat,
 					lineWidth: 2,
 					priceLineVisible: false,
 					lastValueVisible: false,
 				})
 				const hold = ec.addLineSeries({
-					color: "#8b949e",
+					...col.hold,
 					lineWidth: 1,
 					priceLineVisible: false,
 					lastValueVisible: false,
@@ -1901,9 +1590,7 @@
 
 				const dc = LightweightCharts.createChart($("#dd"), base)
 				const dd = dc.addAreaSeries({
-					lineColor: "#ef5350",
-					topColor: "rgba(239,83,80,0.05)",
-					bottomColor: "rgba(239,83,80,0.30)",
+					...col.dd,
 					lineWidth: 1,
 					priceLineVisible: false,
 					lastValueVisible: false,
@@ -1928,7 +1615,30 @@
 					}),
 				)
 				charts.forEach((ch) => ch.timeScale().fitContent())
+				PANES = { charts, line, strat, hold, dd, markers }
 			}
+			window.addEventListener("tf:theme", () => {
+				if (!PANES) return
+				const col = paneColors()
+				const th = TF.chartTheme()
+				PANES.charts.forEach((ch) => ch.applyOptions(th))
+				PANES.line.applyOptions(col.price)
+				PANES.strat.applyOptions(col.strat)
+				PANES.hold.applyOptions(col.hold)
+				PANES.dd.applyOptions(col.dd)
+				PANES.line.setMarkers(PANES.markers())
+			})
+
+			// phones: controls live in a bottom sheet
+			function setSheet(open) {
+				$("#btctl").classList.toggle("open", open)
+				$("#btscrim").classList.toggle("open", open)
+				$("#btsheetbtn").setAttribute("aria-expanded", open ? "true" : "false")
+			}
+			$("#btsheetbtn").onclick = () => setSheet(true)
+			$("#btscrim").onclick = () => setSheet(false)
+			$("#btctl").addEventListener("keydown", (e) => e.key === "Escape" && setSheet(false))
+			for (const id of ["#run", "#runBatch"]) $(id).addEventListener("click", () => setSheet(false))
 
 			// ---- boot ----
 			// ---------------------------------------------------------------- Monte Carlo
@@ -2008,7 +1718,7 @@
 				const ret = d.final_pct
 					? `
     <div class="sub" style="margin-top:14px">Final return across ${d.sims.toLocaleString()} resampled runs</div>
-    ${mcBars(d.final_histogram, "var(--up)")}
+    ${mcBars(d.final_histogram, "var(--bull)")}
     <div class="sub">p5 ${d.final_pct.p5.toFixed(1)}% · p50 ${d.final_pct.p50.toFixed(1)}%
       · p95 ${d.final_pct.p95.toFixed(1)}% · <b>${d.loss_probability_pct.toFixed(0)}%
       of runs finished at a loss</b></div>`
@@ -2018,7 +1728,7 @@
 				$("#mcOut").innerHTML = `
     <div class="stats" style="margin-top:12px">${cards}</div>
     <div class="sub" style="margin-top:14px">Max drawdown across ${d.sims.toLocaleString()} orderings of ${d.trades} trades</div>
-    ${mcBars(d.dd_histogram, "var(--down)")}
+    ${mcBars(d.dd_histogram, "var(--bear)")}
     ${ret}
     <div class="verdict">${d.verdict}</div>
     <div class="caveat">Both modes assume the order of trades carries no
