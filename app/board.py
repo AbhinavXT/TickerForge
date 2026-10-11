@@ -50,6 +50,9 @@ WEIGHTS = {              # relative weights of the score components
 TOP_N = 20               # rows per side on the board
 CACHE_SECS = 60          # rebuild at most this often during market hours
 BARS_DAYS = 5            # 5m history used for detection (≈ 5 sessions)
+TRAP_RECENT = 12         # a sweep this many bars old (1h of 5m) still counts
+REVERSAL_NEAR_ATR = 0.5  # "at the zone": within this many ATRs of the OB
+REVERSAL_OI_MIN = 0.6    # OI_SUPPORT at or above this backs a reversal
 
 # How each OI read supports a bullish / bearish thesis (0..1).
 OI_SUPPORT = {
@@ -171,26 +174,99 @@ def cluster(values: list[float], tol: float) -> list[list[float]]:
     return groups
 
 
+def _session_start(candles: list[dict]) -> int:
+    """Index of the first bar of the last session in `candles`. Bar times are
+    IST-shifted epochs, so whole days divide cleanly."""
+    if not candles:
+        return 0
+    day = candles[-1]["time"] // 86400
+    i = len(candles) - 1
+    while i > 0 and candles[i - 1]["time"] // 86400 == day:
+        i -= 1
+    return i
+
+
 def liquidity_levels(candles: list[dict], atr_now: float | None,
                      pdh: float | None = None, pdl: float | None = None,
                      tol_atr: float = EQ_TOL_ATR) -> list[dict]:
     """Resting liquidity: equal highs / equal lows (two or more swing points
-    within tol_atr × ATR) plus the previous day's high and low."""
+    within tol_atr × ATR) plus the previous day's high and low.
+
+    `formed` is the first bar at which the level was known — the bar that
+    confirmed the last swing of the cluster, or today's open for PDH/PDL —
+    so a sweep is only looked for after it."""
     out: list[dict] = []
     if atr_now:
         highs, lows = ind.swing_points(candles, SWING_LEFT, SWING_RIGHT)
         tol = tol_atr * atr_now
-        for g in cluster([candles[i]["high"] for i in highs], tol):
-            if len(g) >= 2:
-                out.append({"price": max(g), "kind": "eqh", "touches": len(g)})
-        for g in cluster([candles[i]["low"] for i in lows], tol):
-            if len(g) >= 2:
-                out.append({"price": min(g), "kind": "eql", "touches": len(g)})
+        for idx, kind, pick in ((highs, "eqh", max), (lows, "eql", min)):
+            key = "high" if kind == "eqh" else "low"
+            for g in _cluster_idx([(candles[i][key], i) for i in idx], tol):
+                if len(g) >= 2:
+                    out.append({"price": pick(v for v, _ in g), "kind": kind,
+                                "touches": len(g),
+                                "formed": max(i for _, i in g) + SWING_RIGHT})
+    start = _session_start(candles)
     if pdh is not None:
-        out.append({"price": pdh, "kind": "pdh", "touches": 1})
+        out.append({"price": pdh, "kind": "pdh", "touches": 1, "formed": start})
     if pdl is not None:
-        out.append({"price": pdl, "kind": "pdl", "touches": 1})
+        out.append({"price": pdl, "kind": "pdl", "touches": 1, "formed": start})
     return sorted(out, key=lambda x: x["price"])
+
+
+def _cluster_idx(pairs: list[tuple], tol: float) -> list[list[tuple]]:
+    """cluster() for (value, index) pairs."""
+    groups: list[list[tuple]] = []
+    for p in sorted(pairs):
+        if groups and p[0] - groups[-1][-1][0] <= tol:
+            groups[-1].append(p)
+        else:
+            groups.append([p])
+    return groups
+
+
+def liquidity_traps(candles: list[dict], levels: list[dict]) -> list[dict]:
+    """Liquidity sweeps: a bar that runs a level and closes back inside it.
+
+    Above a high (EQH/PDH) that traps breakout buyers and points down; below a
+    low (EQL/PDL) it traps breakdown sellers and points up. Only the first
+    interaction after the level formed counts: once a bar has *closed* beyond
+    it the level was broken, not swept, and its liquidity is spent either way.
+    Newest first.
+    """
+    out: list[dict] = []
+    for lv in levels:
+        above = lv["kind"] in ("eqh", "pdh")
+        p = lv["price"]
+        for i in range(max(lv.get("formed", 0), 0), len(candles)):
+            c = candles[i]
+            ran = c["high"] > p if above else c["low"] < p
+            if not ran:
+                continue
+            back = c["close"] < p if above else c["close"] > p
+            if back:
+                out.append({"i": i, "time": c["time"], "price": p,
+                            "kind": lv["kind"], "dir": "bear" if above else "bull",
+                            "extreme": c["high"] if above else c["low"]})
+            break
+    return sorted(out, key=lambda t: -t["i"])
+
+
+def reversal_setup(side: str, ob: dict | None, d_atr: float | None,
+                   oi: str | None, traps: list[dict], n_bars: int,
+                   recent: int = TRAP_RECENT) -> dict | None:
+    """Reversal build-up: price is back at its live order block and something
+    says the side is defending it — OI on that side, or a fresh sweep of the
+    opposite liquidity pointing the same way. None when it isn't."""
+    if side not in ("bull", "bear") or not ob or d_atr is None \
+            or d_atr > REVERSAL_NEAR_ATR:
+        return None
+    why = []
+    if oi and OI_SUPPORT[side].get(oi, 0) >= REVERSAL_OI_MIN:
+        why.append("oi")
+    if any(t["dir"] == side and t["i"] >= n_bars - recent for t in traps):
+        why.append("trap")
+    return {"at_zone": True, "why": why} if why else None
 
 
 def oi_read(price_chg_pct: float | None, oi_chg_pct: float | None) -> str | None:
@@ -294,13 +370,19 @@ def analyze(candles: list[dict], *, ltp: float | None = None,
         best = {**best, "side": "choppy", "score": 0}
     lv = nearest_levels(candles, ltp)
     liq = liquidity_levels(candles, atr_now, pdh, pdl)
+    traps = liquidity_traps(candles, liq)
+    recent = [t for t in traps if t["i"] >= len(candles) - TRAP_RECENT]
+    setup = None if best["choppy"] else reversal_setup(
+        best["side"], best.get("ob"), best.get("ob_dist_atr"), oi, traps,
+        len(candles))
     return {
         **best, "ltp": ltp, "chg_pct": chg_pct, "atr": atr_now,
         "adx": None if adx_now is None else round(adx_now, 1),
         "vol_ratio": None if vr is None else round(vr, 2),
         "oi_read": oi, "oi_chg_pct": oi_chg_pct,
         "move_atr": None if not best.get("disp") else round(best["disp"]["atr_mult"], 2),
-        **lv, "liquidity": liq,
+        **lv, "liquidity": liq, "traps": traps, "trap": recent[0] if recent else None,
+        "reversal": setup,
     }
 
 
@@ -493,7 +575,12 @@ def _row(u: dict, bars: list[dict], q: dict, fq: dict, prev_oi: float | None,
         "ob_dist_pct": a.get("ob_dist_pct"), "ob_dist_atr": a.get("ob_dist_atr"),
         "move_atr": a.get("move_atr"), "vol_ratio": a.get("vol_ratio"),
         "adx": a.get("adx"), "parts": a.get("parts", {}),
+        "trap": _trap_brief(a.get("trap")), "reversal": a.get("reversal"),
     }
+
+
+def _trap_brief(t: dict | None) -> dict | None:
+    return None if not t else {k: t[k] for k in ("time", "price", "kind", "dir")}
 
 
 def build(kite) -> dict:
@@ -615,6 +702,9 @@ def detail(kite, symbol: str) -> dict | None:
                                    "time": ob["time"], "dir": ob["dir"]},
         "resistance": a.get("resistance"), "support": a.get("support"),
         "liquidity": a.get("liquidity", []), "pdh": pdh, "pdl": pdl,
+        "traps": [_trap_brief(t) for t in a.get("traps", [])
+                  if t["time"] >= bars[-150:][0]["time"]] if bars else [],
+        "trap": _trap_brief(a.get("trap")), "reversal": a.get("reversal"),
         "why": {"move_atr": a.get("move_atr"),
                 "oi_chg_pct": None if oi_chg is None else round(oi_chg, 2),
                 "oi_read": a.get("oi_read"), "vol_ratio": a.get("vol_ratio"),
@@ -657,6 +747,17 @@ def _pct(v) -> str:
     return "—" if v is None else f"{'▲' if v > 0 else '▼' if v < 0 else '■'}{v:+.2f}%"
 
 
+def _flags(r: dict) -> str:
+    """Short suffix for the reversal and trap badges."""
+    out = ""
+    if r.get("reversal"):
+        out += " · REV"
+    t = r.get("trap")
+    if t:
+        out += f" · trap {'▲' if t['dir'] == 'bull' else '▼'}{t['kind'].upper()}"
+    return out
+
+
 def as_text(b: dict, n: int = 5) -> str:
     """/board: breadth plus the top n each side, one line per stock."""
     br = b.get("breadth") or {}
@@ -678,7 +779,8 @@ def as_text(b: dict, n: int = 5) -> str:
             ob = ("in OB" if r.get("ob_dist_pct") == 0 else
                   f"OB {r['ob_dist_pct']:+.1f}%" if r.get("ob_dist_pct") is not None else "no OB")
             lines.append(f"{r.get('rank', '·')}. {r['symbol']} {r['score']} "
-                         f"{_pct(r.get('chg_pct'))} {OI_SHORT.get(r.get('oi_read'), '—')} {ob}")
+                         f"{_pct(r.get('chg_pct'))} {OI_SHORT.get(r.get('oi_read'), '—')} {ob}"
+                         f"{_flags(r)}")
     if b.get("note"):
         lines.append("\n" + b["note"])
     return "\n".join(lines)
@@ -695,6 +797,15 @@ def detail_text(d: dict) -> str:
     liq = d.get("liquidity") or []
     if liq:
         lines.append("liq " + " · ".join(f"{l['kind'].upper()} {f(l['price'])}" for l in liq[:4]))
+    t = d.get("trap")
+    if t:
+        swept = "highs" if t["dir"] == "bear" else "lows"
+        lines.append(f"liquidity trap: swept {t['kind'].upper()} {f(t['price'])} "
+                     f"({swept}) → {'▲' if t['dir'] == 'bull' else '▼'}")
+    rv = d.get("reversal")
+    if rv:
+        lines.append("reversal build-up at the OB (" + " + ".join(
+            {"oi": "OI", "trap": "sweep"}[k] for k in rv["why"]) + ")")
     w = d.get("why") or {}
     lines.append(
         f"disp {w.get('move_atr') or '—'}×ATR · OI {_pct(w.get('oi_chg_pct'))} "

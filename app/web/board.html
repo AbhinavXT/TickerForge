@@ -33,7 +33,7 @@
 			.brow:last-child { border-bottom: 0; }
 			.brow .rk { font: var(--fs-12)/1 var(--mono); color: var(--text-3); }
 			.brow .sym { font: 500 var(--fs-14)/1.2 var(--mono); }
-			.brow .oi { margin-top: 3px; }
+			.brow .oi { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px; }
 			.brow .dist { font: var(--fs-12)/1.3 var(--mono); color: var(--text-2); }
 			.brow .dist small { display: block; color: var(--text-3); font-size: var(--fs-11); }
 			.brow .score .n { font-size: var(--fs-13); }
@@ -275,6 +275,15 @@
 				} catch (e) {}
 			}
 
+			// Reversal build-up (price back at its OB with OI or a sweep behind
+			// it) and the latest liquidity trap. Arrows carry the direction so
+			// the colour is never the only cue.
+			function flagChips(r) {
+				let out = ""
+				if (r.reversal) out += ` <span class="chip violet" title="Price is back at its order block and ${r.reversal.why.map((k) => (k === "oi" ? "OI" : "a liquidity sweep")).join(" and ")} backs the side">Reversal</span>`
+				if (r.trap) out += ` <span class="chip ${r.trap.dir}" title="Swept ${r.trap.kind.toUpperCase()} ${TF.num(r.trap.price)} and closed back">${r.trap.dir === "bull" ? "▲" : "▼"} Trap ${r.trap.kind.toUpperCase()}</span>`
+				return out
+			}
 			function renderList() {
 				const rows = (BOARD && BOARD[SIDE]) || []
 				if (!rows.length) {
@@ -289,7 +298,7 @@
 					.map(
 						(r) => `<button type="button" class="brow" data-sym="${esc(r.symbol)}" aria-label="${esc(r.symbol)}, rank ${r.rank}, score ${r.score}">
       <span class="rk">${r.rank}</span>
-      <span><div class="sym">${esc(r.symbol)}</div><div class="oi">${oiChip(r.oi_read)}</div></span>
+      <span><div class="sym">${esc(r.symbol)}</div><div class="oi">${oiChip(r.oi_read)}${flagChips(r)}</div></span>
       <span class="dist r">${r.ob_dist_pct == null ? "no live OB" : r.ob_dist_pct === 0 ? "in zone" : TF.signed(r.ob_dist_pct, 2, "%")}<small>${r.ob_dist_atr == null ? "" : r.ob_dist_atr + " ATR"}</small></span>
       <span class="r">${TF.delta(r.chg_pct)}</span>
       ${scoreCell(r.score, SIDE)}
@@ -454,6 +463,7 @@
       ${level("sup", "Support", TF.num(d.support), dist(d.support))}
       ${level(ob ? (ob.dir === "bull" ? "sup" : "bear") : "", "Order block", ob ? `${TF.num(ob.bottom)}–${TF.num(ob.top)}` : "none live", ob ? (ob.dir === "bull" ? "bullish zone" : "bearish zone") : "")}
     </div>
+    ${d.reversal ? `<div class="notice" style="margin-top:var(--s3)"><b>Reversal build-up.</b> Price is back at its ${d.side === "bull" ? "bullish" : "bearish"} order block, and ${d.reversal.why.map((k) => (k === "oi" ? `the OI read (${OI_LABEL[w.oi_read] || "—"})` : "a fresh liquidity sweep")).join(" and ")} backs the ${d.side === "bull" ? "buyers" : "sellers"}.</div>` : ""}
     <h3>Why it ranks</h3>
     ${d.choppy ? '<div class="notice">ADX is under 18 — choppy. Order blocks in a range get run through both ways, so this stock scores 0.</div>' : ""}
     <div class="why">
@@ -465,6 +475,8 @@
     </div>
     <h3>Liquidity</h3>
     <div class="row" style="gap:6px">${(d.liquidity || []).map((l) => `<span class="chip mono">${l.kind.toUpperCase()} ${TF.num(l.price)}${l.touches > 1 ? ` ×${l.touches}` : ""}</span>`).join("") || '<span class="caption">none found</span>'}</div>
+    <h3>Liquidity traps</h3>
+    <div class="row" style="gap:6px">${(d.traps || []).slice(0, 4).map((t) => `<span class="chip ${t.dir} mono">${t.dir === "bull" ? "▲ swept lows" : "▼ swept highs"} ${t.kind.toUpperCase()} ${TF.num(t.price)}</span>`).join("") || '<span class="caption">no sweeps in view</span>'}</div>
     <div class="row" style="margin-top:var(--s5)">
       <button type="button" class="btn primary" id="zalert" ${d.alert_cond ? "" : "disabled"}>${TF.icon("bell")}Alert on OB retest</button>
       <span class="caption mono">${d.alert_cond ? esc(d.alert_cond) : "no live order block to retest"}</span>
@@ -514,6 +526,12 @@
 					for (const l of d.liquidity || []) lines.push(line(l.price, c.liq, l.kind.toUpperCase(), 1))
 				}
 				addLines()
+				// Sweeps: the bar that ran the level and closed back inside it.
+				const tmarks = (cs) =>
+					(d.traps || [])
+						.map((t) => ({ time: t.time, position: t.dir === "bull" ? "belowBar" : "aboveBar", shape: t.dir === "bull" ? "arrowUp" : "arrowDown", color: t.dir === "bull" ? cs.up : cs.down, text: "trap" }))
+						.sort((a, b) => a.time - b.time)
+				s.setMarkers(tmarks(col))
 				const vis = Math.min(d.candles.length, 90)
 				ch.timeScale().setVisibleLogicalRange({ from: d.candles.length - vis, to: d.candles.length + 3 })
 				zone.chart = ch
@@ -545,6 +563,7 @@
 					ch.applyOptions(TF.chartTheme())
 					s.applyOptions({ upColor: c.up, downColor: c.down, wickUpColor: c.up, wickDownColor: c.down })
 					addLines()
+					s.setMarkers(tmarks(c))
 				}
 			}
 			window.addEventListener("tf:theme", () => zone && zone.retheme && zone.retheme())

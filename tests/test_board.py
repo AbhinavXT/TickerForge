@@ -165,6 +165,83 @@ def test_pdh_pdl_are_always_liquidity():
     assert [(x["kind"], x["price"]) for x in lv] == [("pdl", 95), ("pdh", 110)]
 
 
+def _eqh_level(price=101.0, formed=10):
+    return {"price": price, "kind": "eqh", "touches": 2, "formed": formed}
+
+
+def test_equal_highs_record_when_they_formed():
+    c = chop(32)
+    lv = [x for x in board.liquidity_levels(c, 1.0) if x["kind"] == "eqh"][0]
+    # formed once the last swing in the cluster is confirmed, never in the future
+    assert 0 < lv["formed"] <= len(c)
+
+
+def test_wick_above_equal_highs_closing_back_is_a_bearish_trap():
+    c = chop(20)
+    t = len(c)
+    c.append(bar(t, 100.5, 100.4, hi=101.6, lo=100.2))     # runs 101, closes back
+    traps = board.liquidity_traps(c, [_eqh_level()])
+    assert len(traps) == 1
+    tr = traps[0]
+    assert tr["dir"] == "bear" and tr["i"] == t and tr["extreme"] == 101.6
+
+
+def test_close_beyond_the_level_is_a_break_not_a_trap():
+    c = chop(20)
+    t = len(c)
+    c.append(bar(t, 100.5, 101.5, hi=101.7, lo=100.4))     # closes above: broken
+    c.append(bar(t + 1, 101.5, 100.5, hi=101.8, lo=100.4)) # later wick: spent
+    assert board.liquidity_traps(c, [_eqh_level()]) == []
+
+
+def test_sweep_before_the_level_formed_does_not_count():
+    c = chop(20)
+    c[5] = bar(5, 100.5, 100.4, hi=101.6, lo=100.2)
+    assert board.liquidity_traps(c, [_eqh_level(formed=10)]) == []
+
+
+def test_sweep_below_lows_is_a_bullish_trap():
+    c = chop(20)
+    t = len(c)
+    c.append(bar(t, 99.5, 99.6, hi=99.8, lo=98.4))
+    lv = {"price": 99.0, "kind": "pdl", "touches": 1, "formed": 0}
+    assert board.liquidity_traps(c, [lv])[0]["dir"] == "bull"
+
+
+def test_pdh_pdl_form_at_the_session_open():
+    day = 86400
+    c = [bar(i * 300, 100, 100.1) for i in range(5)] + \
+        [bar(day + i * 300, 100, 100.1) for i in range(4)]
+    lv = board.liquidity_levels(c, None, pdh=101, pdl=99)
+    assert {x["formed"] for x in lv} == {5}
+
+
+def test_reversal_needs_the_zone_and_a_reason():
+    ob = {"top": 101, "bottom": 100, "dir": "bull"}
+    trap = {"i": 99, "dir": "bull"}
+    # at the zone with buyers adding OI
+    assert board.reversal_setup("bull", ob, 0.0, "long_buildup", [], 100) == \
+        {"at_zone": True, "why": ["oi"]}
+    # at the zone with a fresh sweep of lows
+    assert board.reversal_setup("bull", ob, 0.3, None, [trap], 100)["why"] == ["trap"]
+    # too far from the zone
+    assert board.reversal_setup("bull", ob, 2.0, "long_buildup", [trap], 100) is None
+    # at the zone but nothing defending it
+    assert board.reversal_setup("bull", ob, 0.0, "long_unwinding", [], 100) is None
+    # a stale sweep doesn't count
+    assert board.reversal_setup("bull", ob, 0.0, None, [{"i": 10, "dir": "bull"}], 100) is None
+    # a sweep the wrong way doesn't count
+    assert board.reversal_setup("bull", ob, 0.0, None, [{"i": 99, "dir": "bear"}], 100) is None
+    assert board.reversal_setup("choppy", ob, 0.0, "long_buildup", [], 100) is None
+
+
+def test_flags_in_phone_text():
+    r = {"reversal": {"at_zone": True, "why": ["oi"]},
+         "trap": {"dir": "bull", "kind": "pdl", "price": 99, "time": 0}}
+    assert board._flags(r) == " · REV · trap ▲PDL"
+    assert board._flags({}) == ""
+
+
 def test_cluster_groups_neighbours():
     assert board.cluster([1.0, 1.05, 3.0, 3.1, 3.12, 7], 0.15) == \
         [[1.0, 1.05], [3.0, 3.1, 3.12], [7]]
