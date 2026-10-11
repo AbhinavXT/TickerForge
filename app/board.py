@@ -505,7 +505,7 @@ def build(kite) -> dict:
                 "live": market_open(), "rows": [], "bull": [], "bear": [],
                 "breadth": breadth([]), "sectors": [],
                 "note": "No F&O futures in the instrument index — run "
-                        "`python -m app.cli sync` once to load NFO."}
+                        "`python -m app.cli sync-instruments` once to load NFO."}
     _ensure_sweeper(kite, uni)
     keys = [f"NSE:{u['symbol']}" for u in uni] + [f"NFO:{u['fut']}" for u in uni]
     quotes: dict = {}

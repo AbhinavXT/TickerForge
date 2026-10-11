@@ -329,7 +329,7 @@ leaks from the local `.env`), `test_paper_autopilot` (watcher lacks `maybe_eveni
 - ~~`/api/portfolio` without a Kite session kills the server process.~~ **Fixed**
   (`061526d`), along with `POST /api/watchlist/{unknown}`, which did the same. Every
   `/api` route was then called with the session removed; none lets `SystemExit` escape.
-- Run `python -m app.cli sync` once so NFO futures (and expiries) land; the Board is empty
+- Run `python -m app.cli sync-instruments` once so NFO futures (and expiries) land; the Board is empty
   until then.
 - Market-hours check a live Board: OI change fills ~1 min after the first build of the day;
   scores and ranks need real data to sanity-check the weights in `board.py`.
