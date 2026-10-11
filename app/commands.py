@@ -108,6 +108,8 @@ HELP = (
     "\nResearch (any stock — fetched on demand, watchlist or not):\n"
     "/results [SYM|all|latest]  quarter numbers, the awaited date, or market feed\n"
     "/valuation SYM   ·  /fundamentals SYM  ·  /news SYM  ·  /dividends SYM\n"
+    "/candles SYM [day|5minute|minute] [count]   price history for the\n"
+    "                NewsForge chart (sent as data, not a picture)\n"
     "\nSystem:\n"
     "/health         are the four services actually running?\n"
     "/approve TOKEN pin=XXXX   place a proposed order (single use)\n"
@@ -405,6 +407,160 @@ def cmd_price(sym: str) -> str:
                 f"L {_fmt_money(last['low'])}  V {last['volume']:,}")
     except (Exception, SystemExit) as e:
         return f"Price lookup failed: {e}"
+
+
+# ------------------------------------------------------- candles for the phone
+# Bytes kept back from the message limit for the JSON around the bars.
+# The wrapper is about 120 characters; the rest is slack for a long symbol.
+_PAYLOAD_OVERHEAD = 220
+
+
+def _split_by_size(rows: list[str], limit: int) -> list[list[str]]:
+    """Group encoded rows into messages that fit the server's limit.
+
+    Measured rather than estimated. A row is between 41 and 53 characters
+    depending on how wide the price is — three digits for most of the market,
+    six for MRF — so a fixed bar count has to assume the worst and wastes a
+    third of every message on anything normal. Filling to the actual byte
+    budget means a self-hosted 64 KB server sends a year in one message and a
+    4 KB one still never overflows.
+    """
+    budget = max(limit - _PAYLOAD_OVERHEAD, 512)
+    out, current, size = [], [], 0
+    for row in rows:
+        cost = len(row) + 1                       # the ';' that joins it
+        if current and size + cost > budget:
+            out.append(current)
+            current, size = [], 0
+        current.append(row)
+        size += cost
+    if current:
+        out.append(current)
+    return out
+
+# Bars a trading day yields, per interval, used to turn a bar COUNT into the
+# day window candles.get() wants. Deliberately generous: asking for a few extra
+# days costs nothing (the store is already topped up) and coming up short means
+# the chart silently draws less history than was asked for.
+BARS_PER_DAY = {"minute": 375, "3minute": 125, "5minute": 75,
+                "10minute": 38, "15minute": 25, "30minute": 13,
+                "60minute": 7, "day": 1}
+
+
+def _candle_rows(bars: list[dict]) -> tuple[int, str]:
+    """Encode bars as `t0` plus one positional string.
+
+    The reader flattens JSON payloads to dotted keys and skips arrays outright,
+    so the bars cannot travel as a list of objects — and at ~40 bytes a row
+    that shape would blow the message limit anyway. Hence: rows separated by
+    `;`, fields by `,`, offsets measured from the bar before.
+
+    Times come from candles.series_utc(), not candles.get(): the latter carries
+    IST_OFFSET so lightweight-charts renders UTC as IST, and resolves naive
+    timestamps in the machine's own zone. Both are right for the local chart and
+    wrong on the wire — the phone stores these as real epoch millis.
+    """
+    t0 = bars[0]["time"]
+    out, prev = [], t0
+    for b in bars:
+        out.append(_encode_row(b, prev))
+        prev = b["time"]
+    return t0, ";".join(out)
+
+
+def _encode_row(bar: dict, previous_time: int) -> str:
+    """One bar: seconds since the bar before, then open/high/low/close/volume."""
+    return (
+        f"{bar['time'] - previous_time},{round(bar['open'], 2)},"
+        f"{round(bar['high'], 2)},{round(bar['low'], 2)},"
+        f"{round(bar['close'], 2)},{int(bar['volume'] or 0)}"
+    )
+
+
+def cmd_candles(args: list[str]):
+    """/candles SYM [interval] [count] — price history for the NewsForge chart.
+
+    Read-only: it fetches and publishes, it changes nothing, so it sits with
+    /price and /levels rather than behind the PIN.
+
+    Replies as several ordinary messages rather than one chunked transfer. The
+    phone keys bars on (symbol, interval, open time), so each message is an
+    independent upsert — order does not matter, a lost one is re-requested by
+    the next open, and a duplicate is harmless. That same property is what lets
+    a single-bar message correct the bar still forming.
+    """
+    if not args:
+        return "Usage: /candles SYM [day|5minute|minute] [count]"
+    sym = args[0]
+    interval = args[1] if len(args) > 1 else "day"
+    if interval not in candles.INTERVAL_MAX_DAYS:
+        return (f"Unknown interval {interval}. "
+                f"One of: {', '.join(sorted(candles.INTERVAL_MAX_DAYS))}")
+    try:
+        count = int(args[2]) if len(args) > 2 else 300
+    except ValueError:
+        return f"Bad count {args[2]!r} — expected a number."
+    count = max(1, min(count, 2000))
+
+    inst = instruments.lookup(sym)
+    if not inst:
+        return f"Unknown symbol {sym}."
+    kite = _kite_or_none()
+    if not kite:
+        return "No Kite session — log in first."
+
+    token, tradingsymbol = inst["instrument_token"], inst["tradingsymbol"]
+    # Calendar days, not trading days: ~250 sessions a year, so pad by half
+    # again and let the slice below take exactly what was asked for.
+    per_day = BARS_PER_DAY.get(interval, 1)
+    days = max(2, int(count / per_day * 1.5) + 2)
+    try:
+        candles.ensure(kite, token, interval, days)
+        bars = candles.series_utc(token, interval, days)
+    except (Exception, SystemExit) as e:
+        return f"Candles failed for {tradingsymbol}: {e}"
+    if not bars:
+        return f"No {interval} candles for {tradingsymbol}."
+    bars = bars[-count:]
+
+    # Encode once, then group by size. The offsets are cumulative, so each group
+    # is re-encoded from its own first bar to keep every message self-contained.
+    # Widths only — each group is re-encoded from its own first bar below, so
+    # these are measured against the preceding bar purely to size the split.
+    widths = [
+        _encode_row(bar, previous["time"])
+        for bar, previous in zip(bars, [bars[0]] + bars[:-1])
+    ]
+    groups = _split_by_size(widths, config.NTFY_MESSAGE_LIMIT)
+
+    sent = 0
+    index = 0
+    for group in groups:
+        chunk = bars[index:index + len(group)]
+        index += len(group)
+        t0, rows = _candle_rows(chunk)
+        payload = json.dumps({
+            "nf": 1,
+            "kind": "candles",
+            "symbol": tradingsymbol,
+            "interval": interval,
+            "t0": t0,
+            "bars": rows,
+        }, separators=(",", ":"))
+        # priority=min: these are data for the reader, not something to buzz
+        # about. The phone polls the topic either way.
+        # Stop at the first refusal instead of pushing the rest at a closed
+        # door. The phone keys bars on (symbol, interval, open time), so a
+        # partial history is simply less history — the next time the screen is
+        # opened it asks again and the gap fills in.
+        if not notify.send(payload, title=f"{tradingsymbol} {interval} candles",
+                           priority="min", tags="chart_with_upwards_trend"):
+            print(f"  candles: stopped after {sent} of {len(groups)} messages")
+            break
+        sent += 1
+    print(f"  candles: {tradingsymbol} {interval} "
+          f"{len(bars)} bars in {sent} messages")
+    return None                        # payloads already pushed; no extra buzz
 
 
 def _kite_or_none():
@@ -1421,7 +1577,8 @@ MULTI_ARG = {"alert": cmd_alert, "size": cmd_size, "log": cmd_log,
              "close": cmd_close, "amend": cmd_amend, "batch": cmd_batch,
              "heatmap": cmd_heatmap, "sweep": cmd_heatmap,
              "scan": cmd_scan, "scanner": cmd_scan,
-             "wf": cmd_walkforward, "walkforward": cmd_walkforward}
+             "wf": cmd_walkforward, "walkforward": cmd_walkforward,
+             "candles": cmd_candles, "bars": cmd_candles}
 
 # Commands that CHANGE STATE rather than just report it. Listed explicitly so
 # the read/write split is visible in code — this set is what NTFY_CMD_PIN

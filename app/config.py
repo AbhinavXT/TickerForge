@@ -23,6 +23,15 @@ NTFY_TOPIC = os.getenv("NTFY_TOPIC", "")
 # ntfy.sh with a reserved topic) this is what actually protects the channel —
 # the topic name alone is only a secret until someone reads it over a shoulder.
 NTFY_TOKEN = os.getenv("NTFY_TOKEN", "")
+
+# Biggest message the ntfy server will accept, in bytes.
+#
+# ntfy.sh caps this at 4 KB; a self-hosted instance sets whatever
+# `message-size-limit` says. It matters because a price history is split to fit
+# — at 4 KB that is five messages for a year, and at 64 KB it is one. Kept as a
+# figure rather than a batch size so the split follows the server rather than a
+# constant somebody has to remember to change.
+NTFY_MESSAGE_LIMIT = int(os.getenv("NTFY_MESSAGE_LIMIT", "4096"))
 # Optional PIN required by state-changing phone commands (/alert, /unalert).
 # Weak by design — see the security note in commands.py — but better than the
 # topic name being the only thing between a stranger and your armed alerts.

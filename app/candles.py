@@ -6,7 +6,7 @@ now, chunked to Kite's per-request date-range caps and throttled under the
 the default window; later loads are near-instant.
 """
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import duckdb
 
@@ -213,6 +213,38 @@ def get(token: int, interval: str, days: int) -> list[dict]:
     return [
         {
             "time": int(ts.timestamp()) + IST_OFFSET,
+            "open": o, "high": h, "low": l, "close": cl, "volume": v,
+        }
+        for ts, o, h, l, cl, v in rows
+    ]
+
+
+IST = timezone(timedelta(seconds=IST_OFFSET))
+
+
+def series_utc(token: int, interval: str, days: int) -> list[dict]:
+    """Candles with true UTC epoch seconds — for anything leaving this machine.
+
+    get() is built for the local chart and is wrong for a wire format twice
+    over: it adds IST_OFFSET so lightweight-charts renders UTC as IST, and it
+    calls .timestamp() on a naive value, which Python resolves in whatever zone
+    the box happens to be set to. Locally the two cancel out and nobody notices.
+
+    Stored timestamps are IST wall clock — Kite returns tz-aware datetimes and
+    ensure() strips the tzinfo on insert — so the fix is to say so: attach IST
+    explicitly and the epoch comes out right on any machine, in any zone, with
+    no display shift riding along.
+    """
+    since = datetime.now() - timedelta(days=days)
+    with _conn(read_only=True) as c:
+        rows = c.execute(
+            "SELECT ts, open, high, low, close, volume FROM candles "
+            "WHERE token=? AND interval=? AND ts >= ? ORDER BY ts",
+            [token, interval, since],
+        ).fetchall()
+    return [
+        {
+            "time": int(ts.replace(tzinfo=IST).timestamp()),
             "open": o, "high": h, "low": l, "close": cl, "volume": v,
         }
         for ts, o, h, l, cl, v in rows
