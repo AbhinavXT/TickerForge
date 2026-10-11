@@ -4,7 +4,12 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width,initial-scale=1" />
 		<title>Paper — TickerForge</title>
+		<meta name="theme-color" content="#0b0e13" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
 		<link rel="stylesheet" href="/app.css" />
+		<script src="/ui.js"></script>
 		<style>
 			table {
 				width: 100%;
@@ -68,44 +73,46 @@
 		</style>
 	</head>
 	<body>
-		<div id="nav">
+		<div id="nav" data-page="paper">
 			<span class="brand">TickerForge</span>
+			<a class="tab" href="/board">Board</a>
 			<a class="tab" href="/">Chart</a>
 			<a class="tab" href="/desk">Desk</a>
-			<a class="tab" href="/portfolio">Portfolio</a>
 			<a class="tab" href="/scanner">Scanner</a>
 			<a class="tab" href="/screen">Screen</a>
 			<a class="tab" href="/query">Query</a>
 			<a class="tab" href="/fundamentals">Fundamentals</a>
 			<a class="tab" href="/results">Results</a>
 			<a class="tab" href="/valuation">Valuation</a>
-			<a class="tab" href="/backtest">Backtest</a>
-			<a class="tab" href="/journal">Journal</a>
 			<a class="tab" href="/metrics">Metrics</a>
-			<a class="tab on" href="/paper">Paper</a>
 			<a class="tab" href="/news">News</a>
 			<a class="tab" href="/actions">Corporate Actions</a>
+			<a class="tab" href="/portfolio">Portfolio</a>
+			<a class="tab on" href="/paper">Paper</a>
+			<a class="tab" href="/journal">Journal</a>
+			<a class="tab" href="/backtest">Backtest</a>
 			<a class="tab" href="/settings">Settings</a>
 			<span class="sp"></span>
 			<span class="status" id="status"></span>
 		</div>
+		<script>TF.shell()</script>
 
 		<div class="wrap">
-			<div class="row">
+			<div class="page-head">
 				<h2 class="page">Paper</h2>
 				<span class="sub"
-					>— the edge, tested forward, with nothing at risk</span
+					>the edge, tested forward, with nothing at risk</span
 				>
 				<div class="spacer"></div>
-				<button class="btn" id="queue">Queue today\u2019s flips</button>
+				<button class="btn" id="queue">Queue today’s flips</button>
 				<button class="btn primary" id="fill">Fill due orders</button>
 			</div>
 
 			<div class="note">
 				Orders fill at the <b>next open</b>, never the close that
-				produced the signal &mdash; you didn\u2019t know until it had
+				produced the signal &mdash; you didn’t know until it had
 				already happened. The gap between those two prices is where a
-				real strategy\u2019s profit quietly goes, so it is kept rather
+				real strategy’s profit quietly goes, so it is kept rather
 				than hidden. Costs are charged on both legs on the same basis
 				the backtester uses, and positions are sized by the same risk
 				model as <code>/size</code>. <br /><br />
